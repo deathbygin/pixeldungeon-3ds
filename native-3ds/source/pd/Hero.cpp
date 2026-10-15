@@ -241,7 +241,8 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
 
     int tile = currentLevel->get(nextCell);
     if (tile == Terrain::DOOR || tile == Terrain::SECRET_DOOR) {
-        currentLevel->destroy(nextCell);
+        currentLevel->set(nextCell, Terrain::OPEN_DOOR);
+        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_OPEN).get());
         spend(TICK);
         next();
         Dungeon::observe();

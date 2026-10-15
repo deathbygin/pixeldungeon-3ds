@@ -32,6 +32,7 @@ void Traps::trigger(int tile, int cell, Char* ch) {
         case Terrain::SECRET_FIRE_TRAP:
         case Terrain::FIRE_TRAP: {
             isTrap = true;
+            GLog::w("A fire trap was activated!");
             FX::seedBlob(cell, Blob::BlobType::FIRE, 40);
             FX::burst(cell, 0xff7708FFu, 10);
             noosa::Audio::play(noosa::Audio::getSample(Assets::SND_BURNING).get());
@@ -71,6 +72,7 @@ void Traps::trigger(int tile, int cell, Char* ch) {
         case Terrain::SECRET_TOXIC_TRAP:
         case Terrain::TOXIC_TRAP: {
             isTrap = true;
+            GLog::w("A toxic gas trap was activated!");
             FX::seedBlob(cell, Blob::BlobType::TOXIC_GAS, 300 + 20 * Dungeon::depth);
             FX::splash(cell, 0x40cc55FF, 10);
             FX::burst(cell, 0x40cc55FF, 8);
@@ -80,6 +82,7 @@ void Traps::trigger(int tile, int cell, Char* ch) {
         case Terrain::SECRET_PARALYTIC_TRAP:
         case Terrain::PARALYTIC_TRAP: {
             isTrap = true;
+            GLog::w("A paralytic gas trap was activated!");
             FX::seedBlob(cell, Blob::BlobType::PARALYTIC_GAS, 80 + 5 * Dungeon::depth);
             FX::splash(cell, 0xcccc55FF, 10);
             FX::burst(cell, 0xcccc55FF, 8);
@@ -89,6 +92,7 @@ void Traps::trigger(int tile, int cell, Char* ch) {
         case Terrain::SECRET_POISON_TRAP:
         case Terrain::POISON_TRAP: {
             isTrap = true;
+            GLog::w("A poison dart trap was activated!");
             if (ch) {
                 auto* p = ch->affect<Poison>();
                 if (p) {
@@ -103,6 +107,7 @@ void Traps::trigger(int tile, int cell, Char* ch) {
         case Terrain::SECRET_ALARM_TRAP:
         case Terrain::ALARM_TRAP: {
             isTrap = true;
+            GLog::w("An alarm trap was activated!");
             for (auto& m : Dungeon::mobs) {
                 if (m && m.get() != ch) {
                     m->beckon(cell);
@@ -123,6 +128,7 @@ void Traps::trigger(int tile, int cell, Char* ch) {
         case Terrain::SECRET_LIGHTNING_TRAP:
         case Terrain::LIGHTNING_TRAP: {
             isTrap = true;
+            GLog::w("A lightning trap was activated!");
             noosa::Audio::play(noosa::Audio::getSample(Assets::SND_LIGHTNING).get());
             FX::burst(cell, 0x66cceeFFu, 8);
             FX::burst(cell, 0xffffffffu, 6);
@@ -179,6 +185,7 @@ void Traps::trigger(int tile, int cell, Char* ch) {
         case Terrain::SECRET_GRIPPING_TRAP:
         case Terrain::GRIPPING_TRAP: {
             isTrap = true;
+            GLog::w("A gripping trap was activated!");
             if (ch) {
                 int dmg = std::max(0, (Dungeon::depth + 3) - Random::IntRange(0, ch->dr() / 2));
                 if (dmg > 0) {
@@ -201,6 +208,7 @@ void Traps::trigger(int tile, int cell, Char* ch) {
         case Terrain::SECRET_SUMMONING_TRAP:
         case Terrain::SUMMONING_TRAP: {
             isTrap = true;
+            GLog::w("A summoning trap was activated!");
             if (Dungeon::depth % 5 != 0) { // Not on boss floors
                 int nMobs = 2;
                 if (Random::Int(2) == 0) {
@@ -249,6 +257,7 @@ void Traps::trigger(int tile, int cell, Char* ch) {
         case Terrain::SECRET_TELEPORTATION_TRAP:
         case Terrain::TELEPORTATION_TRAP: {
             isTrap = true;
+            GLog::w("A teleportation trap was activated!");
             if (ch) {
                 int newPos = -1;
                 int count = 10;
