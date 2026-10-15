@@ -35,6 +35,7 @@ private:
     bool m_open = false;
     std::string m_title;
     std::string m_message;
+    std::vector<std::string> m_messageLines;
     std::vector<std::string> m_options;
     OptionCallback m_callback = nullptr;
 

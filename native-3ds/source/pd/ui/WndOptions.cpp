@@ -1,5 +1,11 @@
 #include "pd/ui/WndOptions.h"
+#include "pd/ui/Chrome.h"
+#include "pd/ui/BitmapFont.h"
+#include "pd/Assets.h"
+#include "noosa/Audio.h"
+#include <sstream>
 #include <algorithm>
+#include <cmath>
 
 namespace pd::ui {
 
@@ -19,20 +25,54 @@ void WndOptions::show(std::string title, std::string message,
     m_selected = 0;
     m_open = true;
 
-    // Recalculate layout
-    m_w = 280.0f;
+    // Proportional modal width matching Pixel Dungeon UI window styling
+    m_w = 190.0f;
     m_x = (320.0f - m_w) * 0.5f;
 
-    float btnH = 24.0f;
+    // Word-wrap message into lines using authentic BitmapFont metrics
+    m_messageLines.clear();
+    if (!m_message.empty()) {
+        float maxMsgW = m_w - 24.0f;
+        std::stringstream ss(m_message);
+        std::string word;
+        std::string currentLine;
+        while (ss >> word) {
+            float wordW = BitmapFont::width(BitmapFont::FontType::Font1x, word);
+            float lineW = currentLine.empty() ? 0.0f : (BitmapFont::width(BitmapFont::FontType::Font1x, currentLine) + 3.0f);
+            if (!currentLine.empty() && (lineW + wordW) > maxMsgW) {
+                m_messageLines.push_back(currentLine);
+                currentLine = word;
+            } else {
+                if (!currentLine.empty()) currentLine += " ";
+                currentLine += word;
+            }
+        }
+        if (!currentLine.empty()) {
+            m_messageLines.push_back(currentLine);
+        }
+    }
+
+    float btnH = 22.0f;
     float btnSpacing = 6.0f;
-    float totalBtnH = m_options.size() * (btnH + btnSpacing);
-    m_h = 75.0f + totalBtnH;
+    float totalBtnH = m_options.empty() ? 0.0f : (m_options.size() * btnH + (m_options.size() - 1) * btnSpacing);
+
+    float topPadding = 14.0f;
+    float titleH = 10.0f;
+    float titleToMsgGap = m_messageLines.empty() ? 0.0f : 8.0f;
+    float msgH = m_messageLines.size() * 11.0f;
+    float msgToBtnGap = m_options.empty() ? 0.0f : (m_messageLines.empty() ? 8.0f : 12.0f);
+    float bottomPadding = 14.0f;
+
+    m_h = topPadding + titleH + titleToMsgGap + msgH + msgToBtnGap + totalBtnH + bottomPadding;
     m_y = (240.0f - m_h) * 0.5f;
 
     m_buttonLayouts.clear();
-    float curY = m_y + m_h - totalBtnH - 8.0f;
+    float curY = m_y + topPadding + titleH + titleToMsgGap + msgH + msgToBtnGap;
+    float btnW = m_w - 24.0f;
+    float btnX = m_x + 12.0f;
+
     for (size_t i = 0; i < m_options.size(); ++i) {
-        m_buttonLayouts.push_back({ m_x + 16.0f, curY, m_w - 32.0f, btnH });
+        m_buttonLayouts.push_back({ btnX, curY, btnW, btnH });
         curY += btnH + btnSpacing;
     }
 }
@@ -44,32 +84,49 @@ void WndOptions::hide() {
 bool WndOptions::update(const TouchController& touch, u32 kDown) {
     if (!m_open) return false;
 
-    // Hardware D-pad up/down navigation
+    // Hardware D-pad / Circle Pad up/down navigation
     if (kDown & (KEY_DUP | KEY_CPAD_UP)) {
         if (m_selected > 0) m_selected--;
+        else m_selected = static_cast<int>(m_buttonLayouts.size()) - 1;
+        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
         return true;
     }
     if (kDown & (KEY_DDOWN | KEY_CPAD_DOWN)) {
-        if (m_selected + 1 < static_cast<int>(m_options.size())) m_selected++;
+        if (m_selected + 1 < static_cast<int>(m_buttonLayouts.size())) m_selected++;
+        else m_selected = 0;
+        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
         return true;
     }
 
-    // Hardware confirmation / cancel
+    // Hardware confirmation A
     if (kDown & KEY_A) {
         int choice = m_selected;
+        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
         hide();
         if (m_callback) m_callback(choice);
         return true;
     }
-    if (kDown & KEY_B) {
-        // Option index 1 (usually Cancel / No) or last option
-        int cancelIdx = (m_options.size() > 1) ? 1 : 0;
+
+    // Hardware cancel B or START
+    if (kDown & (KEY_B | KEY_START)) {
+        int cancelIdx = (m_options.size() > 1) ? static_cast<int>(m_options.size() - 1) : 0;
+        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
         hide();
         if (m_callback) m_callback(cancelIdx);
         return true;
     }
 
-    // Stylus Touch handling
+    // Tap outside window on dark overlay to cancel
+    noosa::RectF windowRect(m_x, m_y, m_w, m_h);
+    if (touch.justReleased() && !windowRect.contains(touch.pos().x, touch.pos().y)) {
+        int cancelIdx = (m_options.size() > 1) ? static_cast<int>(m_options.size() - 1) : 0;
+        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        hide();
+        if (m_callback) m_callback(cancelIdx);
+        return true;
+    }
+
+    // Stylus Touch handling for option buttons
     for (size_t i = 0; i < m_buttonLayouts.size(); ++i) {
         const auto& b = m_buttonLayouts[i];
         noosa::RectF r(b.x, b.y, b.w, b.h);
@@ -77,6 +134,7 @@ bool WndOptions::update(const TouchController& touch, u32 kDown) {
             m_selected = static_cast<int>(i);
         }
         if (touch.clicked(r)) {
+            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
             hide();
             if (m_callback) m_callback(static_cast<int>(i));
             return true;
@@ -87,71 +145,46 @@ bool WndOptions::update(const TouchController& touch, u32 kDown) {
 }
 
 void WndOptions::draw(C2D_TextBuf textBuf) {
+    (void)textBuf;
     if (!m_open) return;
 
     // 1. Darken background overlay
     C2D_DrawRectSolid(0.0f, 0.0f, 0.80f, 320.0f, 240.0f, C2D_Color32(0x00, 0x00, 0x00, 0xAA));
 
-    // 2. Dialog box background (matching Pixel Dungeon's WndOptions style)
-    u32 boxBg = C2D_Color32(0x22, 0x1d, 0x2a, 0xFA);
-    u32 borderCol = C2D_Color32(0x5a, 0x47, 0x41, 0xFF);
+    // 2. 9-slice stone window chrome from chrome.png
+    Chrome::get(Chrome::Type::WINDOW).draw(m_x, m_y, m_w, m_h, 0.82f);
 
-    C2D_DrawRectSolid(m_x, m_y, 0.82f, m_w, m_h, boxBg);
+    // 3. Title text in golden yellow with 1px drop-shadow
+    float titleW = BitmapFont::width(BitmapFont::FontType::Font1x, m_title);
+    float titleX = std::round(m_x + (m_w - titleW) * 0.5f);
+    float titleY = m_y + 14.0f;
+    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, m_title, titleX, titleY, 0.86f, 0xFFEBA4FF, 0x000000FF);
 
-    // Frame borders
-    C2D_DrawRectSolid(m_x, m_y, 0.83f, m_w, 2.0f, borderCol);
-    C2D_DrawRectSolid(m_x, m_y + m_h - 2.0f, 0.83f, m_w, 2.0f, borderCol);
-    C2D_DrawRectSolid(m_x, m_y, 0.83f, 2.0f, m_h, borderCol);
-    C2D_DrawRectSolid(m_x + m_w - 2.0f, m_y, 0.83f, 2.0f, m_h, borderCol);
-
-    // 3. Title text (Golden yellow title color)
-    C2D_Text titleObj;
-    C2D_TextParse(&titleObj, textBuf, m_title.c_str());
-    C2D_TextOptimize(&titleObj);
-    float tW = 0.0f, tH = 0.0f;
-    C2D_TextGetDimensions(&titleObj, 0.42f, 0.42f, &tW, &tH);
-    float titleX = m_x + (m_w - tW) * 0.5f;
-    float titleY = m_y + 12.0f;
-    C2D_DrawText(&titleObj, C2D_WithColor, titleX, titleY, 0.85f, 0.42f, 0.42f, C2D_Color32(0xff, 0xcc, 0x44, 0xFF));
-
-    // 4. Message text
-    if (!m_message.empty()) {
-        C2D_Text msgObj;
-        C2D_TextParse(&msgObj, textBuf, m_message.c_str());
-        C2D_TextOptimize(&msgObj);
-        float mW = 0.0f, mH = 0.0f;
-        C2D_TextGetDimensions(&msgObj, 0.36f, 0.36f, &mW, &mH);
-        float msgX = m_x + (m_w - mW) * 0.5f;
-        float msgY = titleY + tH + 6.0f;
-        C2D_DrawText(&msgObj, C2D_WithColor, msgX, msgY, 0.85f, 0.36f, 0.36f, C2D_Color32(0xdd, 0xdd, 0xdd, 0xFF));
+    // 4. Message text lines in readable light grey with 1px drop-shadow
+    float curMsgY = titleY + 16.0f;
+    for (const auto& line : m_messageLines) {
+        float lineW = BitmapFont::width(BitmapFont::FontType::Font1x, line);
+        float lineX = std::round(m_x + (m_w - lineW) * 0.5f);
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, line, lineX, curMsgY, 0.86f, 0xCACFC2FF, 0x000000FF);
+        curMsgY += 11.0f;
     }
 
-    // 5. Option buttons (Red buttons matching original RedButton)
+    // 5. Option buttons (RedButton 9-slice from chrome.png with BitmapFont labels)
+    const auto& btnPatch = Chrome::get(Chrome::Type::BUTTON);
     for (size_t i = 0; i < m_buttonLayouts.size(); ++i) {
         const auto& b = m_buttonLayouts[i];
         bool isSel = (m_selected == static_cast<int>(i));
 
-        u32 btnBg = isSel ? C2D_Color32(0xa6, 0x30, 0x30, 0xFF) : C2D_Color32(0x6e, 0x22, 0x22, 0xFF);
-        u32 btnBorder = isSel ? C2D_Color32(0xff, 0xaa, 0xaa, 0xFF) : C2D_Color32(0x3e, 0x12, 0x12, 0xFF);
+        float brightness = isSel ? 1.35f : 1.0f;
+        btnPatch.draw(b.x, b.y, b.w, b.h, 0.84f, 0xFFFFFFFF, brightness);
 
-        C2D_DrawRectSolid(b.x, b.y, 0.85f, b.w, b.h, btnBg);
-        C2D_DrawRectSolid(b.x, b.y, 0.86f, b.w, 1.0f, btnBorder);
-        C2D_DrawRectSolid(b.x, b.y + b.h - 1.0f, 0.86f, b.w, 1.0f, btnBorder);
-        C2D_DrawRectSolid(b.x, b.y, 0.86f, 1.0f, b.h, btnBorder);
-        C2D_DrawRectSolid(b.x + b.w - 1.0f, b.y, 0.86f, 1.0f, b.h, btnBorder);
+        float textW = BitmapFont::width(BitmapFont::FontType::Font1x, m_options[i]);
+        float textX = std::round(b.x + (b.w - textW) * 0.5f);
+        float textY = std::round(b.y + (b.h - 8.0f) * 0.5f);
 
-        C2D_Text optObj;
-        C2D_TextParse(&optObj, textBuf, m_options[i].c_str());
-        C2D_TextOptimize(&optObj);
-        float oW = 0.0f, oH = 0.0f;
-        C2D_TextGetDimensions(&optObj, 0.38f, 0.38f, &oW, &oH);
-        float optX = b.x + (b.w - oW) * 0.5f;
-        float optY = b.y + (b.h - oH) * 0.5f;
-
-        u32 optCol = isSel ? C2D_Color32(0xff, 0xff, 0x88, 0xFF) : C2D_Color32(0xca, 0xcf, 0xc2, 0xFF);
-        C2D_DrawText(&optObj, C2D_WithColor, optX, optY, 0.88f, 0.38f, 0.38f, optCol);
+        u32 textColor = isSel ? 0xFFEE88FF : 0xFFFFFFFF;
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, m_options[i], textX, textY, 0.86f, textColor, 0x000000FF);
     }
 }
 
 } // namespace pd::ui
-
