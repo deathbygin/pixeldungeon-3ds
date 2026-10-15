@@ -207,6 +207,8 @@ static constexpr struct { int16_t x; int16_t w; } GLYPHS_2X[95] = {
 
 static std::shared_ptr<noosa::Texture> s_tex1x;
 static std::shared_ptr<noosa::Texture> s_tex2x;
+static std::shared_ptr<noosa::Texture> s_tex1xInk;
+static std::shared_ptr<noosa::Texture> s_tex2xInk;
 
 static void setupSubTex(Tex3DS_SubTexture& sub, int potW, int potH, int fx, int fy, int fw, int fh) {
     sub.width = static_cast<u16>(fw);
@@ -220,21 +222,26 @@ static void setupSubTex(Tex3DS_SubTexture& sub, int potW, int potH, int fx, int 
 void BitmapFont::init() {
     if (!s_tex1x) s_tex1x = noosa::Texture::get(Assets::FONTS1X);
     if (!s_tex2x) s_tex2x = noosa::Texture::get(Assets::FONTS2X);
+    if (!s_tex1xInk) s_tex1xInk = noosa::Texture::get(Assets::FONTS1X_INK);
+    if (!s_tex2xInk) s_tex2xInk = noosa::Texture::get(Assets::FONTS2X_INK);
 }
 
 float BitmapFont::height(FontType font, float scale) {
-    return (font == FontType::Font1x ? 8.0f : 16.0f) * scale;
+    bool is1x = (font == FontType::Font1x || font == FontType::Font1xInk);
+    return (is1x ? 8.0f : 16.0f) * scale;
 }
 
 float BitmapFont::lineHeight(FontType font, float scale) {
-    return (font == FontType::Font1x ? 9.0f : 17.0f) * scale;
+    bool is1x = (font == FontType::Font1x || font == FontType::Font1xInk);
+    return (is1x ? 9.0f : 17.0f) * scale;
 }
 
 float BitmapFont::width(FontType font, const std::string& text, float scale) {
+    bool is1x = (font == FontType::Font1x || font == FontType::Font1xInk);
     float curW = 0.0f;
     float maxW = 0.0f;
     float tracking = 0.0f * scale;
-    float spaceW = (font == FontType::Font1x ? 4.0f : 6.0f) * scale;
+    float spaceW = (is1x ? 4.0f : 6.0f) * scale;
 
     for (char c : text) {
         if (c == '\n') {
@@ -249,7 +256,7 @@ float BitmapFont::width(FontType font, const std::string& text, float scale) {
         unsigned char uc = static_cast<unsigned char>(c);
         if (uc >= 33 && uc <= 127) {
             int idx = uc - 33;
-            float gw = (font == FontType::Font1x ? GLYPHS_1X[idx].w : GLYPHS_2X[idx].w) * scale;
+            float gw = (is1x ? GLYPHS_1X[idx].w : GLYPHS_2X[idx].w) * scale;
             curW += gw + tracking;
         }
     }
@@ -258,18 +265,25 @@ float BitmapFont::width(FontType font, const std::string& text, float scale) {
 
 float BitmapFont::draw(FontType font, const std::string& text, float x, float y, float z, u32 color, float scale) {
     init();
-    auto tex = (font == FontType::Font1x ? s_tex1x : s_tex2x);
+    std::shared_ptr<noosa::Texture> tex;
+    switch (font) {
+        case FontType::Font1x:    tex = s_tex1x; break;
+        case FontType::Font2x:    tex = s_tex2x; break;
+        case FontType::Font1xInk: tex = (s_tex1xInk && s_tex1xInk->isLoaded()) ? s_tex1xInk : s_tex1x; break;
+        case FontType::Font2xInk: tex = (s_tex2xInk && s_tex2xInk->isLoaded()) ? s_tex2xInk : s_tex2x; break;
+    }
     if (!tex || !tex->isLoaded()) return x;
 
     int potW = tex->potWidth();
     int potH = tex->potHeight();
     C3D_Tex* rawTex = tex->getTex();
 
+    bool is1x = (font == FontType::Font1x || font == FontType::Font1xInk);
     float curX = std::floor(x);
     float drawY = std::floor(y);
     float tracking = 0.0f * scale;
-    float spaceW = (font == FontType::Font1x ? 4.0f : 6.0f) * scale;
-    int glyphH = (font == FontType::Font1x ? 8 : 16);
+    float spaceW = (is1x ? 4.0f : 6.0f) * scale;
+    int glyphH = (is1x ? 8 : 16);
     int glyphSrcY = 0;
 
     C2D_ImageTint tint;
@@ -290,8 +304,8 @@ float BitmapFont::draw(FontType font, const std::string& text, float x, float y,
         unsigned char uc = static_cast<unsigned char>(c);
         if (uc >= 33 && uc <= 127) {
             int idx = uc - 33;
-            int gx = (font == FontType::Font1x ? GLYPHS_1X[idx].x : GLYPHS_2X[idx].x);
-            int gw = (font == FontType::Font1x ? GLYPHS_1X[idx].w : GLYPHS_2X[idx].w);
+            int gx = (is1x ? GLYPHS_1X[idx].x : GLYPHS_2X[idx].x);
+            int gw = (is1x ? GLYPHS_1X[idx].w : GLYPHS_2X[idx].w);
 
             setupSubTex(sub, potW, potH, gx, glyphSrcY, gw, glyphH);
             C2D_Image img = { rawTex, &sub };
@@ -322,7 +336,13 @@ float BitmapFont::drawWithShadow(FontType font, const std::string& text, float x
 
 float BitmapFont::drawMultiline(FontType font, const std::string& text, float x, float y, float maxWidth, float z, u32 color, float scale) {
     init();
-    auto tex = (font == FontType::Font1x ? s_tex1x : s_tex2x);
+    std::shared_ptr<noosa::Texture> tex;
+    switch (font) {
+        case FontType::Font1x:    tex = s_tex1x; break;
+        case FontType::Font2x:    tex = s_tex2x; break;
+        case FontType::Font1xInk: tex = (s_tex1xInk && s_tex1xInk->isLoaded()) ? s_tex1xInk : s_tex1x; break;
+        case FontType::Font2xInk: tex = (s_tex2xInk && s_tex2xInk->isLoaded()) ? s_tex2xInk : s_tex2x; break;
+    }
     if (!tex || !tex->isLoaded()) return y;
 
     float curX = x;

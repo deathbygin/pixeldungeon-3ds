@@ -25,6 +25,8 @@ public:
     inline static const std::string FONTS2X       = "romfs:/font2x.png";
     inline static const std::string FONTS25X      = "romfs:/font25x.png";
     inline static const std::string FONTS3X       = "romfs:/font3x.png";
+    inline static const std::string FONTS1X_INK   = "romfs:/font1x_ink.png";
+    inline static const std::string FONTS2X_INK   = "romfs:/font2x_ink.png";
 
     // Hero Spritesheets (12x15 per frame)
     inline static const std::string WARRIOR       = "romfs:/warrior.png";

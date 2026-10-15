@@ -52,9 +52,9 @@ void WndStory::wrapText(const std::string& text, float maxW) {
         std::string word;
         std::string currentLine;
         while (ss >> word) {
-            float wordW = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, word);
+            float wordW = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1xInk, word);
             float spaceW = 4.0f;
-            float lineW = currentLine.empty() ? 0.0f : (pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, currentLine) + spaceW);
+            float lineW = currentLine.empty() ? 0.0f : (pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1xInk, currentLine) + spaceW);
             if (!currentLine.empty() && (lineW + wordW) > maxW) {
                 m_lines.push_back(currentLine);
                 currentLine = word;
@@ -118,26 +118,26 @@ void WndStory::draw(C2D_TextBuf textBuf) {
     pd::ui::Chrome::get(pd::ui::Chrome::Type::SCROLL).draw(m_x, m_y, m_w, m_h, 0.86f);
 
     // 3. Chapter Title (Dark sepia ink in authentic BitmapFont)
-    float tW = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, m_chapterTitle);
+    float tW = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1xInk, m_chapterTitle);
     float titleX = std::round(m_x + (m_w - tW) * 0.5f);
     float titleY = m_y + 16.0f;
-    pd::ui::BitmapFont::draw(pd::ui::BitmapFont::FontType::Font1x, m_chapterTitle, titleX, titleY, 0.88f, C2D_Color32(0x4a, 0x2e, 0x16, 0xFF));
+    pd::ui::BitmapFont::draw(pd::ui::BitmapFont::FontType::Font1xInk, m_chapterTitle, titleX, titleY, 0.88f, C2D_Color32(0x54, 0x2a, 0x10, 0xFF));
 
     // 4. Parchment Story Text (Deep dark ink matching source Pixel Dungeon)
     float lineY = titleY + 14.0f;
     for (const auto& line : m_lines) {
         if (!line.empty()) {
-            pd::ui::BitmapFont::draw(pd::ui::BitmapFont::FontType::Font1x, line, m_x + 18.0f, lineY, 0.88f, C2D_Color32(0x28, 0x1e, 0x12, 0xFF));
+            pd::ui::BitmapFont::draw(pd::ui::BitmapFont::FontType::Font1xInk, line, m_x + 18.0f, lineY, 0.88f, C2D_Color32(0x28, 0x1a, 0x12, 0xFF));
         }
         lineY += 10.0f;
     }
 
     // 5. "Tap to continue" prompt (Faded ink in authentic BitmapFont)
     std::string promptStr = "-- Tap or press [A] to continue --";
-    float pW = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, promptStr);
+    float pW = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1xInk, promptStr);
     float promptX = std::round(m_x + (m_w - pW) * 0.5f);
     float promptY = m_y + m_h - 18.0f;
-    pd::ui::BitmapFont::draw(pd::ui::BitmapFont::FontType::Font1x, promptStr, promptX, promptY, 0.88f, C2D_Color32(0x7a, 0x62, 0x48, 0xFF));
+    pd::ui::BitmapFont::draw(pd::ui::BitmapFont::FontType::Font1xInk, promptStr, promptX, promptY, 0.88f, C2D_Color32(0x6e, 0x54, 0x3c, 0xFF));
 }
 
 } // namespace pd::windows

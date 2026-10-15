@@ -11,7 +11,9 @@ class BitmapFont {
 public:
     enum class FontType {
         Font1x,
-        Font2x
+        Font2x,
+        Font1xInk,
+        Font2xInk
     };
 
     static void init();
