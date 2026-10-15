@@ -133,6 +133,7 @@ public:
     static constexpr int STEAK              = 114;
     static constexpr int OVERPRICED         = 115;
     static constexpr int CARPACCIO          = 116;
+    static constexpr int MASTERY            = 82;
 };
 
 } // namespace pd

@@ -2,11 +2,14 @@
 
 #include "Char.h"
 #include "Belongings.h"
+#include "HeroSubClass.h"
 
 namespace pd {
 
 class Level;
 class Heap;
+
+class MissileWeapon;
 
 class Hero : public Char {
 public:
@@ -18,18 +21,27 @@ public:
     };
 
     HeroClass heroClass = HeroClass::Warrior;
+    HeroSubClass subClass = HeroSubClass::None;
     int STR = 10;
     int exp = 0;
     int level = 1;
     int maxExp = 5;
     int gold = 0;
+    float awareness = 0.1f;
 
     Belongings belongings;
+    MissileWeapon* rangedWeapon = nullptr;
     bool waitingForInput = true;
     bool restoreHealth = false;
 
     Hero();
+    explicit Hero(HeroClass cl);
     ~Hero() override = default;
+
+    std::string className() const;
+    void updateAwareness();
+
+    void initClass(HeroClass cl);
 
     CharSprite* getSprite() override;
     void updateArmorTier();
@@ -38,13 +50,17 @@ public:
     bool act() override;
     void interrupt() override;
     void die(Actor* src) override;
+    void damage(int dmg, Actor* src) override;
+    float speed() const override;
 
     // Turn actions
     bool stepTo(int nextCell, Level* currentLevel);
-    bool pickUp(Level* currentLevel = nullptr);
+    bool pickUp(Level* currentLevel = nullptr, bool spendTurn = true);
     void openContainer(Heap* heap, int targetCell);
     void rest(bool tillHealthy = true);
     bool search(Level* currentLevel, bool intentional = true);
+
+    bool shoot(Char* enemy, MissileWeapon* wep);
 
     void earnExp(int amount);
 

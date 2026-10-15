@@ -1,4 +1,5 @@
 #include "pd/Hero.h"
+#include "pd/Item.h"
 #include "pd/CharSprite.h"
 #include "pd/Dungeon.h"
 #include "pd/Level.h"
@@ -15,34 +16,139 @@
 
 namespace pd {
 
-Hero::Hero() {
+Hero::Hero() : Hero(HeroClass::Warrior) {}
+
+Hero::Hero(HeroClass cl) {
     name = "Hero";
-    HP = 20;
-    HT = 20;
-    STR = 11;
     viewDistance = 8;
     waitingForInput = true;
     restoreHealth = false;
 
-    // Starting gear (Warrior default)
-    auto dagger = std::make_unique<Weapon>("Dagger", 2, 5, 10);
-    dagger->identify();
+    initClass(cl);
+    live();
+}
+
+std::string Hero::className() const {
+    if (subClass != HeroSubClass::None) {
+        return subClassTitle(subClass);
+    }
+    switch (heroClass) {
+        case HeroClass::Warrior:  return "Warrior";
+        case HeroClass::Mage:     return "Mage";
+        case HeroClass::Rogue:    return "Rogue";
+        case HeroClass::Huntress: return "Huntress";
+        default:                  return "Hero";
+    }
+}
+
+void Hero::updateAwareness() {
+    awareness = static_cast<float>(1.0 - std::pow(
+        (heroClass == HeroClass::Rogue ? 0.85 : 0.90),
+        (1.0 + std::min(level, 9)) * 0.5
+    ));
+}
+
+void Hero::initClass(HeroClass cl) {
+    heroClass = cl;
+    subClass = HeroSubClass::None;
+    belongings.backpack.clear();
+    belongings.equippedWeapon = nullptr;
+    belongings.equippedArmor = nullptr;
+    belongings.equippedRing1 = nullptr;
+    belongings.equippedRing2 = nullptr;
+
+    // Common starter gear
     auto clothArmor = std::make_unique<Armor>("Cloth Armor", 1, 10);
     clothArmor->identify();
-
-    belongings.equip(dagger.get());
     belongings.equip(clothArmor.get());
-
-    belongings.collect(std::move(dagger));
     belongings.collect(std::move(clothArmor));
 
-    // Starting potion & food ration
-    belongings.collect(std::make_unique<Potion>(Potion::PotionType::HEALING));
-    belongings.collect(std::make_unique<Food>());
+    auto ration = std::make_unique<Food>();
+    ration->identify();
+    belongings.collect(std::move(ration));
 
+    switch (cl) {
+        case HeroClass::Warrior: {
+            HP = 20;
+            HT = 20;
+            STR = 11; // Warriors start with 11 STR
+
+            auto sword = std::make_unique<ShortSword>();
+            sword->identify();
+            belongings.equip(sword.get());
+            belongings.collect(std::move(sword));
+
+            auto darts = std::make_unique<Dart>(8);
+            darts->identify();
+            belongings.collect(std::move(darts));
+
+            // Strength identified
+            Potion::setKnown(Potion::PotionType::STRENGTH);
+            break;
+        }
+        case HeroClass::Mage: {
+            HP = 20;
+            HT = 20;
+            STR = 10;
+
+            auto knuckles = std::make_unique<Weapon>("Knuckles", 1, 6, 10);
+            knuckles->identify();
+            belongings.equip(knuckles.get());
+            belongings.collect(std::move(knuckles));
+
+            // Wand of Magic Missile
+            auto wand = std::make_unique<WandOfMagicMissile>();
+            wand->identify();
+            belongings.collect(std::move(wand));
+
+            // Identify scroll identified
+            Scroll::setKnown(Scroll::ScrollType::IDENTIFY);
+            break;
+        }
+        case HeroClass::Rogue: {
+            HP = 20;
+            HT = 20;
+            STR = 10;
+
+            auto dagger = std::make_unique<Weapon>("Dagger", 2, 5, 10);
+            dagger->identify();
+            belongings.equip(dagger.get());
+            belongings.collect(std::move(dagger));
+
+            auto darts = std::make_unique<Dart>(8);
+            darts->identify();
+            belongings.collect(std::move(darts));
+
+            // Magic mapping scroll identified
+            Scroll::setKnown(Scroll::ScrollType::MAGIC_MAPPING);
+
+            // Ring of Shadows bonus passive
+            affect<Shadows>();
+            break;
+        }
+        case HeroClass::Huntress: {
+            HP = 15; // Huntress starts with 15 HP
+            HT = 15;
+            STR = 10;
+
+            auto dagger = std::make_unique<Weapon>("Dagger", 2, 5, 10);
+            dagger->identify();
+            belongings.equip(dagger.get());
+            belongings.collect(std::move(dagger));
+
+            auto boomerang = std::make_unique<Boomerang>();
+            boomerang->identify();
+            belongings.collect(std::move(boomerang));
+            break;
+        }
+    }
+
+    if (Badges::isUnlocked(Badges::Badge::BOSS_SLAIN_2)) {
+        belongings.collect(std::make_unique<TomeOfMastery>());
+    }
+
+    updateAwareness();
     sprite = CharSprite::createForHero(this);
-
-    live();
 }
 
 CharSprite* Hero::getSprite() {
@@ -73,6 +179,18 @@ void Hero::interrupt() {
 }
 
 bool Hero::act() {
+    // Wand recharge progression
+    for (auto& it : belongings.backpack) {
+        if (it) {
+            Wand* w = it->asWand();
+            if (w) w->updateCharge(1.0f, this);
+        }
+    }
+    if (belongings.equippedWeapon) {
+        Wand* w = belongings.equippedWeapon->asWand();
+        if (w) w->updateCharge(1.0f, this);
+    }
+
     if (restoreHealth) {
         if (isStarving() || HP >= HT) {
             restoreHealth = false;
@@ -183,7 +301,7 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
             }
 
             if (!hasAggroEnemy) {
-                pickUp(currentLevel);
+                pickUp(currentLevel, false);
             } else {
                 Item* item = heap->peek();
                 if (item) {
@@ -213,7 +331,7 @@ void Hero::openContainer(Heap* heap, int targetCell) {
     heap->open(this);
 }
 
-bool Hero::pickUp(Level* currentLevel) {
+bool Hero::pickUp(Level* currentLevel, bool spendTurn) {
     if (!currentLevel) currentLevel = Dungeon::level.get();
     if (!currentLevel) return false;
 
@@ -226,10 +344,12 @@ bool Hero::pickUp(Level* currentLevel) {
     // If standing over an unopened container, open it instead
     if (heap->type != Heap::Type::HEAP && heap->type != Heap::Type::FOR_SALE && heap->type != Heap::Type::HIDDEN) {
         openContainer(heap, pos);
-        spend(TICK);
-        next();
-        waitingForInput = false;
-        Dungeon::observe();
+        if (spendTurn) {
+            spend(TICK);
+            next();
+            waitingForInput = false;
+            Dungeon::observe();
+        }
         return true;
     }
 
@@ -265,10 +385,12 @@ bool Hero::pickUp(Level* currentLevel) {
         GLog::i("There is something else lying here.");
     }
 
-    spend(TICK);
-    next();
-    waitingForInput = false;
-    Dungeon::observe();
+    if (spendTurn) {
+        spend(TICK);
+        next();
+        waitingForInput = false;
+        Dungeon::observe();
+    }
     return true;
 }
 
@@ -347,6 +469,21 @@ bool Hero::search(Level* currentLevel, bool intentional) {
 
 void Hero::earnExp(int amount) {
     exp += amount;
+
+    // Warlock soul siphon on enemy kill
+    if (subClass == HeroSubClass::Warlock) {
+        int value = std::min(HT - HP, 1 + (Dungeon::depth - 1) / 5);
+        if (value > 0) {
+            HP += value;
+            FX::burst(pos, 0x38b764FF, 4);
+            FX::floatingText(pos, "+" + std::to_string(value), 0x38b764FF);
+        }
+        Hunger* hunger = getBuff<Hunger>();
+        if (hunger) {
+            hunger->satisfy(10);
+        }
+    }
+
     while (exp >= maxExp) {
         exp -= maxExp;
         level++;
@@ -356,6 +493,7 @@ void Hero::earnExp(int amount) {
         if (level % 5 == 0) {
             STR++;
         }
+        updateAwareness();
         GLog::h("Welcome to level " + std::to_string(level) + "!");
         Badges::validateLevelReached(level);
     }
@@ -378,14 +516,71 @@ void Hero::die(Actor* src) {
     Char::die(src);
 }
 
+void Hero::damage(int dmg, Actor* src) {
+    restoreHealth = false;
+    Char::damage(dmg, src);
+    if (subClass == HeroSubClass::Berserker && HP > 0 && HP <= HT * 0.40f) {
+        if (!getBuff<Fury>()) {
+            affect<Fury>();
+            GLog::w("You become furious!");
+            FX::floatingText(pos, "FURIOUS", 0xff3333FF);
+        }
+    }
+}
+
+float Hero::speed() const {
+    int aEnc = belongings.equippedArmor ? belongings.equippedArmor->STR - STR : 0;
+    if (aEnc > 0) {
+        return static_cast<float>(Char::speed() * std::pow(1.3, -aEnc));
+    } else {
+        float spd = Char::speed();
+        if (subClass == HeroSubClass::Freerunner && !isStarving()) {
+            return 1.6f * spd;
+        }
+        return spd;
+    }
+}
+
+bool Hero::shoot(Char* enemyChar, MissileWeapon* wep) {
+    rangedWeapon = wep;
+    bool result = attack(enemyChar);
+    rangedWeapon = nullptr;
+    return result;
+}
+
 int Hero::attackSkill(Char* target) {
-    (void)target;
-    return 10 + level * 2;
+    int skill = 10 + level * 2;
+    if (rangedWeapon && target && PathFinder::distanceChebyshev(pos, target->pos) == 1) {
+        skill /= 2; // Point-blank ranged penalty matching Java (accuracy *= 0.5f)
+    }
+    if (rangedWeapon) {
+        skill = static_cast<int>(skill * rangedWeapon->acuracyFactor(this));
+    } else if (belongings.equippedWeapon) {
+        skill = static_cast<int>(skill * belongings.equippedWeapon->acuracyFactor(this));
+    }
+    return skill;
 }
 
 int Hero::defenseSkill(Char* attacker) {
     (void)attacker;
-    return 5 + level;
+    float evasion = 1.0f;
+    if (paralysed) {
+        evasion /= 2.0f;
+    }
+    int aEnc = belongings.equippedArmor ? belongings.equippedArmor->STR - STR : 0;
+    int baseSkill = 5 + level;
+    if (aEnc > 0) {
+        return static_cast<int>(baseSkill * evasion / std::pow(1.5, aEnc));
+    } else {
+        if (heroClass == HeroClass::Rogue) {
+            if (subClass == HeroSubClass::Freerunner && !isStarving()) {
+                evasion *= 2.0f;
+            }
+            return static_cast<int>((baseSkill - aEnc) * evasion);
+        } else {
+            return static_cast<int>(baseSkill * evasion);
+        }
+    }
 }
 
 int Hero::dr() {
@@ -401,10 +596,24 @@ int Hero::dr() {
 }
 
 int Hero::damageRoll() {
-    if (belongings.equippedWeapon) {
-        return belongings.equippedWeapon->damageRoll();
+    int dmg = 0;
+    if (rangedWeapon) {
+        dmg = rangedWeapon->damageRoll(this);
+        if (heroClass == HeroClass::Huntress) {
+            int exStr = STR - rangedWeapon->STR;
+            if (exStr > 0) {
+                dmg += Random::IntRange(0, exStr);
+            }
+        }
+    } else if (belongings.equippedWeapon) {
+        dmg = belongings.equippedWeapon->damageRoll(this);
+    } else {
+        dmg = STR > 10 ? Random::IntRange(1, STR - 9) : 1;
     }
-    return Random::IntRange(1, 2) + (STR / 2);
+    if (getBuff<Fury>() != nullptr) {
+        dmg = static_cast<int>(dmg * 1.5f);
+    }
+    return dmg;
 }
 
 int Hero::stealth() const {
@@ -419,8 +628,33 @@ int Hero::stealth() const {
 }
 
 int Hero::attackProc(Char* enemy, int damage) {
-    if (belongings.equippedWeapon) {
+    if (rangedWeapon) {
+        rangedWeapon->proc(this, enemy, damage);
+        if (subClass == HeroSubClass::Sniper) {
+            SnipersMark* sm = affect<SnipersMark>();
+            if (sm) {
+                sm->targetId = enemy->id;
+            }
+        }
+    } else if (belongings.equippedWeapon) {
         belongings.equippedWeapon->proc(this, enemy, damage);
+        if (subClass == HeroSubClass::Gladiator) {
+            Combo* combo = affect<Combo>();
+            if (combo) {
+                damage += combo->hit(enemy, damage);
+            }
+        } else if (subClass == HeroSubClass::Battlemage) {
+            Wand* wand = belongings.equippedWeapon->asWand();
+            if (wand) {
+                if (wand->curCharges >= wand->maxCharges) {
+                    // Maximum charges
+                } else if (damage > 0) {
+                    wand->restoreCharge(1);
+                    GLog::i("Your wand absorbs kinetic essence and regains a charge!");
+                }
+                damage += wand->curCharges;
+            }
+        }
     }
     return damage;
 }

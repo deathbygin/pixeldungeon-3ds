@@ -18,6 +18,26 @@ std::unique_ptr<FogOfWar> Dungeon::fog = nullptr;
 bool Dungeon::visible[Level::LENGTH] = { false };
 int Dungeon::depth = 1;
 int Dungeon::gold = 0;
+std::unordered_map<int, std::vector<std::unique_ptr<Item>>> Dungeon::droppedItems;
+
+void Dungeon::dropToChasm(std::unique_ptr<Item> item) {
+    if (!item) return;
+    int nextDepth = depth + 1;
+    droppedItems[nextDepth].push_back(std::move(item));
+}
+
+void Dungeon::placeChasmItems() {
+    auto it = droppedItems.find(depth);
+    if (it != droppedItems.end() && level) {
+        for (auto& item : it->second) {
+            if (item) {
+                int pos = level->randomDestination();
+                level->drop(std::move(item), pos);
+            }
+        }
+        droppedItems.erase(it);
+    }
+}
 
 void Dungeon::init() {
     Actor::init();
@@ -132,6 +152,7 @@ void Dungeon::switchLevel(int newDepth) {
     }
 
     fog = std::make_unique<FogOfWar>(Level::WIDTH, Level::HEIGHT);
+    placeChasmItems();
     observe();
     Actor::process();
 }
@@ -298,13 +319,19 @@ void Dungeon::observe() {
     std::copy_n(level->fieldOfView, Level::LENGTH, visible);
 
     if (fog) {
-        fog->updateVisibility(visible, level->visited, nullptr);
+        fog->updateVisibility(visible, level->visited, level->mapped);
     }
 
     for (auto& mob : mobs) {
         if (mob) {
             bool wasVisible = mob->spriteVisible;
-            mob->spriteVisible = visible[mob->pos];
+            bool isVis = visible[mob->pos];
+            if (hero->heroClass == Hero::HeroClass::Huntress && mob->isAlive()) {
+                if (PathFinder::distanceChebyshev(hero->pos, mob->pos) <= 2) {
+                    isVis = true;
+                }
+            }
+            mob->spriteVisible = isVis;
             if (!wasVisible && mob->spriteVisible && hero->restoreHealth) {
                 hero->interrupt();
             }

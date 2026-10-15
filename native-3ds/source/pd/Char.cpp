@@ -6,6 +6,7 @@
 #include "pd/Level.h"
 #include "pd/Dungeon.h"
 #include "pd/Terrain.h"
+#include "pd/Hero.h"
 #include <algorithm>
 
 namespace pd {
@@ -136,7 +137,10 @@ bool Char::attack(Char* enemy) {
 
     if (acuRoll >= defRoll) {
         int dmg = damageRoll();
-        int enemyDr = Random::IntRange(0, enemy->dr());
+        Hero* heroAttacker = (this == Dungeon::hero.get()) ? Dungeon::hero.get() : nullptr;
+        int enemyDr = (heroAttacker && heroAttacker->rangedWeapon && heroAttacker->subClass == HeroSubClass::Sniper)
+            ? 0
+            : Random::IntRange(0, enemy->dr());
         int effective = std::max(0, dmg - enemyDr);
 
         effective = attackProc(enemy, effective);

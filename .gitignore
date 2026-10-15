@@ -34,3 +34,7 @@ native-3ds/build/
 *.elf
 *.lst
 *.map
+
+# Python cache
+__pycache__/
+*.pyc

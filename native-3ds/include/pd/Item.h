@@ -3,11 +3,18 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include "pd/HeroSubClass.h"
 
 namespace pd {
 
 class Char;
 class Hero;
+class Weapon;
+class Wand;
+class MissileWeapon;
+class Boomerang;
+class Dart;
+class ShortSword;
 
 enum class ItemCategory {
     Generic,
@@ -35,6 +42,12 @@ public:
     virtual std::vector<std::string> actions(Hero* hero);
     virtual bool execute(Hero* hero, const std::string& action);
 
+    virtual void cast(Hero* hero, int targetCell);
+    virtual void onThrow(int cell);
+    virtual int maxDistance(const Hero* hero = nullptr) const { (void)hero; return 6; }
+    virtual float speedFactor(Hero* hero) const { (void)hero; return 1.0f; }
+    virtual std::unique_ptr<Item> clone(int qty = 1) const;
+
     virtual bool isEquippable() const { return false; }
     virtual bool isStackable() const { return false; }
     virtual bool isUpgradable() const { return false; }
@@ -52,6 +65,13 @@ public:
 
     virtual std::string info() const;
     virtual std::string displayName() const;
+
+    virtual Weapon* asWeapon() { return nullptr; }
+    virtual Wand* asWand() { return nullptr; }
+    virtual MissileWeapon* asMissile() { return nullptr; }
+    virtual Boomerang* asBoomerang() { return nullptr; }
+    virtual Dart* asDart() { return nullptr; }
+    virtual ShortSword* asShortSword() { return nullptr; }
 };
 
 class Weapon : public Item {
@@ -64,6 +84,7 @@ public:
     int hitsToKnow = HITS_TO_KNOW;
 
     Weapon(std::string n, int minD, int maxD, int strReq);
+    Weapon* asWeapon() override { return this; }
     ItemCategory category() const override { return ItemCategory::Weapon; }
     bool isEquippable() const override { return true; }
     bool isUpgradable() const override { return true; }
@@ -75,8 +96,58 @@ public:
     std::string info() const override;
     std::string displayName() const override;
 
-    int damageRoll() const;
+    virtual float acuracyFactor(Hero* hero) const;
+    float speedFactor(Hero* hero) const override;
+    virtual int damageRoll() const;
+    virtual int damageRoll(Hero* hero) const;
     void proc(Char* attacker, Char* defender, int damage);
+};
+
+class ShortSword : public Weapon {
+public:
+    ShortSword();
+    ShortSword* asShortSword() override { return this; }
+    std::vector<std::string> actions(Hero* hero) override;
+    bool execute(Hero* hero, const std::string& action) override;
+    std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class Wand : public Weapon {
+public:
+    static constexpr int INITIAL_CHARGES = 2;
+    int maxCharges = INITIAL_CHARGES;
+    int curCharges = INITIAL_CHARGES;
+    float chargeTimer = 0.0f;
+
+    explicit Wand(std::string n = "Wand", int initialC = 2);
+    Wand* asWand() override { return this; }
+    ItemCategory category() const override { return ItemCategory::Weapon; }
+    bool isEquippable() const override { return true; }
+    bool isUpgradable() const override { return true; }
+    std::vector<std::string> actions(Hero* hero) override;
+    bool execute(Hero* hero, const std::string& action) override;
+    std::string info() const override;
+    std::string displayName() const override;
+
+    void updateCharge(float dt, Hero* hero);
+    void restoreCharge(int count = 1);
+    void upgrade() override;
+    void degrade() override;
+
+    virtual void onZap(int cell);
+    void cast(Hero* hero, int targetCell) override;
+    int maxDistance(const Hero* hero = nullptr) const override { (void)hero; return 8; }
+};
+
+class WandOfMagicMissile : public Wand {
+public:
+    WandOfMagicMissile();
+    std::vector<std::string> actions(Hero* hero) override;
+    bool execute(Hero* hero, const std::string& action) override;
+    std::string info() const override;
+    void onZap(int cell) override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
 };
 
 class Armor : public Item {
@@ -132,6 +203,11 @@ public:
     bool execute(Hero* hero, const std::string& action) override;
     std::string info() const override;
     std::string displayName() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+
+    void onThrow(int cell) override;
+    virtual void shatter(int cell);
+    int maxDistance(const Hero* hero = nullptr) const override { (void)hero; return 6; }
 
     void updatePerception();
 
@@ -177,6 +253,7 @@ public:
     bool execute(Hero* hero, const std::string& action) override;
     std::string info() const override;
     std::string displayName() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
 
     void updatePerception();
 
@@ -200,6 +277,7 @@ public:
     std::vector<std::string> actions(Hero* hero) override;
     bool execute(Hero* hero, const std::string& action) override;
     std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
 };
 
 class Dewdrop : public Item {
@@ -209,6 +287,7 @@ public:
     std::vector<std::string> actions(Hero* hero) override;
     bool execute(Hero* hero, const std::string& action) override;
     std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
 };
 
 class Gold : public Item {
@@ -219,6 +298,7 @@ public:
     std::vector<std::string> actions(Hero* hero) override;
     bool execute(Hero* hero, const std::string& action) override;
     std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
 };
 
 class Key : public Item {
@@ -247,6 +327,152 @@ public:
     IronKey();
     explicit IronKey(int d);
     std::string info() const override;
+};
+
+// =============================================================================
+// Missile Weapons
+// =============================================================================
+class MissileWeapon : public Weapon {
+public:
+    MissileWeapon(std::string n, int minD, int maxD, int strReq);
+    MissileWeapon* asMissile() override { return this; }
+
+    bool isEquippable() const override { return false; }
+    bool isStackable() const override { return true; }
+    bool isUpgradable() const override { return false; }
+    bool isIdentified() const override { return true; }
+
+    std::vector<std::string> actions(Hero* hero) override;
+    void onThrow(int cell) override;
+    virtual void miss(int cell);
+    float acuracyFactor(Hero* hero) const override;
+    float speedFactor(Hero* hero) const override;
+    int maxDistance(const Hero* hero = nullptr) const override;
+};
+
+class Dart : public MissileWeapon {
+public:
+    Dart(int number = 1);
+    Dart* asDart() override { return this; }
+    Item* random() override;
+    std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class IncendiaryDart : public MissileWeapon {
+public:
+    IncendiaryDart(int number = 1);
+    Item* random() override;
+    void onThrow(int cell) override;
+    void proc(Char* attacker, Char* defender, int damage);
+    std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class CurareDart : public MissileWeapon {
+public:
+    CurareDart(int number = 1);
+    Item* random() override;
+    void proc(Char* attacker, Char* defender, int damage);
+    std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class Javelin : public MissileWeapon {
+public:
+    Javelin(int number = 1);
+    Item* random() override;
+    void proc(Char* attacker, Char* defender, int damage);
+    int maxDistance(const Hero* hero = nullptr) const override;
+    std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class Shuriken : public MissileWeapon {
+public:
+    Shuriken(int number = 1);
+    Item* random() override;
+    float speedFactor(Hero* hero) const override;
+    std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class Tamahawk : public MissileWeapon {
+public:
+    Tamahawk(int number = 1);
+    Item* random() override;
+    void proc(Char* attacker, Char* defender, int damage);
+    int maxDistance(const Hero* hero = nullptr) const override;
+    std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class Boomerang : public MissileWeapon {
+public:
+    Boomerang();
+    Boomerang* asBoomerang() override { return this; }
+    bool isStackable() const override { return false; }
+    bool isUpgradable() const override { return true; }
+    bool isEquippable() const override { return true; }
+
+    int minDamage = 1;
+    int maxDamage = 4;
+
+    void onThrow(int cell) override;
+    void miss(int cell) override;
+    void proc(Char* attacker, Char* defender, int damage);
+    void circleBack(int fromCell, Hero* owner);
+    int maxDistance(const Hero* hero = nullptr) const override;
+    std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+// =============================================================================
+// Plants & Seeds
+// =============================================================================
+class PlantSeed : public Item {
+public:
+    enum class PlantType {
+        FIREBLOOM,
+        ICECAP,
+        SORROWMOSS,
+        DREAMWEED,
+        SUNGRASS,
+        EARTHROOT,
+        FADELEAF,
+        ROTBERRY
+    };
+
+    PlantType plantType = PlantType::FIREBLOOM;
+
+    explicit PlantSeed(PlantType pt);
+    bool isStackable() const override { return true; }
+    bool isIdentified() const override { return true; }
+    std::vector<std::string> actions(Hero* hero) override;
+    bool execute(Hero* hero, const std::string& action) override;
+    void onThrow(int cell) override;
+    int maxDistance(const Hero* hero = nullptr) const override { (void)hero; return 5; }
+    std::string info() const override;
+    std::string displayName() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+// =============================================================================
+// Tome of Mastery
+// =============================================================================
+class TomeOfMastery : public Item {
+public:
+    TomeOfMastery();
+    bool isStackable() const override { return false; }
+    bool isUpgradable() const override { return false; }
+    bool isIdentified() const override { return true; }
+    std::vector<std::string> actions(Hero* hero) override;
+    bool execute(Hero* hero, const std::string& action) override;
+    std::string info() const override;
+    std::string displayName() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+
+    void choose(Hero* hero, HeroSubClass way);
 };
 
 } // namespace pd

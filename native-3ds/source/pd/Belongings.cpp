@@ -56,6 +56,12 @@ bool Belongings::unequip(Item* item) {
     } else if (equippedArmor == item) {
         equippedArmor = nullptr;
         return true;
+    } else if (equippedRing1 == item) {
+        equippedRing1 = nullptr;
+        return true;
+    } else if (equippedRing2 == item) {
+        equippedRing2 = nullptr;
+        return true;
     }
     return false;
 }

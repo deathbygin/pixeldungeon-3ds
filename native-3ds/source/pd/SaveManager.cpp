@@ -117,6 +117,63 @@ bool SaveManager::deleteSave(const std::string& customPath) {
     return (std::remove(path.c_str()) == 0);
 }
 
+bool SaveManager::getSaveSummary(int& outDepth, int& outLevel, int& outHeroClass, const std::string& customPath) {
+    std::string path = customPath.empty() ? getSavePath() : customPath;
+    FILE* fp = std::fopen(path.c_str(), "rb");
+    if (!fp) return false;
+
+    uint32_t magic = 0;
+    uint32_t version = 0;
+    if (std::fread(&magic, sizeof(uint32_t), 1, fp) != 1 ||
+        std::fread(&version, sizeof(uint32_t), 1, fp) != 1) {
+        std::fclose(fp);
+        return false;
+    }
+
+    if (magic != SAVE_MAGIC || version != SAVE_VERSION) {
+        std::fclose(fp);
+        return false;
+    }
+
+    int32_t depth = 1;
+    int32_t gold = 0;
+    uint64_t seed = 0;
+    std::fread(&depth, sizeof(int32_t), 1, fp);
+    std::fread(&gold, sizeof(int32_t), 1, fp);
+    std::fread(&seed, sizeof(uint64_t), 1, fp);
+
+    if (version >= 3) {
+        // Skip potion map (POTION_COUNT * (sizeof(int32_t) + sizeof(uint8_t)))
+        // and scroll map (SCROLL_COUNT * (sizeof(int32_t) + sizeof(uint8_t)))
+        long skipBytes = Potion::POTION_COUNT * (sizeof(int32_t) + sizeof(uint8_t)) +
+                         Scroll::SCROLL_COUNT * (sizeof(int32_t) + sizeof(uint8_t));
+        std::fseek(fp, skipBytes, SEEK_CUR);
+    }
+
+    int32_t heroClass = 0;
+    int32_t pos = 0;
+    int32_t hp = 20;
+    int32_t ht = 20;
+    int32_t str = 10;
+    int32_t exp = 0;
+    int32_t lvl = 1;
+
+    std::fread(&heroClass, sizeof(int32_t), 1, fp);
+    std::fread(&pos, sizeof(int32_t), 1, fp);
+    std::fread(&hp, sizeof(int32_t), 1, fp);
+    std::fread(&ht, sizeof(int32_t), 1, fp);
+    std::fread(&str, sizeof(int32_t), 1, fp);
+    std::fread(&exp, sizeof(int32_t), 1, fp);
+    std::fread(&lvl, sizeof(int32_t), 1, fp);
+
+    std::fclose(fp);
+
+    outDepth = depth;
+    outLevel = lvl;
+    outHeroClass = heroClass;
+    return true;
+}
+
 bool SaveManager::saveGame(const std::string& customPath) {
     if (!Dungeon::hero || !Dungeon::level) return false;
 

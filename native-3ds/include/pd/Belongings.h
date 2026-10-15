@@ -15,6 +15,8 @@ public:
     std::vector<std::unique_ptr<Item>> backpack;
     Weapon* equippedWeapon = nullptr;
     Armor* equippedArmor = nullptr;
+    Item* equippedRing1 = nullptr;
+    Item* equippedRing2 = nullptr;
 
     Belongings() = default;
     ~Belongings() = default;

@@ -1,6 +1,7 @@
 #include "pd/FX.h"
 #include "pd/Dungeon.h"
 #include "pd/Random.h"
+#include "pd/MissileSprite.h"
 #include <cmath>
 
 namespace pd {
@@ -10,6 +11,7 @@ Ripple FX::s_ripples[MAX_RIPPLES];
 CheckedCell FX::s_checked[MAX_CHECKED];
 Wound FX::s_wounds[MAX_WOUNDS];
 FloatingText FX::s_texts[MAX_TEXTS];
+std::vector<std::unique_ptr<MissileSprite>> FX::s_missiles;
 
 Blob FX::s_toxicGas(Blob::BlobType::TOXIC_GAS);
 Blob FX::s_paralyticGas(Blob::BlobType::PARALYTIC_GAS);
@@ -27,6 +29,7 @@ void FX::clear() {
     for (auto& c : s_checked)   c.active = false;
     for (auto& w : s_wounds)    w.active = false;
     for (auto& t : s_texts)     t.active = false;
+    s_missiles.clear();
 
     s_toxicGas.clear();
     s_paralyticGas.clear();
@@ -40,6 +43,17 @@ void FX::update(float dt) {
     for (auto& c : s_checked)   if (c.active) c.update(dt);
     for (auto& w : s_wounds)    if (w.active) w.update(dt);
     for (auto& t : s_texts)     if (t.active) t.update(dt);
+
+    for (auto& m : s_missiles) {
+        if (m && m->active) {
+            m->update(dt);
+        }
+    }
+    s_missiles.erase(
+        std::remove_if(s_missiles.begin(), s_missiles.end(),
+                       [](const std::unique_ptr<MissileSprite>& m) { return !m || !m->active; }),
+        s_missiles.end()
+    );
 
     // Periodic ambient particle emission for active gas & fire in FOV (matching BlobEmitter)
     s_blobEmitTimer += dt;
@@ -88,7 +102,10 @@ void FX::draw(const noosa::Camera* camera, C2D_TextBuf textBuf) {
     // 3. Pixel particles
     for (const auto& p : s_particles) if (p.active) p.draw(camera);
 
-    // 4. Floating damage / text indicators (drawn on top)
+    // 4. Flying missile sprites
+    for (const auto& m : s_missiles) if (m && m->active) m->draw(camera);
+
+    // 5. Floating damage / text indicators (drawn on top)
     for (const auto& t : s_texts) if (t.active) t.draw(camera, textBuf);
 }
 
@@ -193,6 +210,16 @@ Blob* FX::getBlob(Blob::BlobType type) {
     case Blob::BlobType::FIRE:          return &s_fire;
     default:                            return nullptr;
     }
+}
+
+void FX::missile(int fromCell, int toCell, int itemImage, std::function<void()> callback) {
+    auto m = std::make_unique<MissileSprite>();
+    m->reset(fromCell, toCell, itemImage, std::move(callback));
+    s_missiles.push_back(std::move(m));
+}
+
+bool FX::isMissileActive() {
+    return !s_missiles.empty();
 }
 
 } // namespace pd

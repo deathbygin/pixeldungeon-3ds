@@ -1,4 +1,5 @@
 #include "pd/ui/LogConsole.h"
+#include "pd/ui/BitmapFont.h"
 #include <algorithm>
 
 namespace pd::ui {
@@ -17,28 +18,28 @@ void LogConsole::clear() {
 }
 
 void LogConsole::draw(C2D_TextBuf textBuf) const {
-    // Background container
-    C2D_DrawRectSolid(x, y, 0.3f, width, height, C2D_Color32(0x1a, 0x16, 0x24, 0xFF));
-    C2D_DrawRectSolid(x, y, 0.35f, width, 1.0f, C2D_Color32(0x4a, 0x3d, 0x30, 0xFF));
-    C2D_DrawRectSolid(x, y + height - 1.0f, 0.35f, width, 1.0f, C2D_Color32(0x4a, 0x3d, 0x30, 0xFF));
-    C2D_DrawRectSolid(x, y, 0.35f, 1.0f, height, C2D_Color32(0x4a, 0x3d, 0x30, 0xFF));
-    C2D_DrawRectSolid(x + width - 1.0f, y, 0.35f, 1.0f, height, C2D_Color32(0x4a, 0x3d, 0x30, 0xFF));
+    (void)textBuf;
+    // Sleek recessed dark stone panel with subtle top/bottom borders
+    C2D_DrawRectSolid(x, y, 0.30f, width, height, C2D_Color32(0x12, 0x10, 0x16, 0xFF));
+    C2D_DrawRectSolid(x + 1.0f, y + 1.0f, 0.31f, width - 2.0f, height - 2.0f, C2D_Color32(0x19, 0x16, 0x22, 0xFF));
+    
+    // Top highlight and bottom shadow borders
+    C2D_DrawRectSolid(x, y, 0.32f, width, 1.0f, C2D_Color32(0x3E, 0x36, 0x48, 0xFF));
+    C2D_DrawRectSolid(x, y + height - 1.0f, 0.32f, width, 1.0f, C2D_Color32(0x0A, 0x08, 0x0E, 0xFF));
+    C2D_DrawRectSolid(x, y, 0.32f, 1.0f, height, C2D_Color32(0x3E, 0x36, 0x48, 0xFF));
+    C2D_DrawRectSolid(x + width - 1.0f, y, 0.32f, 1.0f, height, C2D_Color32(0x0A, 0x08, 0x0E, 0xFF));
 
-    // Render up to 3 most recent messages
+    // Render 2 most recent messages with clean baseline and drop shadow
     size_t count = m_history.size();
-    size_t startIdx = (count > 3) ? (count - 3) : 0;
+    size_t startIdx = (count > 2) ? (count - 2) : 0;
 
-    float lineY = y + 4.0f;
-    C2D_Text textObj;
+    float lineY = y + 7.0f;
 
     for (size_t i = startIdx; i < count; ++i) {
         const auto& entry = m_history[i];
-        C2D_TextParse(&textObj, textBuf, entry.text.c_str());
-        C2D_TextOptimize(&textObj);
-        C2D_DrawText(&textObj, C2D_WithColor, x + 6.0f, lineY, 0.45f, 0.38f, 0.38f, entry.color);
-        lineY += 13.0f;
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, entry.text, x + 8.0f, lineY, 0.35f, entry.color, 0x000000FF);
+        lineY += 14.0f;
     }
 }
 
 } // namespace pd::ui
-

@@ -60,6 +60,7 @@ public:
     virtual MobType mobType() const { return MobType::Rat; }
     bool act() override;
     void damage(int dmg, Actor* src) override;
+    int defenseProc(Char* enemy, int damage) override;
 
     virtual void aiStep(Hero* hero, Level* currentLevel);
     void die(Actor* src) override;

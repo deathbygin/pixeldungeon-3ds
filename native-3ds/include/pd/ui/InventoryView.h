@@ -37,6 +37,8 @@ public:
     bool update(pd::Hero* hero, const TouchController& touch, u32 kDown, std::string& outMessage);
     void draw(const pd::Hero* hero, C2D_TextBuf textBuf) const;
 
+    int getSelectedIndex() const { return m_selectedIndex; }
+
 private:
     int m_selectedIndex = 0;
     int m_targetScrollIdx = -1;

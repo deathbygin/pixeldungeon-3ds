@@ -332,4 +332,37 @@ bool Shadows::act() {
     return true;
 }
 
+// -----------------------------------------------------------------------------
+// Combo (Gladiator)
+// -----------------------------------------------------------------------------
+int Combo::hit(Char* enemy, int damage) {
+    (void)enemy;
+    count++;
+    if (count >= 3) {
+        GLog::p(std::to_string(count) + " hit combo!");
+        postpone(std::max(0.5f, 1.41f - count / 10.0f));
+        return static_cast<int>(damage * (count - 2) / 5.0f);
+    } else {
+        postpone(1.1f);
+        return 0;
+    }
+}
+
+bool Combo::act() {
+    detach();
+    return true;
+}
+
+// -----------------------------------------------------------------------------
+// Fury (Berserker)
+// -----------------------------------------------------------------------------
+bool Fury::act() {
+    if (!target || !target->isAlive() || target->HP > target->HT * LEVEL) {
+        detach();
+        return true;
+    }
+    spend(TICK);
+    return true;
+}
+
 } // namespace pd

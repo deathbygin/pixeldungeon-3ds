@@ -20,6 +20,7 @@ public:
     static bool loadGame(const std::string& customPath = "");
     static bool hasSave(const std::string& customPath = "");
     static bool deleteSave(const std::string& customPath = "");
+    static bool getSaveSummary(int& outDepth, int& outLevel, int& outHeroClass, const std::string& customPath = "");
 
     // Path resolution
     static std::string getSaveDirectory();

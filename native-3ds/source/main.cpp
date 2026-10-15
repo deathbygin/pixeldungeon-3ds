@@ -51,6 +51,8 @@
 #include "pd/ShadowCaster.h"
 #include "pd/FX.h"
 #include "pd/GLog.h"
+#include "pd/Ballistica.h"
+#include "pd/MissileSprite.h"
 
 // Dual-Screen UI Subsystems (Phase 4)
 #include "pd/ui/TouchController.h"
@@ -59,6 +61,11 @@
 #include "pd/ui/LogConsole.h"
 #include "pd/ui/InventoryView.h"
 #include "pd/ui/BottomScreenUI.h"
+#include "pd/ui/BitmapFont.h"
+#include "pd/ui/WndOptions.h"
+#include "pd/scenes/TitleScene.h"
+#include "pd/scenes/HeroSelectScene.h"
+#include "pd/windows/WndStory.h"
 
 using namespace noosa;
 using namespace pd;
@@ -296,35 +303,12 @@ int main(int argc, char* argv[]) {
     if (!dm300Film)    dm300Film    = fallbackFilm;
     if (!kingFilm)     kingFilm     = fallbackFilm;
     if (!yogFilm)      yogFilm      = fallbackFilm;
+    if (!itemsFilm)    itemsFilm    = fallbackFilm;
+    MissileSprite::initFilm(itemsFilm);
 
     // 4. Audio feedback
     SoundSample sndStep;    sndStep.synthesizeTone(240.0f, 0.03f, 0.3f);
     SoundSample sndHit;     sndHit.synthesizeTone(180.0f, 0.08f, 0.6f);
-
-    bool loadedSave = false;
-    if (SaveManager::hasSave()) {
-        loadedSave = SaveManager::loadGame();
-        if (loadedSave) {
-            Dungeon::fog = std::make_unique<FogOfWar>(Level::WIDTH, Level::HEIGHT);
-            Dungeon::observe();
-        }
-    }
-
-    if (!loadedSave) {
-        pd::Random::seed(1337);
-        Dungeon::newGame();
-
-        // Add extra items to Hero backpack for starting kit
-        if (Dungeon::hero) {
-            Dungeon::hero->belongings.collect(std::make_unique<Weapon>("Longsword", 4, 12, 14));
-            Dungeon::hero->belongings.collect(std::make_unique<Armor>("Leather Armor", 2, 12));
-            Dungeon::hero->belongings.collect(std::make_unique<Scroll>(Scroll::ScrollType::UPGRADE));
-            Dungeon::hero->belongings.collect(std::make_unique<Scroll>(Scroll::ScrollType::IDENTIFY));
-            Dungeon::hero->belongings.collect(std::make_unique<Scroll>(Scroll::ScrollType::REMOVE_CURSE));
-            Dungeon::hero->belongings.collect(std::make_unique<Potion>(Potion::PotionType::STRENGTH));
-        }
-        SaveManager::saveGame();
-    }
 
     // 5. Setup Camera & Dual-Screen UI
     Camera topCamera;
@@ -338,14 +322,6 @@ int main(int argc, char* argv[]) {
     }
 
     BottomScreenUI bottomUI;
-    if (loadedSave) {
-        bottomUI.log("Resumed Depth " + std::to_string(Dungeon::depth) + " from SD Card!", C2D_Color32(0x38, 0x9e, 0x38, 0xFF));
-    } else {
-        bottomUI.log("Welcome to Pixel Dungeon 3DS! Autosave active.");
-    }
-
-    char strBuf[256];
-    C2D_Text textObj;
 
     Image tileImg(fallbackFilm);
     tileImg.targetScreen = ScreenTarget::Top;
@@ -353,6 +329,65 @@ int main(int argc, char* argv[]) {
     Image charImg(fallbackFilm);
     charImg.targetScreen = ScreenTarget::Top;
     charImg.z = 0.6f;
+
+    enum class AppState {
+        TITLE,
+        PROMPT_LOAD,
+        CONFIRM_ERASE,
+        HERO_SELECT,
+        INTERLEVEL,
+        GAME
+    };
+    AppState appState = AppState::TITLE;
+    pd::scenes::TitleScene titleScene;
+    pd::scenes::HeroSelectScene heroSelectScene;
+    pd::ui::WndOptions wndOptions;
+    pd::windows::WndStory wndStory;
+    TouchController screenTouch;
+
+    // Interlevel transition state
+    float interlevelTimer = 0.0f;
+    static constexpr float INTERLEVEL_DURATION = 1.0f; // seconds
+    bool isNewGame = false;
+    bool interlevelStarted = false;
+    Hero::HeroClass chosenHeroClass = Hero::HeroClass::Warrior;
+
+    auto startNewDungeonRun = [&](Hero::HeroClass hClass) {
+        pd::Random::seed(osGetTime());
+        Dungeon::newGame();
+        Dungeon::hero = std::make_unique<Hero>(hClass);
+        Dungeon::fog = std::make_unique<FogOfWar>(Level::WIDTH, Level::HEIGHT);
+        tilemap.loadForDepth(Dungeon::depth);
+
+        // Place hero on level entrance stairs
+        if (Dungeon::level) {
+            Dungeon::hero->pos = Dungeon::level->entrance;
+            float hx = (Dungeon::hero->pos % Level::WIDTH) * 16.0f + 8.0f;
+            float hy = (Dungeon::hero->pos / Level::WIDTH) * 16.0f + 8.0f;
+            topCamera.setCenter(hx, hy);
+        }
+        Dungeon::observe();
+        SaveManager::saveGame();
+
+        bottomUI.reset();
+        bottomUI.log("Entered Depth 1 as " + Dungeon::hero->name + ".");
+    };
+
+    auto resumeExistingRun = [&]() {
+        bool ok = SaveManager::loadGame();
+        if (ok) {
+            Dungeon::fog = std::make_unique<FogOfWar>(Level::WIDTH, Level::HEIGHT);
+            Dungeon::observe();
+            tilemap.loadForDepth(Dungeon::depth);
+            if (Dungeon::hero) {
+                float hx = (Dungeon::hero->pos % Level::WIDTH) * 16.0f + 8.0f;
+                float hy = (Dungeon::hero->pos / Level::WIDTH) * 16.0f + 8.0f;
+                topCamera.setCenter(hx, hy);
+            }
+            bottomUI.reset();
+            bottomUI.log("Resumed Depth " + std::to_string(Dungeon::depth) + " from SD Card!", C2D_Color32(0x38, 0x9e, 0x38, 0xFF));
+        }
+    };
 
     u64 lastTime = osGetTime();
 
@@ -372,14 +407,205 @@ int main(int argc, char* argv[]) {
         u32 kHeld = hidKeysHeld();
         u32 kUp   = hidKeysUp();
 
-        if (kDown & KEY_START) {
-            Profiler::endUpdate();
-            break;
+        screenTouch.update(kDown, kHeld, kUp);
+
+        // ---------------------------------------------------------------------
+        // STATE 1: TITLE SCREEN
+        // ---------------------------------------------------------------------
+        if (appState == AppState::TITLE) {
+            titleScene.update(dt, kDown, kHeld, screenTouch);
+
+            if (titleScene.getPendingAction() == pd::scenes::TitleAction::PLAY) {
+                titleScene.clearAction();
+                if (SaveManager::hasSave()) {
+                    // Save exists: prompt Load Game vs. Erase & Start New
+                    int sDepth = 1, sLvl = 1, sClass = 0;
+                    SaveManager::getSaveSummary(sDepth, sLvl, sClass);
+                    const char* clNames[] = { "Warrior", "Mage", "Rogue", "Huntress" };
+                    std::string clName = (sClass >= 0 && sClass < 4) ? clNames[sClass] : "Hero";
+
+                    char msgBuf[128];
+                    std::snprintf(msgBuf, sizeof(msgBuf), "%s (Depth %d, Level %d)", clName.c_str(), sDepth, sLvl);
+
+                    wndOptions.show("ACTIVE ADVENTURE", msgBuf,
+                        { "Load Game", "New Game", "Cancel" },
+                        [&](int idx) {
+                            if (idx == 0) {
+                                // Load Game -> Interlevel loading -> Resume
+                                appState = AppState::INTERLEVEL;
+                                interlevelTimer = 0.0f;
+                                isNewGame = false;
+                                interlevelStarted = false;
+                            } else if (idx == 1) {
+                                // New Game with existing save -> Prompt Confirmation
+                                appState = AppState::CONFIRM_ERASE;
+                                wndOptions.show("Start New Game?",
+                                    "Your current game progress will be permanently erased.",
+                                    { "Yes, start new game", "No, return" },
+                                    [&](int confIdx) {
+                                        if (confIdx == 0) {
+                                            SaveManager::deleteSave();
+                                            appState = AppState::HERO_SELECT;
+                                        } else {
+                                            appState = AppState::TITLE;
+                                        }
+                                    });
+                            } else {
+                                appState = AppState::TITLE;
+                            }
+                        });
+                    appState = AppState::PROMPT_LOAD;
+                } else {
+                    // No save: straight to Hero Selection
+                    appState = AppState::HERO_SELECT;
+                }
+            } else if (titleScene.getPendingAction() != pd::scenes::TitleAction::NONE) {
+                titleScene.clearAction();
+            }
+
+            Profiler::beginRender();
+            C2D_TextBufClear(textBuf);
+            C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+
+            C2D_TargetClear(topTarget, C2D_Color32(0x10, 0x0c, 0x18, 0xFF));
+            C2D_SceneBegin(topTarget);
+            titleScene.drawTop(textBuf);
+
+            C2D_TargetClear(bottomTarget, C2D_Color32(0x10, 0x0c, 0x18, 0xFF));
+            C2D_SceneBegin(bottomTarget);
+            titleScene.drawBottom(textBuf);
+
+            C3D_FrameEnd(0);
+            Profiler::endRender();
+            Profiler::endFrame();
+            continue;
         }
 
-        // Toggle on-screen performance profiler via [SELECT]
-        if (kDown & KEY_SELECT) {
-            Profiler::toggleOverlay();
+        // ---------------------------------------------------------------------
+        // STATE 2 & 3: SAVE DETECTION & CONFIRMATION MODALS
+        // ---------------------------------------------------------------------
+        if (appState == AppState::PROMPT_LOAD || appState == AppState::CONFIRM_ERASE) {
+            titleScene.update(dt, 0, 0, screenTouch);
+            wndOptions.update(screenTouch, kDown);
+
+            Profiler::beginRender();
+            C2D_TextBufClear(textBuf);
+            C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+
+            C2D_TargetClear(topTarget, C2D_Color32(0x10, 0x0c, 0x18, 0xFF));
+            C2D_SceneBegin(topTarget);
+            titleScene.drawTop(textBuf);
+
+            C2D_TargetClear(bottomTarget, C2D_Color32(0x10, 0x0c, 0x18, 0xFF));
+            C2D_SceneBegin(bottomTarget);
+            titleScene.drawBottom(textBuf);
+            wndOptions.draw(textBuf);
+
+            C3D_FrameEnd(0);
+            Profiler::endRender();
+            Profiler::endFrame();
+            continue;
+        }
+
+        // ---------------------------------------------------------------------
+        // STATE 4: HERO SELECTION SCREEN
+        // ---------------------------------------------------------------------
+        if (appState == AppState::HERO_SELECT) {
+            heroSelectScene.update(dt, kDown, kHeld, screenTouch);
+
+            if (heroSelectScene.getPendingAction() == pd::scenes::SelectAction::START_GAME) {
+                heroSelectScene.clearAction();
+                chosenHeroClass = heroSelectScene.getSelectedClass();
+                appState = AppState::INTERLEVEL;
+                interlevelTimer = 0.0f;
+                isNewGame = true;
+                interlevelStarted = false;
+            } else if (heroSelectScene.getPendingAction() == pd::scenes::SelectAction::BACK_TO_TITLE) {
+                heroSelectScene.clearAction();
+                appState = AppState::TITLE;
+            }
+
+            Profiler::beginRender();
+            C2D_TextBufClear(textBuf);
+            C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+
+            C2D_TargetClear(topTarget, C2D_Color32(0x10, 0x0c, 0x18, 0xFF));
+            C2D_SceneBegin(topTarget);
+            heroSelectScene.drawTop(textBuf);
+
+            C2D_TargetClear(bottomTarget, C2D_Color32(0x10, 0x0c, 0x18, 0xFF));
+            C2D_SceneBegin(bottomTarget);
+            heroSelectScene.drawBottom(textBuf);
+
+            C3D_FrameEnd(0);
+            Profiler::endRender();
+            Profiler::endFrame();
+            continue;
+        }
+
+        // ---------------------------------------------------------------------
+        // STATE 5: INTERLEVEL TRANSITION ("Descending...")
+        // ---------------------------------------------------------------------
+        if (appState == AppState::INTERLEVEL) {
+            interlevelTimer += dt;
+            float p = interlevelTimer / INTERLEVEL_DURATION;
+
+            // Generate or resume dungeon once at start of interlevel transition
+            if (!interlevelStarted) {
+                interlevelStarted = true;
+                if (isNewGame) {
+                    startNewDungeonRun(chosenHeroClass);
+                } else {
+                    resumeExistingRun();
+                }
+            }
+
+            // Pulse text alpha
+            float textAlpha = (p < 0.5f) ? (p * 2.0f) : ((1.0f - p) * 2.0f);
+            textAlpha = std::clamp(textAlpha, 0.0f, 1.0f);
+
+            if (interlevelTimer >= INTERLEVEL_DURATION) {
+                appState = AppState::GAME;
+                if (isNewGame) {
+                    wndStory.show(pd::windows::WndStory::ID_SEWERS);
+                    isNewGame = false;
+                }
+            }
+
+            Profiler::beginRender();
+            C2D_TextBufClear(textBuf);
+            C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+
+            // Top Screen: Clean black screen with centered pulsing "Descending..."
+            C2D_TargetClear(topTarget, C2D_Color32(0x00, 0x00, 0x00, 0xFF));
+            C2D_SceneBegin(topTarget);
+
+            C2D_Text descText;
+            C2D_TextParse(&descText, textBuf, "Descending...");
+            C2D_TextOptimize(&descText);
+            float dW = 0.0f, dH = 0.0f;
+            C2D_TextGetDimensions(&descText, 0.55f, 0.55f, &dW, &dH);
+            u8 a = static_cast<u8>(textAlpha * 255.0f);
+            C2D_DrawText(&descText, C2D_WithColor, (400.0f - dW) * 0.5f, (240.0f - dH) * 0.5f, 0.5f, 0.55f, 0.55f, C2D_Color32(0xFF, 0xFF, 0xFF, a));
+
+            // Bottom Screen: Black fade
+            C2D_TargetClear(bottomTarget, C2D_Color32(0x00, 0x00, 0x00, 0xFF));
+            C2D_SceneBegin(bottomTarget);
+
+            C3D_FrameEnd(0);
+            Profiler::endRender();
+            Profiler::endFrame();
+            continue;
+        }
+
+        // ---------------------------------------------------------------------
+        // STATE 6: ACTIVE GAMEPLAY
+        // ---------------------------------------------------------------------
+        if (wndStory.isOpen()) {
+            wndStory.update(screenTouch, kDown);
+            kDown = 0;
+            kHeld = 0;
+            kUp = 0;
         }
 
         Hero* hero = Dungeon::hero.get();
@@ -427,7 +653,7 @@ int main(int argc, char* argv[]) {
         // ---------------------------------------------------------------------
         // 2. D-pad & Circle Pad Movement (Supports 8-directional analog movement)
         // ---------------------------------------------------------------------
-        if (!actionConsumed && !bottomUI.isInventoryOpen() && hero && hero->isAlive() && !hero->restoreHealth) {
+        if (!actionConsumed && !bottomUI.isInventoryOpen() && !bottomUI.isTargeting() && !FX::isMissileActive() && hero && hero->isAlive() && !hero->restoreHealth) {
             int heroX = hero->pos % Level::WIDTH;
             int heroY = hero->pos / Level::WIDTH;
             int targetCell = -1;
@@ -514,7 +740,16 @@ int main(int argc, char* argv[]) {
             float hy = hspr ? (hspr->getY() + hspr->getHeight() * 0.5f) : ((hero->pos / Level::WIDTH) * 16.0f + 8.0f);
             float cx = topCamera.getCenter().x;
             float cy = topCamera.getCenter().y;
-            topCamera.setCenter(cx + (hx - cx) * 0.2f, cy + (hy - cy) * 0.2f);
+            if (bottomUI.isTargeting()) {
+                int tc = bottomUI.getTargetCell();
+                float tx = (tc % Level::WIDTH) * 16.0f + 8.0f;
+                float ty = (tc / Level::WIDTH) * 16.0f + 8.0f;
+                float targetCx = (hx + tx) * 0.5f;
+                float targetCy = (hy + ty) * 0.5f;
+                topCamera.setCenter(cx + (targetCx - cx) * 0.2f, cy + (targetCy - cy) * 0.2f);
+            } else {
+                topCamera.setCenter(cx + (hx - cx) * 0.2f, cy + (hy - cy) * 0.2f);
+            }
         }
         topCamera.update(dt);
         FX::update(dt);
@@ -559,10 +794,8 @@ int main(int argc, char* argv[]) {
                     for (int x = minTileX; x <= maxTileX; ++x) {
                         int cellIdx = y * Level::WIDTH + x;
 
-                        if (!level->visited[cellIdx]) continue;
                         drawnTiles++;
 
-                        bool inFov = level->fieldOfView[cellIdx];
                         tileImg.x = x * 16.0f;
                         tileImg.y = y * 16.0f;
                         tileImg.z = 0.2f;
@@ -574,7 +807,7 @@ int main(int argc, char* argv[]) {
                         else if (t == Terrain::WATER) tileImg.setFrame(fWater);
                         else tileImg.setFrame(fFloor);
 
-                        tileImg.tint = inFov ? Color(255, 255, 255, 255) : Color(100, 100, 115, 255);
+                        tileImg.tint = Color(255, 255, 255, 255);
                         tileImg.draw(&topCamera);
                     }
                 }
@@ -586,11 +819,10 @@ int main(int argc, char* argv[]) {
             if (itemsFilm) {
                 for (const auto& heap : level->heaps) {
                     if (heap && (!heap->isEmpty() || heap->type != Heap::Type::HEAP) && level->visited[heap->pos]) {
-                        bool inFov = Dungeon::visible[heap->pos];
                         charImg.x = (heap->pos % Level::WIDTH) * 16.0f;
                         charImg.y = (heap->pos / Level::WIDTH) * 16.0f;
                         charImg.z = 0.25f;
-                        charImg.tint = inFov ? Color(255, 255, 255, 255) : Color(100, 100, 115, 255);
+                        charImg.tint = Color(255, 255, 255, 255);
                         charImg.setFilm(itemsFilm, heap->image());
                         charImg.draw(&topCamera);
                     }
@@ -634,21 +866,75 @@ int main(int argc, char* argv[]) {
                 }
             }
 
+            // Smooth tile-based Fog of War
+            if (Dungeon::fog) {
+                Dungeon::fog->draw(&topCamera);
+            }
+
+            // Ranged Targeting Trajectory & Reticle Overlay
+            if (bottomUI.isTargeting() && hero) {
+                int targetCell = bottomUI.getTargetCell();
+                int collisionCell = Ballistica::cast(hero->pos, targetCell, false, true);
+
+                // Draw trajectory line / dots along Ballistica::trace
+                for (int i = 1; i < Ballistica::distance; ++i) {
+                    int c = Ballistica::trace[i];
+                    float wx = (c % Level::WIDTH) * 16.0f + 8.0f;
+                    float wy = (c / Level::WIDTH) * 16.0f + 8.0f;
+                    float sx, sy;
+                    topCamera.worldToScreen(wx, wy, sx, sy);
+
+                    bool isPastCollision = (i > Ballistica::distTo(collisionCell));
+                    u32 dotCol = isPastCollision
+                        ? C2D_Color32(0xdd, 0x44, 0x44, 0xAA)
+                        : ((collisionCell == targetCell) ? C2D_Color32(0x56, 0xbb, 0x77, 0xEE) : C2D_Color32(0xee, 0xaa, 0x33, 0xEE));
+
+                    C2D_DrawCircleSolid(sx, sy, 0.78f, 2.5f * topCamera.getZoom(), dotCol);
+                }
+
+                // Draw Reticle Brackets on targetCell
+                float rx = (targetCell % Level::WIDTH) * 16.0f;
+                float ry = (targetCell / Level::WIDTH) * 16.0f;
+                float sx1, sy1, sx2, sy2;
+                topCamera.worldToScreen(rx, ry, sx1, sy1);
+                topCamera.worldToScreen(rx + 16.0f, ry + 16.0f, sx2, sy2);
+
+                u32 reticleCol = (collisionCell == targetCell)
+                    ? C2D_Color32(0x56, 0xbb, 0x77, 0xFF)
+                    : C2D_Color32(0xee, 0x55, 0x55, 0xFF);
+
+                float thick = 2.0f;
+                float clen = 5.0f * topCamera.getZoom();
+                // Top-Left
+                C2D_DrawRectSolid(sx1, sy1, 0.79f, clen, thick, reticleCol);
+                C2D_DrawRectSolid(sx1, sy1, 0.79f, thick, clen, reticleCol);
+                // Top-Right
+                C2D_DrawRectSolid(sx2 - clen, sy1, 0.79f, clen, thick, reticleCol);
+                C2D_DrawRectSolid(sx2 - thick, sy1, 0.79f, thick, clen, reticleCol);
+                // Bottom-Left
+                C2D_DrawRectSolid(sx1, sy2 - thick, 0.79f, clen, thick, reticleCol);
+                C2D_DrawRectSolid(sx1, sy2 - clen, 0.79f, thick, clen, reticleCol);
+                // Bottom-Right
+                C2D_DrawRectSolid(sx2 - clen, sy2 - thick, 0.79f, clen, thick, reticleCol);
+                C2D_DrawRectSolid(sx2 - thick, sy2 - clen, 0.79f, thick, clen, reticleCol);
+
+                // If collision blocked before target, draw collision indicator at collisionCell
+                if (collisionCell != targetCell) {
+                    float cx = (collisionCell % Level::WIDTH) * 16.0f + 8.0f;
+                    float cy = (collisionCell / Level::WIDTH) * 16.0f + 8.0f;
+                    float csx, csy;
+                    topCamera.worldToScreen(cx, cy, csx, csy);
+                    C2D_DrawCircleSolid(csx, csy, 0.79f, 3.5f * topCamera.getZoom(), C2D_Color32(0xff, 0x22, 0x22, 0xDD));
+                }
+            }
+
             // Render Core Visual Effects & Particles
             FX::draw(&topCamera, textBuf);
         }
 
-        // Minimalist Top Screen HUD Header
-        C2D_DrawRectSolid(0.0f, 0.0f, 0.8f, 400.0f, 18.0f, C2D_Color32(0x18, 0x14, 0x25, 0xDC));
-        std::snprintf(strBuf, sizeof(strBuf), "DEPTH %d  |  FOV Active  |  SELECT: Stats  |  Y: Items  |  A: Rest",
-                      Dungeon::depth);
-        C2D_TextParse(&textObj, textBuf, strBuf);
-        C2D_TextOptimize(&textObj);
-        C2D_DrawText(&textObj, C2D_WithColor, 8.0f, 2.0f, 0.85f, 0.40f, 0.40f, C2D_Color32(0xe4, 0xa6, 0x72, 0xFF));
-
         // Real-time Performance Profiling Overlay (toggled via [SELECT])
         if (Profiler::isOverlayEnabled()) {
-            C2D_DrawRectSolid(0.0f, 18.0f, 0.95f, 400.0f, 16.0f, C2D_Color32(0x0a, 0x0a, 0x14, 0xEE));
+            C2D_DrawRectSolid(0.0f, 0.0f, 0.95f, 400.0f, 16.0f, C2D_Color32(0x0a, 0x0a, 0x14, 0xEE));
             char profBuf[128];
             std::snprintf(profBuf, sizeof(profBuf), "FPS: %.1f | Frame: %.2fms (Upd: %.2fms, Ren: %.2fms) | Culled: %lu/%d",
                           Profiler::getFps(), Profiler::getFrameTimeMs(),
@@ -657,7 +943,7 @@ int main(int argc, char* argv[]) {
             C2D_Text profText;
             C2D_TextParse(&profText, textBuf, profBuf);
             C2D_TextOptimize(&profText);
-            C2D_DrawText(&profText, C2D_WithColor, 6.0f, 19.0f, 0.96f, 0.38f, 0.38f, C2D_Color32(0x40, 0xf0, 0x60, 0xFF));
+            C2D_DrawText(&profText, C2D_WithColor, 6.0f, 1.0f, 0.96f, 0.38f, 0.38f, C2D_Color32(0x40, 0xf0, 0x60, 0xFF));
         }
 
         // =====================================================================
@@ -667,6 +953,10 @@ int main(int argc, char* argv[]) {
         C2D_SceneBegin(bottomTarget);
 
         bottomUI.draw(hero, Dungeon::depth, textBuf);
+
+        if (wndStory.isOpen()) {
+            wndStory.draw(textBuf);
+        }
 
         C3D_FrameEnd(0);
         Profiler::endRender();

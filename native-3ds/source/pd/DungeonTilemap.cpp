@@ -64,17 +64,12 @@ void DungeonTilemap::draw(const Level* level, const noosa::Camera* camera, uint3
     int maxTileY = std::min(Level::HEIGHT - 1, static_cast<int>(camB / static_cast<float>(SIZE)) + 1);
 
     drawnCount = 0;
+    noosa::Color litTint(255, 255, 255, 255);
+
     for (int y = minTileY; y <= maxTileY; ++y) {
         for (int x = minTileX; x <= maxTileX; ++x) {
             int cellIdx = y * Level::WIDTH + x;
-
-            if (!level->visited[cellIdx]) {
-                continue; // Fog of War: completely hidden in darkness
-            }
             drawnCount++;
-
-            bool inFov = level->fieldOfView[cellIdx];
-            noosa::Color litTint = inFov ? noosa::Color(255, 255, 255, 255) : noosa::Color(100, 100, 115, 255);
 
             int rawTile = level->get(cellIdx);
             bool isWaterTile = (rawTile == Terrain::WATER || (rawTile >= Terrain::WATER_TILES && rawTile < Terrain::WATER_TILES + 16));

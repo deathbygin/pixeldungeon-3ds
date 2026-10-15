@@ -5,6 +5,7 @@
 #include "Mob.h"
 #include <memory>
 #include <vector>
+#include <unordered_map>
 
 namespace pd {
 
@@ -33,9 +34,14 @@ public:
     static void observe();
     static void updateVisibility() { observe(); }
 
+    static void dropToChasm(std::unique_ptr<Item> item);
+    static void placeChasmItems();
+
     // Line of sight and hazard aware pathfinding
     static int findPath(Char* ch, int from, int to, const bool* pass, const bool* visible);
     static int flee(Char* ch, int cur, int from, const bool* pass, const bool* visible);
+
+    static std::unordered_map<int, std::vector<std::unique_ptr<Item>>> droppedItems;
 };
 
 } // namespace pd

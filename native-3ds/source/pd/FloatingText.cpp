@@ -1,4 +1,5 @@
 #include "pd/FloatingText.h"
+#include "pd/ui/BitmapFont.h"
 #include <algorithm>
 
 namespace pd {
@@ -26,7 +27,8 @@ void FloatingText::update(float dt) {
 }
 
 void FloatingText::draw(const noosa::Camera* camera, C2D_TextBuf textBuf) const {
-    if (!active || time <= 0.0f || text.empty() || !textBuf) return;
+    (void)textBuf;
+    if (!active || time <= 0.0f || text.empty()) return;
 
     float drawX = x;
     float drawY = y;
@@ -44,15 +46,8 @@ void FloatingText::draw(const noosa::Camera* camera, C2D_TextBuf textBuf) const 
     uint8_t b = static_cast<uint8_t>((color >> 8) & 0xFF);
     u32 finalColor = C2D_Color32(r, g, b, a);
 
-    C2D_Text textObj;
-    C2D_TextParse(&textObj, textBuf, text.c_str());
-    C2D_TextOptimize(&textObj);
-
-    // Draw with slight shadow for readability
-    u32 shadowColor = C2D_Color32(0, 0, 0, a / 2);
-    C2D_DrawText(&textObj, C2D_WithColor, drawX + 1.0f, drawY + 1.0f, 0.88f, 0.45f, 0.45f, shadowColor);
-    C2D_DrawText(&textObj, C2D_WithColor, drawX, drawY, 0.89f, 0.45f, 0.45f, finalColor);
+    float tw = ui::BitmapFont::width(ui::BitmapFont::FontType::Font1x, text);
+    ui::BitmapFont::draw(ui::BitmapFont::FontType::Font1x, text, drawX - tw * 0.5f, drawY, 0.89f, finalColor);
 }
 
 } // namespace pd
-

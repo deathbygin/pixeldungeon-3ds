@@ -10,6 +10,7 @@
 #include <citro2d.h>
 #include <string>
 #include <vector>
+#include <functional>
 
 namespace pd {
 
@@ -50,12 +51,17 @@ public:
     static void evolveBlobs(const Level* level);
     static Blob* getBlob(Blob::BlobType type);
 
+    // Missile Projectile
+    static void missile(int fromCell, int toCell, int itemImage, std::function<void()> callback = nullptr);
+    static bool isMissileActive();
+
 private:
     static PixelParticle s_particles[MAX_PARTICLES];
     static Ripple s_ripples[MAX_RIPPLES];
     static CheckedCell s_checked[MAX_CHECKED];
     static Wound s_wounds[MAX_WOUNDS];
     static FloatingText s_texts[MAX_TEXTS];
+    static std::vector<std::unique_ptr<class MissileSprite>> s_missiles;
 
     static Blob s_toxicGas;
     static Blob s_paralyticGas;

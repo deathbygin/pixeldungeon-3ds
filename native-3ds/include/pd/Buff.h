@@ -21,8 +21,13 @@ enum class BuffType {
     Invisibility,
     Levitation,
     Shadows,
-    Ooze
+    Ooze,
+    Combo,
+    Fury,
+    SnipersMark
 };
+
+class Combo;
 
 class Buff : public Actor {
 public:
@@ -35,6 +40,7 @@ public:
     virtual std::string name() const = 0;
 
     Buff* asBuff() override { return this; }
+    virtual Combo* asCombo() { return nullptr; }
 
     virtual void attachTo(Char* ch);
     virtual void detach();
@@ -235,6 +241,45 @@ public:
     std::string name() const override { return "Shadows"; }
 
     bool act() override;
+};
+
+// =============================================================================
+// Subclass Specialization Buffs
+// =============================================================================
+class Combo : public Buff {
+public:
+    static constexpr BuffType STATIC_TYPE = BuffType::Combo;
+    int count = 0;
+
+    Combo* asCombo() override { return this; }
+    BuffType type() const override { return STATIC_TYPE; }
+    std::string name() const override { return "Combo"; }
+
+    int hit(Char* enemy, int damage);
+    bool act() override;
+};
+
+class Fury : public Buff {
+public:
+    static constexpr BuffType STATIC_TYPE = BuffType::Fury;
+    static constexpr float LEVEL = 0.40f;
+
+    BuffType type() const override { return STATIC_TYPE; }
+    std::string name() const override { return "Fury"; }
+
+    bool act() override;
+};
+
+class SnipersMark : public FlavourBuff {
+public:
+    static constexpr BuffType STATIC_TYPE = BuffType::SnipersMark;
+    int targetId = -1;
+    float duration = 2.0f;
+
+    SnipersMark(int tId = -1, float dur = 2.0f) : targetId(tId), duration(dur) {}
+
+    BuffType type() const override { return STATIC_TYPE; }
+    std::string name() const override { return "Sniper's Mark"; }
 };
 
 } // namespace pd

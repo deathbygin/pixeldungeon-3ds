@@ -11,6 +11,14 @@ class Ballistica {
 public:
     static inline int trace[Level::WIDTH > Level::HEIGHT ? Level::WIDTH : Level::HEIGHT];
     static inline int distance = 0;
+    static inline int collisionCell = 0;
+
+    static int distTo(int cell) {
+        for (int i = 0; i < distance; ++i) {
+            if (trace[i] == cell) return i;
+        }
+        return distance - 1;
+    }
 
     static int cast(int from, int to, bool magic, bool hitChars) {
         int w = Level::WIDTH;
@@ -53,7 +61,7 @@ public:
         int err = dA / 2;
 
         Level* level = Dungeon::level.get();
-        if (!level) return to;
+        if (!level) return collisionCell = to;
 
         while (cell != to || magic) {
             cell += stepA;
@@ -64,25 +72,25 @@ public:
             }
 
             if (cell < 0 || cell >= Level::LENGTH) {
-                return trace[std::max(0, distance - 1)];
+                return collisionCell = trace[std::max(0, distance - 1)];
             }
 
             trace[distance++] = cell;
 
             if (!level->passable[cell] && !level->avoid[cell]) {
                 if (--distance > 0) {
-                    return trace[distance - 1];
+                    return collisionCell = trace[distance - 1];
                 }
-                return from;
+                return collisionCell = from;
             }
 
             if (level->losBlocking[cell] || (hitChars && Actor::findChar(cell) != nullptr)) {
-                return cell;
+                return collisionCell = cell;
             }
         }
 
         trace[distance++] = cell;
-        return to;
+        return collisionCell = to;
     }
 };
 

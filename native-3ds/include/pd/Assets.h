@@ -20,6 +20,11 @@ public:
     inline static const std::string XP_BAR        = "romfs:/exp_bar.png";
     inline static const std::string TOOLBAR       = "romfs:/toolbar.png";
     inline static const std::string SHADOW        = "romfs:/shadow.png";
+    inline static const std::string FONTS1X       = "romfs:/font1x.png";
+    inline static const std::string FONTS15X      = "romfs:/font15x.png";
+    inline static const std::string FONTS2X       = "romfs:/font2x.png";
+    inline static const std::string FONTS25X      = "romfs:/font25x.png";
+    inline static const std::string FONTS3X       = "romfs:/font3x.png";
 
     // Hero Spritesheets (12x15 per frame)
     inline static const std::string WARRIOR       = "romfs:/warrior.png";
@@ -114,6 +119,17 @@ public:
     inline static const std::string SND_BURNING   = "romfs:/snd_burning.mp3";
     inline static const std::string SND_TELEPORT  = "romfs:/snd_teleport.mp3";
     inline static const std::string SND_PUFF      = "romfs:/snd_puff.mp3";
+    inline static const std::string SND_EVOKE     = "romfs:/snd_evoke.mp3";
+    inline static const std::string SND_MASTERY   = "romfs:/snd_mastery.mp3";
+    inline static const std::string SND_MELD      = "romfs:/snd_meld.mp3";
+    inline static const std::string SND_DEGRADE   = "romfs:/snd_degrade.mp3";
+    inline static const std::string SND_CHARMS    = "romfs:/snd_charms.mp3";
+    inline static const std::string SND_CHALLENGE = "romfs:/snd_challenge.mp3";
+    inline static const std::string SND_MIMIC     = "romfs:/snd_mimic.mp3";
+    inline static const std::string SND_PLANT     = "romfs:/snd_plant.mp3";
+    inline static const std::string SND_RAY       = "romfs:/snd_ray.mp3";
+    inline static const std::string SND_LULLABY   = "romfs:/snd_lullaby.mp3";
+    inline static const std::string SND_GHOST     = "romfs:/snd_ghost.mp3";
 
     // Helper returning depth-appropriate tilesheet
     static const std::string& getTilesetForDepth(int depth) {

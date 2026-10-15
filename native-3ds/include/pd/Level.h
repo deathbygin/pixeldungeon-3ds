@@ -20,6 +20,7 @@ public:
 
     int map[LENGTH] = { 0 };
     bool visited[LENGTH] = { false };
+    bool mapped[LENGTH] = { false };
     bool fieldOfView[LENGTH] = { false };
     bool passable[LENGTH] = { false };
     bool losBlocking[LENGTH] = { false };

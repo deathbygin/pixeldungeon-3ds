@@ -53,7 +53,7 @@ public:
     virtual void move(int step);
     virtual void place(int cell);
     virtual int stealth() const { return 0; }
-    float speed() const;
+    virtual float speed() const;
     bool isAlive() const { return HP > 0; }
 
     void addBuff(Buff* b);

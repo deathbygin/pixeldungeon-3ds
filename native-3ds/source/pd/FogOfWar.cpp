@@ -46,6 +46,7 @@ FogOfWar::FogOfWar(int mapWidth, int mapHeight)
     scale.x = 16.0f;
     scale.y = 16.0f;
     targetScreen = noosa::ScreenTarget::Top;
+    z = 0.65f;
 }
 
 void FogOfWar::updateVisibility(const bool* visible, const bool* visited, const bool* mapped) {

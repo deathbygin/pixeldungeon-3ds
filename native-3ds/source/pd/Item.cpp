@@ -10,6 +10,7 @@
 #include "pd/Buff.h"
 #include "pd/GLog.h"
 #include "pd/Assets.h"
+#include "pd/Ballistica.h"
 #include "noosa/Audio.h"
 #include <sstream>
 #include <algorithm>
@@ -33,6 +34,14 @@ Item* Item::random() {
     return this;
 }
 
+std::unique_ptr<Item> Item::clone(int qty) const {
+    auto it = std::make_unique<Item>();
+    it->name = name;
+    it->image = image;
+    it->quantity = qty;
+    return it;
+}
+
 std::string Item::info() const {
     return "A common dungeon object.";
 }
@@ -54,118 +63,97 @@ static bool doDropItem(Hero* hero, Item* item) {
     return true;
 }
 
+void Item::cast(Hero* hero, int targetCell) {
+    if (!hero) return;
+
+    int cell = Ballistica::cast(hero->pos, targetCell, false, true);
+
+    // Hero turns and operates/zaps towards target
+    if (hero->sprite) {
+        hero->sprite->turnTo(hero->pos, cell);
+    }
+    HeroSprite* hspr = hero->getSprite() ? hero->getSprite()->asHeroSprite() : nullptr;
+    if (hspr) {
+        hspr->operate(cell);
+    }
+
+    noosa::Audio::play(noosa::Audio::getSample(Assets::SND_MISS).get(), 0.6f, 0.0f);
+
+    float delay = Actor::TICK * speedFactor(hero);
+
+    // Separate 1 unit from stack if stackable
+    std::unique_ptr<Item> thrown = nullptr;
+    if (quantity > 1) {
+        quantity--;
+        thrown = clone(1);
+    } else {
+        thrown = hero->belongings.drop(this);
+    }
+
+    if (!thrown) return;
+
+    Item* thrownPtr = thrown.release();
+
+    // Spawn animated parabolic projectile
+    FX::missile(hero->pos, cell, thrownPtr->image, [hero, thrownPtr, cell, delay]() {
+        thrownPtr->onThrow(cell);
+        hero->spendAndNext(delay);
+        Actor::process();
+        if (Dungeon::level) {
+            FX::evolveBlobs(Dungeon::level.get());
+        }
+        Dungeon::mobs.erase(
+            std::remove_if(Dungeon::mobs.begin(), Dungeon::mobs.end(),
+                           [](const std::unique_ptr<Mob>& m) { return !m || !m->isAlive(); }),
+            Dungeon::mobs.end()
+        );
+    });
+}
+
+void Item::onThrow(int cell) {
+    if (Dungeon::level) {
+        Char* ch = Actor::findChar(cell);
+        if (ch && ch != Dungeon::hero.get()) {
+            int dmg = Random::IntRange(1, 2);
+            ch->damage(dmg, Dungeon::hero.get());
+            FX::floatingText(cell, std::to_string(dmg), 0xe43b44FF);
+            GLog::i("The " + displayName() + " strikes " + ch->name + " for " + std::to_string(dmg) + " damage!");
+        }
+
+        std::unique_ptr<Item> self(this);
+        Dungeon::level->drop(std::move(self), cell);
+    }
+}
+
 static bool doThrowItem(Hero* hero, Item* item) {
     if (!hero || !item) return false;
-    std::string itemName = item->displayName();
-    std::unique_ptr<Item> thrown = nullptr;
 
-    if (item->quantity > 1) {
-        item->quantity--;
-        if (item->category() == ItemCategory::Potion) {
-            thrown = std::make_unique<Potion>(static_cast<Potion*>(item)->type);
-        } else if (item->category() == ItemCategory::Scroll) {
-            thrown = std::make_unique<Scroll>(static_cast<Scroll*>(item)->type);
-        } else if (item->name == "Dewdrop") {
-            thrown = std::make_unique<Dewdrop>();
-        } else {
-            thrown = std::make_unique<Food>();
+    int targetCell = hero->pos;
+    Char* nearestEnemy = nullptr;
+    float minDist = 999.0f;
+    for (const auto& m : Dungeon::mobs) {
+        if (m && m->isAlive() && Dungeon::visible[m->pos]) {
+            float dist = PathFinder::distanceChebyshev(hero->pos, m->pos);
+            if (dist < minDist) {
+                minDist = dist;
+                nearestEnemy = m.get();
+            }
         }
+    }
+
+    if (nearestEnemy) {
+        targetCell = nearestEnemy->pos;
     } else {
-        thrown = hero->belongings.drop(item);
+        for (int i = 0; i < 8; ++i) {
+            int n = hero->pos + PathFinder::NEIGHBOURS8[i];
+            if (Dungeon::level && Dungeon::level->isPassable(n)) {
+                targetCell = n;
+                break;
+            }
+        }
     }
 
-    if (thrown && Dungeon::level) {
-        int targetCell = hero->pos;
-        Char* nearestEnemy = nullptr;
-        float minDist = 999.0f;
-        for (const auto& m : Dungeon::mobs) {
-            if (m && m->isAlive() && Dungeon::visible[m->pos]) {
-                float dist = PathFinder::distanceChebyshev(hero->pos, m->pos);
-                if (dist < minDist) {
-                    minDist = dist;
-                    nearestEnemy = m.get();
-                }
-            }
-        }
-
-        if (nearestEnemy) {
-            targetCell = nearestEnemy->pos;
-        } else {
-            for (int i = 0; i < 8; ++i) {
-                int n = hero->pos + PathFinder::NEIGHBOURS8[i];
-                if (Dungeon::level->isPassable(n)) {
-                    targetCell = n;
-                    break;
-                }
-            }
-        }
-
-        float fx = (hero->pos % Level::WIDTH) * 16.0f + 8.0f;
-        float fy = (hero->pos / Level::WIDTH) * 16.0f + 8.0f;
-        float tx = (targetCell % Level::WIDTH) * 16.0f + 8.0f;
-        float ty = (targetCell / Level::WIDTH) * 16.0f + 8.0f;
-        FX::burst((fx + tx) * 0.5f, (fy + ty) * 0.5f, 0xffffffFF, 4);
-
-        if (nearestEnemy && targetCell == nearestEnemy->pos) {
-            int dmg = Random::IntRange(1, 4);
-            nearestEnemy->damage(dmg, hero);
-            FX::floatingText(targetCell, std::to_string(dmg), 0xe43b44FF);
-            GLog::p("You hit " + nearestEnemy->name + " with " + itemName + " for " + std::to_string(dmg) + " dmg!");
-        }
-
-        if (thrown->category() == ItemCategory::Potion) {
-            Potion* pot = static_cast<Potion*>(thrown.get());
-            if (pot->type == Potion::PotionType::TOXIC_GAS ||
-                pot->type == Potion::PotionType::LIQUID_FLAME ||
-                pot->type == Potion::PotionType::FROST ||
-                pot->type == Potion::PotionType::PARALYTIC_GAS) {
-
-                if (Dungeon::visible[targetCell]) {
-                    Potion::setKnown(pot->type);
-                }
-
-                if (pot->type == Potion::PotionType::TOXIC_GAS) {
-                    FX::burst(targetCell, 0x00ff00FF, 16);
-                    GLog::i("The flask shatters and a cloud of toxic gas billows out!");
-                    if (nearestEnemy && targetCell == nearestEnemy->pos) {
-                        nearestEnemy->damage(Random::IntRange(4, 10), hero);
-                    }
-                } else if (pot->type == Potion::PotionType::LIQUID_FLAME) {
-                    FX::burst(targetCell, 0xff4500FF, 16);
-                    GLog::i("The flask shatters and liquid flame bursts into a roaring inferno!");
-                    if (nearestEnemy && targetCell == nearestEnemy->pos) {
-                        nearestEnemy->damage(Random::IntRange(6, 14), hero);
-                    }
-                } else if (pot->type == Potion::PotionType::FROST) {
-                    FX::burst(targetCell, 0x00ffffff, 16);
-                    GLog::i("The flask shatters and freezing frost encases the area!");
-                    if (nearestEnemy && targetCell == nearestEnemy->pos) {
-                        nearestEnemy->damage(Random::IntRange(3, 8), hero);
-                    }
-                } else if (pot->type == Potion::PotionType::PARALYTIC_GAS) {
-                    FX::burst(targetCell, 0xffff00FF, 16);
-                    GLog::i("The flask shatters into a cloud of paralyzing vapor!");
-                    if (nearestEnemy && targetCell == nearestEnemy->pos) {
-                        nearestEnemy->spend(4.0f * Actor::TICK);
-                    }
-                }
-                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_SHATTER).get());
-            } else {
-                if (Dungeon::visible[targetCell]) {
-                    GLog::i("The flask shatters and " + Potion::colorName(pot->type) + " liquid splashes harmlessly.");
-                    noosa::Audio::play(noosa::Audio::getSample(Assets::SND_SHATTER).get());
-                    FX::burst(targetCell, 0x88ccffFF, 6);
-                }
-            }
-            hero->spendAndNext(Actor::TICK);
-            return true;
-        }
-
-        Dungeon::level->drop(std::move(thrown), targetCell);
-        GLog::i("You threw " + itemName);
-    }
-
-    hero->spendAndNext(Actor::TICK);
+    item->cast(hero, targetCell);
     return true;
 }
 
@@ -301,8 +289,31 @@ std::string Weapon::info() const {
     }
 }
 
+float Weapon::acuracyFactor(Hero* hero) const {
+    if (!hero) return 1.0f;
+    int encumbrance = STR - hero->STR;
+    return (encumbrance > 0) ? static_cast<float>(1.0 / std::pow(1.5, encumbrance)) : 1.0f;
+}
+
+float Weapon::speedFactor(Hero* hero) const {
+    if (!hero) return 1.0f;
+    int encumbrance = STR - hero->STR;
+    return (encumbrance > 0) ? static_cast<float>(std::pow(1.2, encumbrance)) : 1.0f;
+}
+
 int Weapon::damageRoll() const {
     return Random::IntRange(minDamage, maxDamage) + level;
+}
+
+int Weapon::damageRoll(Hero* hero) const {
+    int dmg = damageRoll();
+    if (hero && hero->heroClass != Hero::HeroClass::Huntress) {
+        int exStr = hero->STR - STR;
+        if (exStr > 0) {
+            dmg += Random::IntRange(0, exStr);
+        }
+    }
+    return dmg;
 }
 
 void Weapon::proc(Char* attacker, Char* defender, int damage) {
@@ -315,6 +326,289 @@ void Weapon::proc(Char* attacker, Char* defender, int damage) {
             GLog::i("You are now familiar enough with your " + name + " to identify it. It is " + displayName() + ".");
         }
     }
+}
+
+// -----------------------------------------------------------------------------
+// ShortSword
+// -----------------------------------------------------------------------------
+ShortSword::ShortSword() : Weapon("Shortsword", 3, 8, 11) {
+    image = ItemSpriteSheet::SHORT_SWORD;
+}
+
+std::vector<std::string> ShortSword::actions(Hero* hero) {
+    auto acts = Weapon::actions(hero);
+    if (level > 0) {
+        acts.push_back("REFORGE");
+    }
+    return acts;
+}
+
+bool ShortSword::execute(Hero* hero, const std::string& action) {
+    if (!hero) return false;
+    if (action == "REFORGE") {
+        Weapon* target = nullptr;
+        if (hero->belongings.equippedWeapon && hero->belongings.equippedWeapon != this) {
+            target = hero->belongings.equippedWeapon;
+        } else {
+            for (auto& it : hero->belongings.backpack) {
+                if (it && it.get() != this) {
+                    Weapon* w = it->asWeapon();
+                    if (w && !w->asBoomerang()) {
+                        target = w;
+                        break;
+                    }
+                }
+            }
+        }
+        if (target) {
+            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_EVOKE).get());
+            target->upgrade();
+            target->identify();
+            GLog::w("You reforged the shortsword to upgrade your " + target->name + "!");
+            FX::burst(hero->pos, 0xffd700FF, 12);
+            FX::floatingText(hero->pos, "+1 LVL", 0xffd700FF);
+            hero->spendAndNext(2.0f * Actor::TICK);
+            quantity = 0;
+            hero->belongings.drop(this);
+            return true;
+        } else {
+            GLog::w("You need another melee weapon to reforge this onto!");
+            return false;
+        }
+    }
+    return Weapon::execute(hero, action);
+}
+
+std::string ShortSword::info() const {
+    return "It is indeed quite short, just a few inches longer than a dagger. When upgraded, it can be reforged to upgrade another melee weapon.";
+}
+
+std::unique_ptr<Item> ShortSword::clone(int qty) const {
+    auto s = std::make_unique<ShortSword>();
+    s->level = level;
+    s->quantity = qty;
+    s->identified = identified;
+    s->levelKnown = levelKnown;
+    return s;
+}
+
+// -----------------------------------------------------------------------------
+// Wand
+// -----------------------------------------------------------------------------
+Wand::Wand(std::string n, int initialC)
+    : Weapon(std::move(n), 2, 7, 10), maxCharges(initialC), curCharges(initialC) {
+    image = ItemSpriteSheet::WAND_MAGIC_MISSILE;
+}
+
+std::vector<std::string> Wand::actions(Hero* hero) {
+    std::vector<std::string> acts;
+    if (curCharges > 0) {
+        acts.push_back("ZAP");
+    }
+    if (hero && hero->heroClass == Hero::HeroClass::Mage) {
+        if (hero->belongings.equippedWeapon == this) {
+            acts.push_back("UNEQUIP");
+        } else {
+            acts.push_back("EQUIP");
+        }
+    }
+    acts.push_back("THROW");
+    acts.push_back("DROP");
+    return acts;
+}
+
+bool Wand::execute(Hero* hero, const std::string& action) {
+    if (!hero) return false;
+    if (action == "ZAP") {
+        if (curCharges <= 0) {
+            GLog::w("Your wand fizzles; it must be out of charges for now.");
+            hero->spendAndNext(Actor::TICK);
+            return true;
+        }
+        int targetCell = hero->pos;
+        Char* nearestEnemy = nullptr;
+        float minDist = 999.0f;
+        for (const auto& m : Dungeon::mobs) {
+            if (m && m->isAlive() && Dungeon::visible[m->pos]) {
+                float dist = static_cast<float>(PathFinder::distanceChebyshev(hero->pos, m->pos));
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearestEnemy = m.get();
+                }
+            }
+        }
+        if (nearestEnemy) {
+            targetCell = nearestEnemy->pos;
+        } else {
+            for (int i = 0; i < 8; ++i) {
+                int n = hero->pos + PathFinder::NEIGHBOURS8[i];
+                if (Dungeon::level && Dungeon::level->isPassable(n)) {
+                    targetCell = n;
+                    break;
+                }
+            }
+        }
+
+        cast(hero, targetCell);
+        return true;
+    }
+    return Weapon::execute(hero, action);
+}
+
+std::string Wand::info() const {
+    std::string s = "A magical wand. When zapped, it unleashes potent arcane energy.";
+    if (Dungeon::hero && Dungeon::hero->heroClass == Hero::HeroClass::Mage) {
+        s += "\n\nYou can also equip this wand as a melee weapon.";
+    }
+    return s;
+}
+
+std::string Wand::displayName() const {
+    std::string s = Weapon::displayName();
+    s += " (" + std::to_string(curCharges) + "/" + std::to_string(maxCharges) + ")";
+    return s;
+}
+
+void Wand::updateCharge(float dt, Hero* hero) {
+    if (curCharges >= maxCharges) {
+        chargeTimer = 0.0f;
+        return;
+    }
+    chargeTimer += dt;
+    float timeToCharge = 40.0f;
+    if (hero && hero->heroClass == Hero::HeroClass::Mage) {
+        timeToCharge = 40.0f / std::sqrt(1.0f + static_cast<float>(level));
+    }
+    if (chargeTimer >= timeToCharge) {
+        chargeTimer -= timeToCharge;
+        curCharges++;
+    }
+}
+
+void Wand::restoreCharge(int count) {
+    curCharges = std::min(maxCharges, curCharges + count);
+}
+
+void Wand::upgrade() {
+    Weapon::upgrade();
+    maxCharges = std::min(9, maxCharges + 1);
+    curCharges = std::min(maxCharges, curCharges + 1);
+}
+
+void Wand::degrade() {
+    Weapon::degrade();
+    maxCharges = std::max(1, maxCharges - 1);
+    curCharges = std::min(maxCharges, curCharges);
+}
+
+void Wand::onZap(int cell) {
+    (void)cell;
+}
+
+void Wand::cast(Hero* hero, int targetCell) {
+    if (!hero) return;
+
+    if (curCharges <= 0) {
+        GLog::w("Your wand fizzles; it must be out of charges for now.");
+        hero->spendAndNext(Actor::TICK);
+        return;
+    }
+
+    int cell = Ballistica::cast(hero->pos, targetCell, true, true);
+    if (hero->getSprite()) {
+        hero->getSprite()->turnTo(hero->pos, cell);
+        HeroSprite* hspr = hero->getSprite()->asHeroSprite();
+        if (hspr) hspr->operate(cell);
+    }
+
+    noosa::Audio::play(noosa::Audio::getSample(Assets::SND_ZAP).get());
+    curCharges--;
+    onZap(cell);
+    hero->spendAndNext(Actor::TICK);
+    Actor::process();
+    if (Dungeon::level) {
+        FX::evolveBlobs(Dungeon::level.get());
+    }
+    Dungeon::mobs.erase(
+        std::remove_if(Dungeon::mobs.begin(), Dungeon::mobs.end(),
+                       [](const std::unique_ptr<Mob>& m) { return !m || !m->isAlive(); }),
+        Dungeon::mobs.end()
+    );
+}
+
+// -----------------------------------------------------------------------------
+// WandOfMagicMissile
+// -----------------------------------------------------------------------------
+WandOfMagicMissile::WandOfMagicMissile() : Wand("Wand of Magic Missile", 3) {
+    image = ItemSpriteSheet::WAND_MAGIC_MISSILE;
+    identified = true;
+    levelKnown = true;
+}
+
+std::vector<std::string> WandOfMagicMissile::actions(Hero* hero) {
+    auto acts = Wand::actions(hero);
+    if (level > 0) {
+        acts.push_back("DISENCHANT");
+    }
+    return acts;
+}
+
+bool WandOfMagicMissile::execute(Hero* hero, const std::string& action) {
+    if (!hero) return false;
+    if (action == "DISENCHANT") {
+        Wand* targetWand = nullptr;
+        for (auto& it : hero->belongings.backpack) {
+            if (it && it.get() != this) {
+                Wand* w = it->asWand();
+                if (w) {
+                    targetWand = w;
+                    break;
+                }
+            }
+        }
+        if (targetWand) {
+            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_EVOKE).get());
+            targetWand->upgrade();
+            targetWand->identify();
+            GLog::w("You disenchanted the Wand of Magic Missile to upgrade your " + targetWand->name + "!");
+            FX::burst(hero->pos, 0x99ccffFF, 12);
+            FX::floatingText(hero->pos, "+1 LVL", 0x99ccffFF);
+            hero->spendAndNext(2.0f * Actor::TICK);
+            quantity = 0;
+            hero->belongings.drop(this);
+            return true;
+        } else {
+            GLog::w("You need another wand to disenchant this into!");
+            return false;
+        }
+    }
+    return Wand::execute(hero, action);
+}
+
+void WandOfMagicMissile::onZap(int cell) {
+    Char* ch = Actor::findChar(cell);
+    if (ch) {
+        int dmg = Random::IntRange(1, 6 + level * 2);
+        ch->damage(dmg, Dungeon::hero.get());
+        FX::burst(cell, 0x99ccffFF, 8 + level);
+        FX::floatingText(cell, std::to_string(dmg), 0x99ccffFF);
+        GLog::i("The magic missile strikes " + ch->name + " for " + std::to_string(dmg) + " damage!");
+    } else {
+        FX::burst(cell, 0x99ccffFF, 6);
+    }
+}
+
+std::string WandOfMagicMissile::info() const {
+    return "This wand launches missiles of pure magical energy, dealing moderate damage to a target creature.";
+}
+
+std::unique_ptr<Item> WandOfMagicMissile::clone(int qty) const {
+    auto w = std::make_unique<WandOfMagicMissile>();
+    w->level = level;
+    w->curCharges = curCharges;
+    w->maxCharges = maxCharges;
+    w->quantity = qty;
+    return w;
 }
 
 // -----------------------------------------------------------------------------
@@ -629,6 +923,12 @@ std::string Potion::displayName() const {
     return s;
 }
 
+std::unique_ptr<Item> Potion::clone(int qty) const {
+    auto p = std::make_unique<Potion>(type);
+    p->quantity = qty;
+    return p;
+}
+
 std::vector<std::string> Potion::actions(Hero* hero) {
     (void)hero;
     return { "DRINK", "THROW", "DROP" };
@@ -740,6 +1040,90 @@ std::string Potion::info() const {
         return trueDesc(type);
     } else {
         return "This flask contains a swirling " + colorName(type) + " liquid. Who knows what it will do when drunk or thrown?";
+    }
+}
+
+void Potion::onThrow(int cell) {
+    shatter(cell);
+    delete this;
+}
+
+void Potion::shatter(int cell) {
+    if (cell < 0 || cell >= Level::LENGTH) return;
+
+    if (Dungeon::visible[cell]) {
+        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_SHATTER).get());
+        FX::splash(cell, 0x88ccffFF, 8);
+    }
+
+    Char* targetChar = Actor::findChar(cell);
+
+    switch (type) {
+        case PotionType::TOXIC_GAS: {
+            if (Dungeon::visible[cell]) setKnown(type);
+            FX::burst(cell, 0x00ff00FF, 16);
+            FX::seedBlob(cell, Blob::BlobType::TOXIC_GAS, 1000);
+            if (Dungeon::visible[cell]) {
+                GLog::i("The flask shatters and a cloud of toxic gas billows out!");
+            }
+            break;
+        }
+        case PotionType::LIQUID_FLAME: {
+            if (Dungeon::visible[cell]) setKnown(type);
+            FX::burst(cell, 0xff4500FF, 16);
+            FX::seedBlob(cell, Blob::BlobType::FIRE, 4);
+            if (Dungeon::visible[cell]) {
+                GLog::i("The flask shatters and liquid flame bursts into a roaring inferno!");
+            }
+            break;
+        }
+        case PotionType::PARALYTIC_GAS: {
+            if (Dungeon::visible[cell]) setKnown(type);
+            FX::burst(cell, 0xffff00FF, 16);
+            FX::seedBlob(cell, Blob::BlobType::PARALYTIC_GAS, 1000);
+            if (Dungeon::visible[cell]) {
+                GLog::i("The flask shatters into a cloud of paralyzing vapor!");
+            }
+            break;
+        }
+        case PotionType::FROST: {
+            if (Dungeon::visible[cell]) setKnown(type);
+            FX::burst(cell, 0x00ffffff, 16);
+            if (Dungeon::visible[cell]) {
+                GLog::i("The flask shatters and freezing frost encases the area!");
+            }
+            // Freeze target and adjacent cells
+            for (int dy = -1; dy <= 1; ++dy) {
+                for (int dx = -1; dx <= 1; ++dx) {
+                    int c = cell + dy * Level::WIDTH + dx;
+                    if (c >= 0 && c < Level::LENGTH) {
+                        Char* ch = Actor::findChar(c);
+                        if (ch) {
+                            ch->affect<Frost>();
+                            ch->damage(Random::IntRange(3, 8), Dungeon::hero.get());
+                        }
+                    }
+                }
+            }
+            break;
+        }
+        case PotionType::HEALING: {
+            if (targetChar) {
+                targetChar->HP = targetChar->HT;
+                FX::burst(cell, 0x38b764FF, 12);
+                FX::floatingText(cell, "HEALED", 0x38b764FF);
+                if (Dungeon::visible[cell]) setKnown(type);
+            } else if (Dungeon::visible[cell]) {
+                GLog::i("The flask shatters and " + colorName(type) + " liquid splashes harmlessly.");
+            }
+            break;
+        }
+        default: {
+            if (Dungeon::visible[cell]) {
+                GLog::i("The flask shatters and " + colorName(type) + " liquid splashes harmlessly.");
+            }
+            break;
+        }
     }
 }
 
@@ -916,6 +1300,12 @@ std::string Scroll::displayName() const {
     return s;
 }
 
+std::unique_ptr<Item> Scroll::clone(int qty) const {
+    auto s = std::make_unique<Scroll>(type);
+    s->quantity = qty;
+    return s;
+}
+
 std::vector<std::string> Scroll::actions(Hero* hero) {
     (void)hero;
     return { "READ", "THROW", "DROP" };
@@ -964,6 +1354,7 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
                 if (Dungeon::level) {
                     for (int i = 0; i < Level::LENGTH; ++i) {
                         if (Dungeon::level->map[i] != Terrain::WALL) {
+                            Dungeon::level->mapped[i] = true;
                             Dungeon::level->visited[i] = true;
                         }
                     }
@@ -1103,6 +1494,23 @@ bool Food::execute(Hero* hero, const std::string& action) {
                 hero->HP = std::min(hero->HT, hero->HP + 5);
                 FX::floatingText(hero->pos, "+5", 0x38b764FF);
             }
+        } else if (hero->heroClass == Hero::HeroClass::Mage) {
+            for (auto& item : hero->belongings.backpack) {
+                if (item) {
+                    Wand* w = item->asWand();
+                    if (w) {
+                        w->restoreCharge(1);
+                    }
+                }
+            }
+            if (hero->belongings.equippedWeapon) {
+                Wand* w = hero->belongings.equippedWeapon->asWand();
+                if (w) {
+                    w->restoreCharge(1);
+                }
+            }
+            GLog::i("Your wands surge with re-energized magic!");
+            FX::floatingText(hero->pos, "RECHARGED", 0x99ccffFF);
         }
         quantity--;
         hero->spendAndNext(3.0f * Actor::TICK);
@@ -1117,6 +1525,12 @@ bool Food::execute(Hero* hero, const std::string& action) {
 
 std::string Food::info() const {
     return "Nutritious traveling ration that satisfies hunger and restores vigor.";
+}
+
+std::unique_ptr<Item> Food::clone(int qty) const {
+    auto f = std::make_unique<Food>();
+    f->quantity = qty;
+    return f;
 }
 
 // -----------------------------------------------------------------------------
@@ -1138,8 +1552,12 @@ std::vector<std::string> Dewdrop::actions(Hero* hero) {
 bool Dewdrop::execute(Hero* hero, const std::string& action) {
     if (!hero) return false;
     if (action == "DRINK") {
-        hero->HP = std::min(hero->HT, hero->HP + 2);
-        FX::floatingText(hero->pos, "+2", 0x38b764FF);
+        int heal = 1 + (Dungeon::depth - 1) / 5;
+        if (hero->heroClass == Hero::HeroClass::Huntress) {
+            heal++;
+        }
+        hero->HP = std::min(hero->HT, hero->HP + heal);
+        FX::floatingText(hero->pos, "+" + std::to_string(heal), 0x38b764FF);
         quantity--;
         hero->spendAndNext(Actor::TICK);
         return true;
@@ -1151,6 +1569,12 @@ bool Dewdrop::execute(Hero* hero, const std::string& action) {
 
 std::string Dewdrop::info() const {
     return "A fresh drop of crystalline dew gathered from trampled tall grass.";
+}
+
+std::unique_ptr<Item> Dewdrop::clone(int qty) const {
+    auto d = std::make_unique<Dewdrop>();
+    d->quantity = qty;
+    return d;
 }
 
 // -----------------------------------------------------------------------------
@@ -1178,6 +1602,10 @@ bool Gold::execute(Hero* hero, const std::string& action) {
 
 std::string Gold::info() const {
     return "A pile of " + std::to_string(quantity) + " gold coins. Collect gold coins to spend them later in a shop.";
+}
+
+std::unique_ptr<Item> Gold::clone(int qty) const {
+    return std::make_unique<Gold>(qty);
 }
 
 // -----------------------------------------------------------------------------
@@ -1225,6 +1653,449 @@ IronKey::IronKey(int d) : Key(d) {
 
 std::string IronKey::info() const {
     return "A simple iron key that can open a locked door.";
+}
+
+// =============================================================================
+// MissileWeapon Implementations
+// =============================================================================
+MissileWeapon::MissileWeapon(std::string n, int minD, int maxD, int strReq)
+    : Weapon(std::move(n), minD, maxD, strReq) {
+}
+
+std::vector<std::string> MissileWeapon::actions(Hero* hero) {
+    (void)hero;
+    return { "THROW", "DROP" };
+}
+
+float MissileWeapon::acuracyFactor(Hero* hero) const {
+    if (!hero) return 1.0f;
+    int enc = STR - hero->STR;
+    if (hero->heroClass == Hero::HeroClass::Warrior) {
+        enc += 3;
+    } else if (hero->heroClass == Hero::HeroClass::Huntress) {
+        enc -= 2;
+    }
+    return enc > 0 ? static_cast<float>(1.0 / std::pow(1.5, enc)) : 1.0f;
+}
+
+float MissileWeapon::speedFactor(Hero* hero) const {
+    int enc = STR - (hero ? hero->STR : 10);
+    if (hero && hero->heroClass == Hero::HeroClass::Huntress) {
+        enc -= 2;
+    }
+    return enc > 0 ? (1.0f * std::pow(1.2f, static_cast<float>(enc))) : 1.0f;
+}
+
+int MissileWeapon::maxDistance(const Hero* hero) const {
+    bool isSniper = (hero && hero->subClass == HeroSubClass::Sniper);
+    return isSniper ? 10 : 8;
+}
+
+void MissileWeapon::onThrow(int cell) {
+    Char* enemy = Actor::findChar(cell);
+    if (!enemy || enemy == Dungeon::hero.get()) {
+        miss(cell);
+    } else {
+        if (!Dungeon::hero->shoot(enemy, this)) {
+            miss(cell);
+        } else {
+            // Check breakage chance on hit (1 in 4 breaks, surviving missile drops to floor)
+            if (Random::Int(4) == 0) {
+                FX::burst(cell, 0x888888FF, 6);
+                delete this;
+            } else {
+                miss(cell);
+            }
+        }
+    }
+}
+
+void MissileWeapon::miss(int cell) {
+    if (Dungeon::level) {
+        std::unique_ptr<Item> self(this);
+        Dungeon::level->drop(std::move(self), cell);
+    }
+}
+
+// Dart
+Dart::Dart(int number) : MissileWeapon("dart", 1, 4, 10) {
+    image = ItemSpriteSheet::DART;
+    quantity = number;
+}
+
+Item* Dart::random() {
+    quantity = Random::IntRange(5, 15);
+    return this;
+}
+
+std::string Dart::info() const {
+    return "These simple metal spikes are weighted to fly true and sting their prey with a flick of the wrist.";
+}
+
+std::unique_ptr<Item> Dart::clone(int qty) const {
+    return std::make_unique<Dart>(qty);
+}
+
+// Incendiary Dart
+IncendiaryDart::IncendiaryDart(int number) : MissileWeapon("incendiary dart", 1, 2, 12) {
+    image = ItemSpriteSheet::INCENDIARY_DART;
+    quantity = number;
+}
+
+Item* IncendiaryDart::random() {
+    quantity = Random::IntRange(3, 6);
+    return this;
+}
+
+void IncendiaryDart::onThrow(int cell) {
+    Char* enemy = Actor::findChar(cell);
+    if (!enemy || enemy == Dungeon::hero.get()) {
+        FX::seedBlob(cell, Blob::BlobType::FIRE, 4);
+        miss(cell);
+    } else {
+        MissileWeapon::onThrow(cell);
+    }
+}
+
+void IncendiaryDart::proc(Char* attacker, Char* defender, int damage) {
+    (void)attacker;
+    (void)damage;
+    if (defender) {
+        defender->affect<Burning>(4);
+    }
+}
+
+std::string IncendiaryDart::info() const {
+    return "The spike on each of these darts pins it to its target while volatile compounds burst into brilliant flames.";
+}
+
+std::unique_ptr<Item> IncendiaryDart::clone(int qty) const {
+    return std::make_unique<IncendiaryDart>(qty);
+}
+
+// Curare Dart
+CurareDart::CurareDart(int number) : MissileWeapon("curare dart", 1, 3, 14) {
+    image = ItemSpriteSheet::CURARE_DART;
+    quantity = number;
+}
+
+Item* CurareDart::random() {
+    quantity = Random::IntRange(2, 5);
+    return this;
+}
+
+void CurareDart::proc(Char* attacker, Char* defender, int damage) {
+    (void)attacker;
+    (void)damage;
+    if (defender) {
+        defender->affect<Paralysis>(3);
+    }
+}
+
+std::string CurareDart::info() const {
+    return "These little evil darts can paralyze the target leaving it helpless and motionless for some time.";
+}
+
+std::unique_ptr<Item> CurareDart::clone(int qty) const {
+    return std::make_unique<CurareDart>(qty);
+}
+
+// Javelin
+Javelin::Javelin(int number) : MissileWeapon("javelin", 2, 15, 15) {
+    image = ItemSpriteSheet::JAVELIN;
+    quantity = number;
+}
+
+Item* Javelin::random() {
+    quantity = Random::IntRange(5, 15);
+    return this;
+}
+
+void Javelin::proc(Char* attacker, Char* defender, int damage) {
+    (void)attacker;
+    (void)damage;
+    if (defender) {
+        defender->affect<Cripple>();
+    }
+}
+
+int Javelin::maxDistance(const Hero* hero) const {
+    bool isSniper = (hero && hero->subClass == HeroSubClass::Sniper);
+    return isSniper ? 7 : 6;
+}
+
+std::string Javelin::info() const {
+    return "This length of metal is weighted to keep the spike at its tip foremost as it sails through the air.";
+}
+
+std::unique_ptr<Item> Javelin::clone(int qty) const {
+    return std::make_unique<Javelin>(qty);
+}
+
+// Shuriken
+Shuriken::Shuriken(int number) : MissileWeapon("shuriken", 2, 6, 13) {
+    image = ItemSpriteSheet::SHURIKEN;
+    quantity = number;
+}
+
+Item* Shuriken::random() {
+    quantity = Random::IntRange(5, 15);
+    return this;
+}
+
+float Shuriken::speedFactor(Hero* hero) const {
+    return 0.5f * MissileWeapon::speedFactor(hero);
+}
+
+std::string Shuriken::info() const {
+    return "Star-shaped pieces of metal with razor-sharp blades. They can be thrown at very high rate.";
+}
+
+std::unique_ptr<Item> Shuriken::clone(int qty) const {
+    return std::make_unique<Shuriken>(qty);
+}
+
+// Tamahawk
+Tamahawk::Tamahawk(int number) : MissileWeapon("tomahawk", 4, 20, 17) {
+    image = ItemSpriteSheet::TOMAHAWK;
+    quantity = number;
+}
+
+Item* Tamahawk::random() {
+    quantity = Random::IntRange(5, 12);
+    return this;
+}
+
+void Tamahawk::proc(Char* attacker, Char* defender, int damage) {
+    (void)attacker;
+    if (defender) {
+        defender->affect<Bleeding>(damage);
+    }
+}
+
+int Tamahawk::maxDistance(const Hero* hero) const {
+    bool isSniper = (hero && hero->subClass == HeroSubClass::Sniper);
+    return isSniper ? 7 : 6;
+}
+
+std::string Tamahawk::info() const {
+    return "This throwing axe is not that heavy, but it still requires significant strength to be used effectively.";
+}
+
+std::unique_ptr<Item> Tamahawk::clone(int qty) const {
+    return std::make_unique<Tamahawk>(qty);
+}
+
+// Boomerang
+Boomerang::Boomerang() : MissileWeapon("boomerang", 1, 4, 10) {
+    image = ItemSpriteSheet::BOOMERANG;
+    quantity = 1;
+}
+
+void Boomerang::onThrow(int cell) {
+    Char* enemy = Actor::findChar(cell);
+    if (!enemy || enemy == Dungeon::hero.get()) {
+        circleBack(cell, Dungeon::hero.get());
+    } else {
+        if (!Dungeon::hero->shoot(enemy, this)) {
+            circleBack(cell, Dungeon::hero.get());
+        }
+    }
+}
+
+void Boomerang::miss(int cell) {
+    circleBack(cell, Dungeon::hero.get());
+}
+
+void Boomerang::proc(Char* attacker, Char* defender, int damage) {
+    (void)damage;
+    if (attacker && defender) {
+        Hero* h = attacker == Dungeon::hero.get() ? Dungeon::hero.get() : nullptr;
+        if (h && h->rangedWeapon == this) {
+            circleBack(defender->pos, h);
+        }
+    }
+}
+
+int Boomerang::maxDistance(const Hero* hero) const {
+    bool isSniper = (hero && hero->subClass == HeroSubClass::Sniper);
+    return isSniper ? 11 : 9;
+}
+
+void Boomerang::circleBack(int fromCell, Hero* owner) {
+    if (!owner) return;
+    int heroCell = owner->pos;
+
+    // Launch return missile sprite arc backwards to hero
+    FX::missile(fromCell, heroCell, image, [this, owner, heroCell]() {
+        std::unique_ptr<Item> self(this);
+        if (!owner->belongings.collect(std::move(self))) {
+            if (Dungeon::level) {
+                Dungeon::level->drop(std::unique_ptr<Item>(this), heroCell);
+            }
+        }
+    });
+}
+
+std::string Boomerang::info() const {
+    return "Thrown to the enemy this flat curved wooden missile will return to the hands of its thrower.";
+}
+
+std::unique_ptr<Item> Boomerang::clone(int qty) const {
+    auto b = std::make_unique<Boomerang>();
+    b->quantity = qty;
+    return b;
+}
+
+// =============================================================================
+// PlantSeed Implementation
+// =============================================================================
+PlantSeed::PlantSeed(PlantType pt) : plantType(pt) {
+    switch (pt) {
+        case PlantType::FIREBLOOM:  name = "Seed of Firebloom";  image = ItemSpriteSheet::SEED_FIREBLOOM;  break;
+        case PlantType::ICECAP:     name = "Seed of Icecap";     image = ItemSpriteSheet::SEED_ICECAP;     break;
+        case PlantType::SORROWMOSS: name = "Seed of Sorrowmoss"; image = ItemSpriteSheet::SEED_SORROWMOSS; break;
+        case PlantType::DREAMWEED:  name = "Seed of Dreamweed";  image = ItemSpriteSheet::SEED_DREAMWEED;  break;
+        case PlantType::SUNGRASS:   name = "Seed of Sungrass";   image = ItemSpriteSheet::SEED_SUNGRASS;   break;
+        case PlantType::EARTHROOT:  name = "Seed of Earthroot";  image = ItemSpriteSheet::SEED_EARTHROOT;  break;
+        case PlantType::FADELEAF:   name = "Seed of Fadeleaf";   image = ItemSpriteSheet::SEED_FADELEAF;   break;
+        case PlantType::ROTBERRY:   name = "Seed of Rotberry";   image = ItemSpriteSheet::SEED_ROTBERRY;   break;
+    }
+}
+
+std::vector<std::string> PlantSeed::actions(Hero* hero) {
+    (void)hero;
+    return { "THROW", "PLANT", "DROP" };
+}
+
+bool PlantSeed::execute(Hero* hero, const std::string& action) {
+    if (!hero) return false;
+    if (action == "PLANT") {
+        onThrow(hero->pos);
+        hero->spendAndNext(Actor::TICK);
+        return true;
+    }
+    return Item::execute(hero, action);
+}
+
+void PlantSeed::onThrow(int cell) {
+    if (!Dungeon::level) return;
+
+    // Planting logic:
+    // If thrown into open chasm, drops into chasm
+    if (Dungeon::level->map[cell] == Terrain::CHASM || Dungeon::level->pit[cell]) {
+        std::unique_ptr<Item> self(this);
+        Dungeon::dropToChasm(std::move(self));
+        return;
+    }
+
+    // High grass / plantable ground
+    if (Dungeon::visible[cell]) {
+        FX::splash(cell, 0x44aa44FF, 6);
+        GLog::i("The seed lands on the ground.");
+    }
+
+    std::unique_ptr<Item> self(this);
+    Dungeon::level->drop(std::move(self), cell);
+}
+
+std::string PlantSeed::info() const {
+    return "Throw this seed to the place where you want to plant it.";
+}
+
+std::string PlantSeed::displayName() const {
+    std::string s = name;
+    if (quantity > 1) s += " x" + std::to_string(quantity);
+    return s;
+}
+
+std::unique_ptr<Item> PlantSeed::clone(int qty) const {
+    auto p = std::make_unique<PlantSeed>(plantType);
+    p->quantity = qty;
+    return p;
+}
+
+// -----------------------------------------------------------------------------
+// TomeOfMastery
+// -----------------------------------------------------------------------------
+TomeOfMastery::TomeOfMastery() {
+    name = "Tome of Mastery";
+    image = ItemSpriteSheet::MASTERY;
+    identified = true;
+    levelKnown = true;
+}
+
+std::string TomeOfMastery::displayName() const {
+    if (Dungeon::hero && Dungeon::hero->subClass != HeroSubClass::None) {
+        return "Tome of Remastery";
+    }
+    return "Tome of Mastery";
+}
+
+std::vector<std::string> TomeOfMastery::actions(Hero* hero) {
+    (void)hero;
+    return { "READ", "DROP" };
+}
+
+bool TomeOfMastery::execute(Hero* hero, const std::string& action) {
+    if (!hero) return false;
+    if (action == "READ") {
+        if (hero->buff(BuffType::Paralysis)) {
+            GLog::w("You can't read while paralyzed!");
+            return false;
+        }
+        HeroSubClass sc1 = HeroSubClass::None;
+        HeroSubClass sc2 = HeroSubClass::None;
+        switch (hero->heroClass) {
+            case Hero::HeroClass::Warrior:
+                sc1 = HeroSubClass::Gladiator;
+                sc2 = HeroSubClass::Berserker;
+                break;
+            case Hero::HeroClass::Mage:
+                sc1 = HeroSubClass::Battlemage;
+                sc2 = HeroSubClass::Warlock;
+                break;
+            case Hero::HeroClass::Rogue:
+                sc1 = HeroSubClass::Assassin;
+                sc2 = HeroSubClass::Freerunner;
+                break;
+            case Hero::HeroClass::Huntress:
+                sc1 = HeroSubClass::Sniper;
+                sc2 = HeroSubClass::Warden;
+                break;
+        }
+
+        choose(hero, (hero->subClass == sc1) ? sc2 : sc1);
+        return true;
+    }
+    return Item::execute(hero, action);
+}
+
+void TomeOfMastery::choose(Hero* hero, HeroSubClass way) {
+    if (!hero) return;
+    hero->subClass = way;
+    hero->spendAndNext(10.0f * Actor::TICK);
+    noosa::Audio::play(noosa::Audio::getSample(Assets::SND_MASTERY).get());
+    FX::burst(hero->pos, 0xffd700FF, 16);
+    FX::floatingText(hero->pos, subClassTitle(way), 0xffd700FF);
+    GLog::w("You have chosen the way of the " + std::string(subClassTitle(way)) + "!");
+
+    if (way == HeroSubClass::Berserker && hero->HP <= hero->HT * 0.40f) {
+        hero->affect<Fury>();
+    }
+
+    quantity = 0;
+    hero->belongings.drop(this);
+}
+
+std::string TomeOfMastery::info() const {
+    return "This worn leather book is not that thick, but you feel somehow that you can gather a lot from it. Remember though that reading this tome may require some time.";
+}
+
+std::unique_ptr<Item> TomeOfMastery::clone(int qty) const {
+    auto t = std::make_unique<TomeOfMastery>();
+    t->quantity = qty;
+    return t;
 }
 
 } // namespace pd

@@ -21,12 +21,14 @@ public:
         LEVEL_REACHED_4  = 11, // Level 24 reached
         BOSS_SLAIN_1     = 12, // 1st boss slain (Goo)
         BOSS_SLAIN_2     = 13, // 2nd boss slain (Tengu)
-        DEATH_FROM_FIRE  = 14,
-        DEATH_FROM_POISON= 15,
-        DEATH_FROM_GAS   = 16,
-        DEATH_FROM_HUNGER= 17,
-        DEATH_FROM_FALLING= 18,
-        ALL_ITEMS_IDENTIFIED = 19,
+        BOSS_SLAIN_3     = 14, // 3rd boss slain (DM-300) - Unlocks Huntress!
+        BOSS_SLAIN_4     = 15, // 4th boss slain (King of Dwarves)
+        DEATH_FROM_FIRE  = 16,
+        DEATH_FROM_POISON= 17,
+        DEATH_FROM_GAS   = 18,
+        DEATH_FROM_HUNGER= 19,
+        DEATH_FROM_FALLING= 20,
+        ALL_ITEMS_IDENTIFIED = 21,
         COUNT
     };
 

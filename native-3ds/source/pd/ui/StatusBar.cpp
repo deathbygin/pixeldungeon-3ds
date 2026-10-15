@@ -1,5 +1,7 @@
 #include "pd/ui/StatusBar.h"
 #include "pd/Hero.h"
+#include "pd/Buff.h"
+#include "pd/HeroSubClass.h"
 #include <cstdio>
 #include <cmath>
 #include <algorithm>
@@ -22,8 +24,8 @@ void StatusBar::draw(const pd::Hero* hero, int depth, C2D_TextBuf textBuf) const
 
     // Stats line 1
     char buf[128];
-    std::snprintf(buf, sizeof(buf), "LV %d Warrior  |  Depth %d  |  Gold %d  |  STR %d",
-                  hero->level, depth, hero->gold, hero->STR);
+    std::snprintf(buf, sizeof(buf), "LV %d %s  |  Depth %d  |  Gold %d  |  STR %d",
+                  hero->level, hero->className().c_str(), depth, hero->gold, hero->STR);
     C2D_Text textObj;
     C2D_TextParse(&textObj, textBuf, buf);
     C2D_TextOptimize(&textObj);
@@ -40,6 +42,12 @@ void StatusBar::draw(const pd::Hero* hero, int depth, C2D_TextBuf textBuf) const
     float hpPct = std::clamp(static_cast<float>(hero->HP) / static_cast<float>(hero->HT), 0.0f, 1.0f);
     u32 hpColor = (hpPct > 0.5f) ? C2D_Color32(0x38, 0x9e, 0x38, 0xFF) :
                   (hpPct > 0.25f) ? C2D_Color32(0xd6, 0x9e, 0x2e, 0xFF) : C2D_Color32(0xd6, 0x30, 0x30, 0xFF);
+
+    if (hero->buff(BuffType::Fury)) {
+        // Red pulse outline for Berserker Fury
+        C2D_DrawRectSolid(barX - 1.0f, barY - 1.0f, 0.43f, barW + 2.0f, barH + 2.0f, C2D_Color32(0xff, 0x22, 0x22, 0xFF));
+        hpColor = C2D_Color32(0xff, 0x44, 0x22, 0xFF);
+    }
     C2D_DrawRectSolid(barX, barY, 0.45f, barW * hpPct, barH, hpColor);
 
     // HP Text
@@ -57,6 +65,45 @@ void StatusBar::draw(const pd::Hero* hero, int depth, C2D_TextBuf textBuf) const
 
     // Active Status / Buff Badges
     float badgeX = barX + 54.0f;
+    if (hero->buff(BuffType::Fury)) {
+        C2D_DrawRectSolid(badgeX, expY - 1.0f, 0.46f, 40.0f, 9.0f, C2D_Color32(0xff, 0x11, 0x11, 0xFF));
+        C2D_TextParse(&textObj, textBuf, "FURY");
+        C2D_TextOptimize(&textObj);
+        C2D_DrawText(&textObj, C2D_WithColor, badgeX + 4.0f, expY - 1.0f, 0.5f, 0.28f, 0.28f, C2D_Color32(0xff, 0xff, 0x88, 0xFF));
+        badgeX += 44.0f;
+    }
+    Combo* combo = const_cast<Hero*>(hero)->getBuff<Combo>();
+    if (combo && combo->count > 0) {
+        std::string cStr = "COMBO " + std::to_string(combo->count) + "x";
+        C2D_DrawRectSolid(badgeX, expY - 1.0f, 0.46f, 56.0f, 9.0f, C2D_Color32(0xcc, 0x33, 0x33, 0xFF));
+        C2D_TextParse(&textObj, textBuf, cStr.c_str());
+        C2D_TextOptimize(&textObj);
+        C2D_DrawText(&textObj, C2D_WithColor, badgeX + 2.0f, expY - 1.0f, 0.5f, 0.28f, 0.28f, C2D_Color32(0xff, 0xff, 0xff, 0xFF));
+        badgeX += 60.0f;
+    }
+    if (hero->buff(BuffType::SnipersMark)) {
+        C2D_DrawRectSolid(badgeX, expY - 1.0f, 0.46f, 48.0f, 9.0f, C2D_Color32(0x22, 0x88, 0x99, 0xFF));
+        C2D_TextParse(&textObj, textBuf, "SNIPER");
+        C2D_TextOptimize(&textObj);
+        C2D_DrawText(&textObj, C2D_WithColor, badgeX + 2.0f, expY - 1.0f, 0.5f, 0.28f, 0.28f, C2D_Color32(0xff, 0xff, 0xff, 0xFF));
+        badgeX += 52.0f;
+    }
+    Barkskin* bark = const_cast<Hero*>(hero)->getBuff<Barkskin>();
+    if (bark) {
+        std::string bStr = "BARK +" + std::to_string(bark->getLevel());
+        C2D_DrawRectSolid(badgeX, expY - 1.0f, 0.46f, 50.0f, 9.0f, C2D_Color32(0x66, 0x88, 0x33, 0xFF));
+        C2D_TextParse(&textObj, textBuf, bStr.c_str());
+        C2D_TextOptimize(&textObj);
+        C2D_DrawText(&textObj, C2D_WithColor, badgeX + 2.0f, expY - 1.0f, 0.5f, 0.28f, 0.28f, C2D_Color32(0xff, 0xff, 0xff, 0xFF));
+        badgeX += 54.0f;
+    }
+    if (hero->buff(BuffType::Shadows)) {
+        C2D_DrawRectSolid(badgeX, expY - 1.0f, 0.46f, 50.0f, 9.0f, C2D_Color32(0x44, 0x33, 0x66, 0xFF));
+        C2D_TextParse(&textObj, textBuf, "SHADOW");
+        C2D_TextOptimize(&textObj);
+        C2D_DrawText(&textObj, C2D_WithColor, badgeX + 2.0f, expY - 1.0f, 0.5f, 0.28f, 0.28f, C2D_Color32(0xdd, 0xcc, 0xff, 0xFF));
+        badgeX += 54.0f;
+    }
     if (hero->isStarving()) {
         C2D_DrawRectSolid(badgeX, expY - 1.0f, 0.46f, 52.0f, 9.0f, C2D_Color32(0xd6, 0x30, 0x30, 0xFF));
         C2D_TextParse(&textObj, textBuf, "STARVING");

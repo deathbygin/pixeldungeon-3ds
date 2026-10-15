@@ -217,6 +217,19 @@ bool Mob::act() {
     return true;
 }
 
+int Mob::defenseProc(Char* enemyChar, int damage) {
+    if (!enemySeen && enemyChar == Dungeon::hero.get()) {
+        Hero* hero = Dungeon::hero.get();
+        if (hero && hero->subClass == HeroSubClass::Assassin) {
+            damage += Random::IntRange(1, damage);
+            FX::slash(pos);
+            FX::blood(pos, 10);
+            GLog::p("Surprise attack! Critical strike!");
+        }
+    }
+    return damage;
+}
+
 // -----------------------------------------------------------------------------
 // Bestiary Implementations
 // -----------------------------------------------------------------------------
@@ -349,7 +362,7 @@ int Swarm::defenseSkill(Char* attackerChar) {
 }
 
 int Swarm::defenseProc(Char* enemyChar, int damage) {
-    (void)enemyChar;
+    damage = Mob::defenseProc(enemyChar, damage);
     if (HP >= damage + 2 && Dungeon::level) {
         std::vector<int> candidates;
         int n4[4] = { pos + 1, pos - 1, pos + Level::WIDTH, pos - Level::WIDTH };
