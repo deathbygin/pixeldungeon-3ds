@@ -64,12 +64,20 @@ public:
     static std::shared_ptr<SoundSample> getSample(const std::string& key);
     static void clearCache();
 
+    // Sound FX and Music toggles
+    static void setSoundFxEnabled(bool enabled);
+    static bool isSoundFxEnabled() { return s_soundFxEnabled; }
+    static void setMusicEnabled(bool enabled);
+    static bool isMusicEnabled() { return s_musicEnabled; }
+
     // Allocate an NDSP channel (0..NUM_CHANNELS-1)
     static int allocateChannel();
 
 private:
     static constexpr int NUM_CHANNELS = 16;
     static bool s_initialized;
+    static bool s_soundFxEnabled;
+    static bool s_musicEnabled;
     static ndspWaveBuf s_waveBufs[NUM_CHANNELS];
     static std::unordered_map<std::string, std::shared_ptr<SoundSample>> s_sampleCache;
 };

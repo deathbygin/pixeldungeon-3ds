@@ -1,5 +1,6 @@
 #include "pd/FogOfWar.h"
 #include "pd/Level.h"
+#include "pd/Preferences.h"
 #include <algorithm>
 
 namespace pd {
@@ -68,7 +69,7 @@ void FogOfWar::updateVisibility(const bool* visible, const bool* visited, const 
             if (visible[p0] && visible[p1] && visible[p2] && visible[p3]) {
                 c = COLOR_VISIBLE;
             } else if (visited[p0] && visited[p1] && visited[p2] && visited[p3]) {
-                c = COLOR_VISITED;
+                c = pd::Preferences::brightness() ? 0x88111111 : COLOR_VISITED;
             } else if (mapped && mapped[p0] && mapped[p1] && mapped[p2] && mapped[p3]) {
                 c = COLOR_MAPPED;
             }

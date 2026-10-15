@@ -59,6 +59,9 @@ void BottomScreenUI::reset() {
     cancelTargeting();
     if (m_wndBag.isOpen) m_wndBag.close();
     if (m_wndHero.isOpen()) m_wndHero.hide();
+    m_wndGame.hide();
+    m_wndSettings.hide();
+    m_pendingGameAction = pd::windows::GameAction::NONE;
     m_toolbar = Toolbar();
     m_showMinimap = true;
     initLogger();
@@ -158,6 +161,19 @@ void BottomScreenUI::toggleWndHero() {
     m_wndHero.toggle();
 }
 
+void BottomScreenUI::openPauseMenu() {
+    if (m_wndBag.isOpen) m_wndBag.close();
+    if (m_wndHero.isOpen()) m_wndHero.hide();
+    if (m_isTargeting) cancelTargeting();
+    m_wndSettings.hide();
+    m_wndGame.show();
+}
+
+void BottomScreenUI::closePauseMenu() {
+    m_wndGame.hide();
+    m_wndSettings.hide();
+}
+
 void BottomScreenUI::log(std::string msg, u32 color) {
     m_logConsole.addMessage(std::move(msg), color);
 }
@@ -210,13 +226,35 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
         return false;
     }
 
-    // 1. If WndHero modal is open, route input exclusively to it
+    // 1. If WndSettings modal is open, route input exclusively to it
+    if (m_wndSettings.isOpen()) {
+        m_wndSettings.update(m_touch, kDown);
+        if (!m_wndSettings.isOpen()) {
+            m_wndGame.show(); // Return to in-game pause menu
+        }
+        return false;
+    }
+
+    // 2. If WndGame modal is open, route input exclusively to it
+    if (m_wndGame.isOpen()) {
+        pd::windows::GameAction act = m_wndGame.update(m_touch, kDown);
+        if (act == pd::windows::GameAction::SETTINGS) {
+            m_wndGame.hide();
+            m_wndSettings.show();
+        } else if (act == pd::windows::GameAction::MAIN_MENU || act == pd::windows::GameAction::EXIT_GAME) {
+            m_pendingGameAction = act;
+            m_wndGame.hide();
+        }
+        return false;
+    }
+
+    // 3. If WndHero modal is open, route input exclusively to it
     if (m_wndHero.isOpen()) {
         m_wndHero.update(m_touch, kDown, hero);
         return false;
     }
 
-    // 2. If WndBag (Inventory) is open, route inputs exclusively to it
+    // 4. If WndBag (Inventory) is open, route inputs exclusively to it
     if (m_wndBag.isOpen) {
         std::string bagMsg;
         bool actionTaken = m_wndBag.update(hero, m_touch, kDown, bagMsg);
@@ -343,8 +381,7 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
         toggleWndHero();
         return false;
     } else if (statusAction == 2 || (kDown & KEY_START)) {
-        SaveManager::saveGame();
-        log("Game saved to SD storage.", C2D_Color32(0x56, 0xbb, 0x77, 0xFF));
+        openPauseMenu();
         return false;
     }
 
@@ -674,6 +711,16 @@ void BottomScreenUI::draw(const pd::Hero* hero, int depth, C2D_TextBuf textBuf) 
     // 7. Modal Hero Info Overlay (WndHero)
     if (m_wndHero.isOpen()) {
         m_wndHero.draw(hero, textBuf);
+    }
+
+    // 8. Modal Pause Menu (WndGame)
+    if (m_wndGame.isOpen()) {
+        m_wndGame.draw(textBuf);
+    }
+
+    // 9. Modal Settings Window (WndSettings)
+    if (m_wndSettings.isOpen()) {
+        m_wndSettings.draw(textBuf);
     }
 }
 

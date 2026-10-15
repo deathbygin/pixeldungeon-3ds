@@ -66,6 +66,7 @@
 #include "pd/scenes/TitleScene.h"
 #include "pd/scenes/HeroSelectScene.h"
 #include "pd/windows/WndStory.h"
+#include "pd/Preferences.h"
 
 using namespace noosa;
 using namespace pd;
@@ -310,9 +311,11 @@ int main(int argc, char* argv[]) {
     SoundSample sndStep;    sndStep.synthesizeTone(240.0f, 0.03f, 0.3f);
     SoundSample sndHit;     sndHit.synthesizeTone(180.0f, 0.08f, 0.6f);
 
-    // 5. Setup Camera & Dual-Screen UI
+    // 5. Setup Preferences, Camera & Dual-Screen UI
+    Preferences::init();
+
     Camera topCamera;
-    topCamera.setZoom(2.0f);
+    topCamera.setZoom(Preferences::zoom());
     topCamera.setBounds(0.0f, 0.0f, Level::WIDTH * 16.0f, Level::HEIGHT * 16.0f);
 
     if (Dungeon::hero) {
@@ -621,6 +624,19 @@ int main(int argc, char* argv[]) {
             }
 
             bool actionConsumed = bottomUI.update(hero, level, kDown, kHeld, kUp);
+
+            // Handle pause menu actions (Main Menu or Exit to 3DS Home Menu)
+            if (bottomUI.getPendingGameAction() == pd::windows::GameAction::MAIN_MENU) {
+                bottomUI.clearPendingGameAction();
+                SaveManager::saveGame();
+                appState = AppState::TITLE;
+                continue;
+            } else if (bottomUI.getPendingGameAction() == pd::windows::GameAction::EXIT_GAME) {
+                bottomUI.clearPendingGameAction();
+                SaveManager::saveGame();
+                break; // Terminate cleanly to Home Menu
+            }
+
             if (actionConsumed) {
                 Dungeon::mobs.erase(
                     std::remove_if(Dungeon::mobs.begin(), Dungeon::mobs.end(),
@@ -628,7 +644,7 @@ int main(int argc, char* argv[]) {
                     Dungeon::mobs.end()
                 );
                 FX::evolveBlobs(level);
-            } else if (hero && hero->restoreHealth) {
+            } else if (hero && hero->restoreHealth && !bottomUI.isPauseMenuOpen()) {
                 // Hero is resting: advance turns smoothly
                 static float restDelay = 0.0f;
                 restDelay += dt;
@@ -652,7 +668,7 @@ int main(int argc, char* argv[]) {
             // -----------------------------------------------------------------
             // 2. D-pad & Circle Pad Movement (Supports 8-directional analog movement)
             // -----------------------------------------------------------------
-            if (!actionConsumed && !bottomUI.isInventoryOpen() && !bottomUI.isTargeting() && !FX::isMissileActive() && hero && hero->isAlive() && !hero->restoreHealth) {
+            if (!actionConsumed && !bottomUI.isInventoryOpen() && !bottomUI.isTargeting() && !bottomUI.isPauseMenuOpen() && !bottomUI.isWndHeroOpen() && !FX::isMissileActive() && hero && hero->isAlive() && !hero->restoreHealth) {
                 int heroX = hero->pos % Level::WIDTH;
                 int heroY = hero->pos / Level::WIDTH;
                 int targetCell = -1;
@@ -807,7 +823,8 @@ int main(int argc, char* argv[]) {
                         else if (t == Terrain::WATER) tileImg.setFrame(fWater);
                         else tileImg.setFrame(fFloor);
 
-                        tileImg.tint = Color(255, 255, 255, 255);
+                        uint8_t tileB = Preferences::brightness() ? 255 : 215;
+                        tileImg.tint = Color(tileB, tileB, tileB, 255);
                         tileImg.draw(&topCamera);
                     }
                 }

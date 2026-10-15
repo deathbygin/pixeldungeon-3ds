@@ -1,0 +1,250 @@
+#include "pd/windows/WndSettings.h"
+#include "pd/Preferences.h"
+#include "pd/ui/Chrome.h"
+#include "pd/ui/BitmapFont.h"
+#include "pd/Assets.h"
+#include "noosa/Audio.h"
+#include <algorithm>
+#include <cmath>
+
+namespace pd::windows {
+
+static void setupSubTex(Tex3DS_SubTexture& sub, int potW, int potH, int fx, int fy, int fw, int fh) {
+    sub.width = static_cast<u16>(fw);
+    sub.height = static_cast<u16>(fh);
+    sub.left = static_cast<float>(fx) / static_cast<float>(potW);
+    sub.right = static_cast<float>(fx + fw) / static_cast<float>(potW);
+    sub.top = 1.0f - (static_cast<float>(fy) / static_cast<float>(potH));
+    sub.bottom = 1.0f - (static_cast<float>(fy + fh) / static_cast<float>(potH));
+}
+
+WndSettings::WndSettings() {
+    m_w = 190.0f;
+    m_h = 168.0f;
+    m_x = (320.0f - m_w) * 0.5f;
+    m_y = (240.0f - m_h) * 0.5f;
+    m_texIcons = noosa::Texture::get(pd::Assets::ICONS);
+}
+
+void WndSettings::initIcons() {
+    if (m_subIconsInit || !m_texIcons || !m_texIcons->isLoaded()) return;
+    int potW = m_texIcons->potWidth();
+    int potH = m_texIcons->potHeight();
+    // Icons.CHECKED: (54, 12, 12, 12), Icons.UNCHECKED: (66, 12, 12, 12)
+    setupSubTex(m_subChecked, potW, potH, 54, 12, 12, 12);
+    setupSubTex(m_subUnchecked, potW, potH, 66, 12, 12, 12);
+    m_subIconsInit = true;
+}
+
+void WndSettings::show() {
+    m_open = true;
+    m_selected = 1; // Default highlight on 2x zoom or music
+}
+
+bool WndSettings::update(const pd::ui::TouchController& touch, u32 kDown) {
+    if (!m_open) return false;
+
+    // B or START closes settings modal
+    if (kDown & (KEY_B | KEY_START)) {
+        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        hide();
+        return true;
+    }
+
+    // Coordinates
+    float rowW = m_w - 28.0f;
+    float rowX = m_x + 14.0f;
+
+    // Zoom buttons: 1x, 2x, 3x
+    float zBtnY = m_y + 24.0f;
+    float z1X = rowX;
+    float z1W = 46.0f;
+    float z2X = rowX + 51.0f;
+    float z2W = 60.0f;
+    float z3X = rowX + 116.0f;
+    float z3W = 46.0f;
+    float zH = 20.0f;
+
+    // Checkboxes
+    float musicY = m_y + 50.0f;
+    float sfxY = m_y + 76.0f;
+    float brightY = m_y + 102.0f;
+    float btnH = 22.0f;
+
+    // Return button
+    float retX = m_x + 24.0f;
+    float retY = m_y + 132.0f;
+    float retW = m_w - 48.0f;
+    float retH = 22.0f;
+
+    // Touch interaction
+    if (touch.clicked(noosa::RectF(z1X, zBtnY, z1W, zH))) {
+        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        Preferences::setZoom(1.0f);
+        m_selected = 0;
+        return true;
+    }
+    if (touch.clicked(noosa::RectF(z2X, zBtnY, z2W, zH))) {
+        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        Preferences::setZoom(2.0f);
+        m_selected = 1;
+        return true;
+    }
+    if (touch.clicked(noosa::RectF(z3X, zBtnY, z3W, zH))) {
+        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        Preferences::setZoom(3.0f);
+        m_selected = 2;
+        return true;
+    }
+    if (touch.clicked(noosa::RectF(rowX, musicY, rowW, btnH))) {
+        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        Preferences::setMusic(!Preferences::music());
+        m_selected = 3;
+        return true;
+    }
+    if (touch.clicked(noosa::RectF(rowX, sfxY, rowW, btnH))) {
+        Preferences::setSoundFx(!Preferences::soundFx());
+        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        m_selected = 4;
+        return true;
+    }
+    if (touch.clicked(noosa::RectF(rowX, brightY, rowW, btnH))) {
+        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        Preferences::setBrightness(!Preferences::brightness());
+        m_selected = 5;
+        return true;
+    }
+    if (touch.clicked(noosa::RectF(retX, retY, retW, retH))) {
+        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        hide();
+        return true;
+    }
+
+    // Hardware navigation
+    if (kDown & (KEY_DUP | KEY_CPAD_UP)) {
+        if (m_selected <= 2) m_selected = 6;
+        else if (m_selected == 3) m_selected = 1;
+        else m_selected--;
+    } else if (kDown & (KEY_DDOWN | KEY_CPAD_DOWN)) {
+        if (m_selected <= 2) m_selected = 3;
+        else if (m_selected == 6) m_selected = 1;
+        else m_selected++;
+    } else if (kDown & (KEY_DLEFT | KEY_CPAD_LEFT)) {
+        if (m_selected > 0 && m_selected <= 2) m_selected--;
+    } else if (kDown & (KEY_DRIGHT | KEY_CPAD_RIGHT)) {
+        if (m_selected < 2) m_selected++;
+    } else if (kDown & KEY_A) {
+        if (m_selected == 0) Preferences::setZoom(1.0f);
+        else if (m_selected == 1) Preferences::setZoom(2.0f);
+        else if (m_selected == 2) Preferences::setZoom(3.0f);
+        else if (m_selected == 3) Preferences::setMusic(!Preferences::music());
+        else if (m_selected == 4) Preferences::setSoundFx(!Preferences::soundFx());
+        else if (m_selected == 5) Preferences::setBrightness(!Preferences::brightness());
+        else if (m_selected == 6) hide();
+        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        return true;
+    }
+
+    return true; // Absorb input
+}
+
+void WndSettings::draw(C2D_TextBuf textBuf) {
+    (void)textBuf;
+    if (!m_open) return;
+
+    initIcons();
+
+    // 1. Darken background overlay
+    C2D_DrawRectSolid(0.0f, 0.0f, 0.80f, 320.0f, 240.0f, C2D_Color32(0x00, 0x00, 0x00, 0xAA));
+
+    // 2. 9-slice stone window chrome from chrome.png
+    pd::ui::Chrome::get(pd::ui::Chrome::Type::WINDOW).draw(m_x, m_y, m_w, m_h, 0.82f);
+
+    // 3. Header title "SETTINGS"
+    std::string title = "SETTINGS";
+    float titleW = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, title);
+    float titleX = std::round(m_x + (m_w - titleW) * 0.5f);
+    float titleY = m_y + 10.0f;
+    pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, title, titleX, titleY, 0.86f, 0xFFEBA4FF, 0x000000FF);
+
+    const auto& btnPatch = pd::ui::Chrome::get(pd::ui::Chrome::Type::BUTTON);
+
+    // 4. Zoom selector strip: [ 1x ] [ 2x (Def) ] [ 3x ]
+    float rowW = m_w - 28.0f;
+    float rowX = m_x + 14.0f;
+    float zBtnY = m_y + 24.0f;
+    float z1X = rowX;
+    float z1W = 46.0f;
+    float z2X = rowX + 51.0f;
+    float z2W = 60.0f;
+    float z3X = rowX + 116.0f;
+    float z3W = 46.0f;
+    float zH = 20.0f;
+
+    float curZoom = Preferences::zoom();
+
+    auto drawZoomBtn = [&](float bx, float bw, const std::string& lbl, bool isCurZoom, int selIdx) {
+        bool isFocus = (m_selected == selIdx);
+        float brightness = isCurZoom ? 1.4f : (isFocus ? 1.2f : 1.0f);
+        btnPatch.draw(bx, zBtnY, bw, zH, 0.84f, 0xFFFFFFFF, brightness);
+
+        float tw = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, lbl);
+        float tx = std::round(bx + (bw - tw) * 0.5f);
+        float ty = std::round(zBtnY + (zH - 8.0f) * 0.5f);
+        u32 col = isCurZoom ? 0xFFEE88FF : (isFocus ? 0xFFFFAAFF : 0xFFFFFFFF);
+        pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, lbl, tx, ty, 0.86f, col, 0x000000FF);
+    };
+
+    drawZoomBtn(z1X, z1W, "1x", std::abs(curZoom - 1.0f) < 0.1f, 0);
+    drawZoomBtn(z2X, z2W, "2x (Def)", std::abs(curZoom - 2.0f) < 0.1f, 1);
+    drawZoomBtn(z3X, z3W, "3x", std::abs(curZoom - 3.0f) < 0.1f, 2);
+
+    // 5. Checkboxes (Music, Sound FX, Brightness)
+    auto drawCheckBox = [&](float by, const std::string& label, bool isChecked, int selIdx) {
+        bool isFocus = (m_selected == selIdx);
+        float brightness = isFocus ? 1.25f : 1.0f;
+        btnPatch.draw(rowX, by, rowW, 22.0f, 0.84f, 0xFFFFFFFF, brightness);
+
+        // Text label on left
+        float tx = rowX + 10.0f;
+        float ty = std::round(by + (22.0f - 8.0f) * 0.5f);
+        u32 col = isFocus ? 0xFFEE88FF : 0xFFFFFFFF;
+        pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, label, tx, ty, 0.86f, col, 0x000000FF);
+
+        // Checkbox icon on right
+        if (m_texIcons && m_texIcons->isLoaded() && m_subIconsInit) {
+            Tex3DS_SubTexture& sub = isChecked ? m_subChecked : m_subUnchecked;
+            C2D_Image img = { m_texIcons->getTex(), &sub };
+            C2D_DrawParams p;
+            p.pos.x = rowX + rowW - 20.0f;
+            p.pos.y = by + 5.0f;
+            p.pos.w = 12.0f;
+            p.pos.h = 12.0f;
+            p.center.x = p.center.y = 0.0f;
+            p.depth = 0.86f;
+            p.angle = 0.0f;
+            C2D_DrawImage(img, &p, nullptr);
+        }
+    };
+
+    drawCheckBox(m_y + 50.0f, "Music", Preferences::music(), 3);
+    drawCheckBox(m_y + 76.0f, "Sound FX", Preferences::soundFx(), 4);
+    drawCheckBox(m_y + 102.0f, "Brightness", Preferences::brightness(), 5);
+
+    // 6. Return Button
+    float retX = m_x + 24.0f;
+    float retY = m_y + 132.0f;
+    float retW = m_w - 48.0f;
+    float retH = 22.0f;
+    bool isRetFocus = (m_selected == 6);
+    btnPatch.draw(retX, retY, retW, retH, 0.84f, 0xFFFFFFFF, isRetFocus ? 1.3f : 1.0f);
+    std::string retLabel = "Return";
+    float rtw = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, retLabel);
+    float rtx = std::round(retX + (retW - rtw) * 0.5f);
+    float rty = std::round(retY + (retH - 8.0f) * 0.5f);
+    pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, retLabel, rtx, rty, 0.86f,
+                                      isRetFocus ? 0xFFEE88FF : 0xFFFFFFFF, 0x000000FF);
+}
+
+} // namespace pd::windows
+

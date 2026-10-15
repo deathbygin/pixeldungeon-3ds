@@ -35,6 +35,7 @@ int StatusPane::update(const TouchController& touch, u32 kDown) {
     (void)kDown;
     // Avatar shield touch area: (0, 0, 40, HEIGHT)
     noosa::RectF avatarRect(0.0f, 0.0f, 40.0f, HEIGHT);
+    m_avatarPressed = touch.hitTest(avatarRect);
     if (touch.clicked(avatarRect)) {
         noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
         return 1; // Toggle Hero Info
@@ -42,6 +43,7 @@ int StatusPane::update(const TouchController& touch, u32 kDown) {
 
     // Menu button touch area: (290, 0, 30, HEIGHT)
     noosa::RectF menuRect(290.0f, 0.0f, 30.0f, HEIGHT);
+    m_menuPressed = touch.hitTest(menuRect);
     if (touch.clicked(menuRect)) {
         noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
         return 2; // Open Menu / Options
@@ -218,17 +220,29 @@ void StatusPane::draw(const pd::Hero* hero, int depth, C2D_TextBuf textBuf) cons
         BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, goldBuf, 255.0f, 9.0f, zText, 0xE4A672FF, 0x000000FF);
     }
 
-    // 7. Menu Button (x: 294, y: 4, w: 22, h: 22)
-    Chrome::get(Chrome::Type::BUTTON).draw(294.0f, 4.0f, 22.0f, 22.0f, zContent);
+    // 7. Burger Menu Button (x: 298, y: 8, w: 14, h: 13) - Rendered directly without outer red frame
     if (m_texStatus && m_texStatus->isLoaded()) {
         int potW = m_texStatus->potWidth();
         int potH = m_texStatus->potHeight();
         setupSubTex(m_subBtnMenu, potW, potH, 114, 3, 12, 11);
         C2D_Image imgMenu = { m_texStatus->getTex(), &m_subBtnMenu };
         C2D_DrawParams pMenu;
-        pMenu.pos.x = 299.0f; pMenu.pos.y = 9.0f; pMenu.pos.w = 12.0f; pMenu.pos.h = 11.0f;
-        pMenu.center.x = pMenu.center.y = 0.0f; pMenu.depth = zContent + 0.01f; pMenu.angle = 0.0f;
-        C2D_DrawImage(imgMenu, &pMenu, nullptr);
+        float shift = m_menuPressed ? 1.0f : 0.0f;
+        pMenu.pos.x = 298.0f;
+        pMenu.pos.y = 8.0f + shift;
+        pMenu.pos.w = 14.0f;
+        pMenu.pos.h = 13.0f;
+        pMenu.center.x = pMenu.center.y = 0.0f;
+        pMenu.depth = zContent + 0.01f;
+        pMenu.angle = 0.0f;
+
+        if (m_menuPressed) {
+            C2D_ImageTint tint;
+            C2D_PlainImageTint(&tint, C2D_Color32(0xFF, 0xEE, 0xAA, 0xFF), 0.5f);
+            C2D_DrawImage(imgMenu, &pMenu, &tint);
+        } else {
+            C2D_DrawImage(imgMenu, &pMenu, nullptr);
+        }
     }
 
     // 8. Bottom divider border & EXP Progress line at y: 32

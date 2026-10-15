@@ -7,6 +7,8 @@
 namespace noosa {
 
 bool Audio::s_initialized = false;
+bool Audio::s_soundFxEnabled = true;
+bool Audio::s_musicEnabled = true;
 ndspWaveBuf Audio::s_waveBufs[Audio::NUM_CHANNELS];
 std::unordered_map<std::string, std::shared_ptr<SoundSample>> Audio::s_sampleCache;
 
@@ -274,8 +276,19 @@ int Audio::allocateChannel() {
     return ch;
 }
 
+void Audio::setSoundFxEnabled(bool enabled) {
+    s_soundFxEnabled = enabled;
+    if (!enabled) {
+        stopAll();
+    }
+}
+
+void Audio::setMusicEnabled(bool enabled) {
+    s_musicEnabled = enabled;
+}
+
 int Audio::play(SoundSample* sample, float volume, float pan, bool loop) {
-    if (!s_initialized || !sample || !sample->isLoaded()) {
+    if (!s_initialized || !s_soundFxEnabled || !sample || !sample->isLoaded()) {
         return -1;
     }
 

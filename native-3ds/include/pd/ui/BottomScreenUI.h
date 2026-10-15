@@ -9,6 +9,8 @@
 #include "pd/ui/WndBag.h"
 #include "pd/ui/LogConsole.h"
 #include "pd/windows/WndHero.h"
+#include "pd/windows/WndGame.h"
+#include "pd/windows/WndSettings.h"
 
 namespace pd {
 class Hero;
@@ -47,6 +49,13 @@ public:
     bool isWndHeroOpen() const { return m_wndHero.isOpen(); }
     void toggleWndHero();
 
+    bool isPauseMenuOpen() const { return m_wndGame.isOpen() || m_wndSettings.isOpen(); }
+    void openPauseMenu();
+    void closePauseMenu();
+
+    pd::windows::GameAction getPendingGameAction() const { return m_pendingGameAction; }
+    void clearPendingGameAction() { m_pendingGameAction = pd::windows::GameAction::NONE; }
+
     // Ranged targeting mode
     bool isTargeting() const { return m_isTargeting; }
     void startTargeting(Item* item);
@@ -63,6 +72,9 @@ private:
     WndBag m_wndBag;
     LogConsole m_logConsole;
     pd::windows::WndHero m_wndHero;
+    pd::windows::WndGame m_wndGame;
+    pd::windows::WndSettings m_wndSettings;
+    pd::windows::GameAction m_pendingGameAction = pd::windows::GameAction::NONE;
 
     // Ranged Targeting State
     bool m_isTargeting = false;
