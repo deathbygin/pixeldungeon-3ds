@@ -69,6 +69,19 @@ void Preferences::save() {
     std::fclose(fp);
 }
 
+void Preferences::resetDefaults() {
+    s_zoom = 2.0f;
+    s_music = true;
+    s_soundFx = true;
+    s_brightness = false;
+    noosa::Audio::setSoundFxEnabled(s_soundFx);
+    noosa::Audio::setMusicEnabled(s_music);
+    if (noosa::Camera::main) {
+        noosa::Camera::main->setZoom(s_zoom);
+    }
+    save();
+}
+
 void Preferences::setZoom(float z) {
     s_zoom = std::clamp(z, 1.0f, 3.0f);
     if (noosa::Camera::main) {

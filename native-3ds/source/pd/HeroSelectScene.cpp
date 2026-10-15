@@ -13,6 +13,13 @@ HeroSelectScene::HeroSelectScene() {
     layoutUI();
 }
 
+void HeroSelectScene::refreshUnlocked() {
+    m_huntressUnlocked = Badges::isUnlocked(Badges::Badge::BOSS_SLAIN_3);
+    if (!m_huntressUnlocked && m_currentClass == Hero::HeroClass::Huntress) {
+        m_currentClass = Hero::HeroClass::Warrior;
+    }
+}
+
 void HeroSelectScene::initTextures() {
     m_texBanners = noosa::Texture::get(pd::Assets::BANNERS);
     m_texAvatars = noosa::Texture::get(pd::Assets::AVATARS);

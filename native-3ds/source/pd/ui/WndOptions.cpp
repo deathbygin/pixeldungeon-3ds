@@ -144,28 +144,28 @@ bool WndOptions::update(const TouchController& touch, u32 kDown) {
     return true; // Absorb all input while modal is active
 }
 
-void WndOptions::draw(C2D_TextBuf textBuf) {
+void WndOptions::draw(C2D_TextBuf textBuf, float baseDepth) {
     (void)textBuf;
     if (!m_open) return;
 
     // 1. Darken background overlay
-    C2D_DrawRectSolid(0.0f, 0.0f, 0.80f, 320.0f, 240.0f, C2D_Color32(0x00, 0x00, 0x00, 0xAA));
+    C2D_DrawRectSolid(0.0f, 0.0f, baseDepth, 320.0f, 240.0f, C2D_Color32(0x00, 0x00, 0x00, 0xAA));
 
     // 2. 9-slice stone window chrome from chrome.png
-    Chrome::get(Chrome::Type::WINDOW).draw(m_x, m_y, m_w, m_h, 0.82f);
+    Chrome::get(Chrome::Type::WINDOW).draw(m_x, m_y, m_w, m_h, baseDepth + 0.02f);
 
     // 3. Title text in golden yellow with 1px drop-shadow
     float titleW = BitmapFont::width(BitmapFont::FontType::Font1x, m_title);
     float titleX = std::round(m_x + (m_w - titleW) * 0.5f);
     float titleY = m_y + 14.0f;
-    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, m_title, titleX, titleY, 0.86f, 0xFFEBA4FF, 0x000000FF);
+    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, m_title, titleX, titleY, baseDepth + 0.06f, 0xFFEBA4FF, 0x000000FF);
 
     // 4. Message text lines in readable light grey with 1px drop-shadow
     float curMsgY = titleY + 16.0f;
     for (const auto& line : m_messageLines) {
         float lineW = BitmapFont::width(BitmapFont::FontType::Font1x, line);
         float lineX = std::round(m_x + (m_w - lineW) * 0.5f);
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, line, lineX, curMsgY, 0.86f, 0xCACFC2FF, 0x000000FF);
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, line, lineX, curMsgY, baseDepth + 0.06f, 0xCACFC2FF, 0x000000FF);
         curMsgY += 11.0f;
     }
 
@@ -176,14 +176,14 @@ void WndOptions::draw(C2D_TextBuf textBuf) {
         bool isSel = (m_selected == static_cast<int>(i));
 
         float brightness = isSel ? 1.35f : 1.0f;
-        btnPatch.draw(b.x, b.y, b.w, b.h, 0.84f, 0xFFFFFFFF, brightness);
+        btnPatch.draw(b.x, b.y, b.w, b.h, baseDepth + 0.04f, 0xFFFFFFFF, brightness);
 
         float textW = BitmapFont::width(BitmapFont::FontType::Font1x, m_options[i]);
         float textX = std::round(b.x + (b.w - textW) * 0.5f);
         float textY = std::round(b.y + (b.h - 8.0f) * 0.5f);
 
         u32 textColor = isSel ? 0xFFEE88FF : 0xFFFFFFFF;
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, m_options[i], textX, textY, 0.86f, textColor, 0x000000FF);
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, m_options[i], textX, textY, baseDepth + 0.06f, textColor, 0x000000FF);
     }
 }
 

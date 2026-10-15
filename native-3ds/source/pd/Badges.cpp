@@ -57,6 +57,15 @@ void Badges::save() {
     std::fclose(fp);
 }
 
+void Badges::reset() {
+    for (size_t i = 0; i < static_cast<size_t>(Badge::COUNT); ++i) {
+        s_unlocked[i] = false;
+    }
+    monstersSlainCount = 0;
+    std::remove(getBadgesFilePath());
+    std::remove("badges.dat");
+}
+
 bool Badges::isUnlocked(Badge badge) {
     size_t idx = static_cast<size_t>(badge);
     if (idx < static_cast<size_t>(Badge::COUNT)) {

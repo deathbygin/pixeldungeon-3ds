@@ -29,7 +29,7 @@ public:
     bool isOpen() const { return m_open; }
 
     bool update(const TouchController& touch, u32 kDown);
-    void draw(C2D_TextBuf textBuf);
+    void draw(C2D_TextBuf textBuf, float baseDepth = 0.80f);
 
 private:
     bool m_open = false;

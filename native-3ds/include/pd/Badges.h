@@ -35,6 +35,7 @@ public:
     static void init();
     static void load();
     static void save();
+    static void reset();
 
     static bool isUnlocked(Badge badge);
     static void unlock(Badge badge, const std::string& description);

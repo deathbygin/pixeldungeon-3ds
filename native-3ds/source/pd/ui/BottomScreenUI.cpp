@@ -240,7 +240,7 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
         pd::windows::GameAction act = m_wndGame.update(m_touch, kDown);
         if (act == pd::windows::GameAction::SETTINGS) {
             m_wndGame.hide();
-            m_wndSettings.show();
+            m_wndSettings.show(true);
         } else if (act == pd::windows::GameAction::MAIN_MENU || act == pd::windows::GameAction::EXIT_GAME) {
             m_pendingGameAction = act;
             m_wndGame.hide();

@@ -9,6 +9,9 @@
 #include "pd/Actor.h"
 #include "pd/Heap.h"
 #include "pd/Random.h"
+#include "pd/Badges.h"
+#include "pd/Preferences.h"
+#include "pd/FogOfWar.h"
 
 #include <3ds.h>
 #include <sys/stat.h>
@@ -115,6 +118,41 @@ bool SaveManager::hasSave(const std::string& customPath) {
 bool SaveManager::deleteSave(const std::string& customPath) {
     std::string path = customPath.empty() ? getSavePath() : customPath;
     return (std::remove(path.c_str()) == 0);
+}
+
+void SaveManager::wipeAllData() {
+    std::string dir = getSaveDirectory();
+    std::remove((dir + "savegame.dat").c_str());
+    std::remove((dir + "game.dat").c_str());
+    std::remove((dir + "badges.dat").c_str());
+    std::remove((dir + "rankings.dat").c_str());
+    std::remove((dir + "settings.dat").c_str());
+    std::remove("savegame.dat");
+    std::remove("game.dat");
+    std::remove("badges.dat");
+    std::remove("rankings.dat");
+    std::remove("settings.dat");
+
+    for (int i = 1; i <= 30; ++i) {
+        std::string depthFile = "depth" + std::to_string(i) + ".dat";
+        std::remove((dir + depthFile).c_str());
+        std::remove(depthFile.c_str());
+    }
+
+    // Reset badges
+    Badges::reset();
+
+    // Reset preferences
+    Preferences::resetDefaults();
+
+    // Clear in-memory game state
+    Dungeon::hero.reset();
+    Dungeon::level.reset();
+    Dungeon::mobs.clear();
+    Dungeon::fog.reset();
+    Dungeon::droppedItems.clear();
+    Dungeon::depth = 1;
+    Dungeon::gold = 0;
 }
 
 bool SaveManager::getSaveSummary(int& outDepth, int& outLevel, int& outHeroClass, const std::string& customPath) {

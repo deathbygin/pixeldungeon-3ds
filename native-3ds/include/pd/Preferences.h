@@ -8,6 +8,7 @@ class Preferences {
 public:
     static void init();
     static void save();
+    static void resetDefaults();
 
     // Camera zoom factor on Top Screen: 1.0f (Zoomed Out), 2.0f (Default), 3.0f (Zoomed In)
     static float zoom() { return s_zoom; }

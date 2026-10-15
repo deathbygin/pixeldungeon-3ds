@@ -66,6 +66,7 @@
 #include "pd/scenes/TitleScene.h"
 #include "pd/scenes/HeroSelectScene.h"
 #include "pd/windows/WndStory.h"
+#include "pd/windows/WndSettings.h"
 #include "pd/Preferences.h"
 
 using namespace noosa;
@@ -346,6 +347,13 @@ int main(int argc, char* argv[]) {
     pd::scenes::HeroSelectScene heroSelectScene;
     pd::ui::WndOptions wndOptions;
     pd::windows::WndStory wndStory;
+    Hero::HeroClass chosenHeroClass = Hero::HeroClass::Warrior;
+    pd::windows::WndSettings wndTitleSettings;
+    wndTitleSettings.setOnDataWiped([&]() {
+        heroSelectScene.refreshUnlocked();
+        chosenHeroClass = Hero::HeroClass::Warrior;
+        titleScene.clearAction();
+    });
     TouchController screenTouch;
 
     // Interlevel transition state
@@ -353,7 +361,6 @@ int main(int argc, char* argv[]) {
     static constexpr float INTERLEVEL_DURATION = 1.0f; // seconds
     bool isNewGame = false;
     bool interlevelStarted = false;
-    Hero::HeroClass chosenHeroClass = Hero::HeroClass::Warrior;
 
     auto startNewDungeonRun = [&](Hero::HeroClass hClass) {
         pd::Random::seed(osGetTime());
@@ -416,54 +423,61 @@ int main(int argc, char* argv[]) {
         // STATE 1: TITLE SCREEN
         // ---------------------------------------------------------------------
         if (appState == AppState::TITLE) {
-            titleScene.update(dt, kDown, kHeld, screenTouch);
+            if (wndTitleSettings.isOpen()) {
+                wndTitleSettings.update(screenTouch, kDown);
+            } else {
+                titleScene.update(dt, kDown, kHeld, screenTouch);
 
-            if (titleScene.getPendingAction() == pd::scenes::TitleAction::PLAY) {
-                titleScene.clearAction();
-                if (SaveManager::hasSave()) {
-                    // Save exists: prompt Load Game vs. Erase & Start New
-                    int sDepth = 1, sLvl = 1, sClass = 0;
-                    SaveManager::getSaveSummary(sDepth, sLvl, sClass);
-                    const char* clNames[] = { "Warrior", "Mage", "Rogue", "Huntress" };
-                    std::string clName = (sClass >= 0 && sClass < 4) ? clNames[sClass] : "Hero";
+                if (titleScene.getPendingAction() == pd::scenes::TitleAction::PLAY) {
+                    titleScene.clearAction();
+                    if (SaveManager::hasSave()) {
+                        // Save exists: prompt Load Game vs. Erase & Start New
+                        int sDepth = 1, sLvl = 1, sClass = 0;
+                        SaveManager::getSaveSummary(sDepth, sLvl, sClass);
+                        const char* clNames[] = { "Warrior", "Mage", "Rogue", "Huntress" };
+                        std::string clName = (sClass >= 0 && sClass < 4) ? clNames[sClass] : "Hero";
 
-                    char msgBuf[128];
-                    std::snprintf(msgBuf, sizeof(msgBuf), "%s (Depth %d, Level %d)", clName.c_str(), sDepth, sLvl);
+                        char msgBuf[128];
+                        std::snprintf(msgBuf, sizeof(msgBuf), "%s (Depth %d, Level %d)", clName.c_str(), sDepth, sLvl);
 
-                    wndOptions.show("ACTIVE ADVENTURE", msgBuf,
-                        { "Load Game", "New Game", "Cancel" },
-                        [&](int idx) {
-                            if (idx == 0) {
-                                // Load Game -> Interlevel loading -> Resume
-                                appState = AppState::INTERLEVEL;
-                                interlevelTimer = 0.0f;
-                                isNewGame = false;
-                                interlevelStarted = false;
-                            } else if (idx == 1) {
-                                // New Game with existing save -> Prompt Confirmation
-                                appState = AppState::CONFIRM_ERASE;
-                                wndOptions.show("Start New Game?",
-                                    "Your current game progress will be permanently erased.",
-                                    { "Yes, start new game", "No, return" },
-                                    [&](int confIdx) {
-                                        if (confIdx == 0) {
-                                            SaveManager::deleteSave();
-                                            appState = AppState::HERO_SELECT;
-                                        } else {
-                                            appState = AppState::TITLE;
-                                        }
-                                    });
-                            } else {
-                                appState = AppState::TITLE;
-                            }
-                        });
-                    appState = AppState::PROMPT_LOAD;
-                } else {
-                    // No save: straight to Hero Selection
-                    appState = AppState::HERO_SELECT;
+                        wndOptions.show("ACTIVE ADVENTURE", msgBuf,
+                            { "Load Game", "New Game", "Cancel" },
+                            [&](int idx) {
+                                if (idx == 0) {
+                                    // Load Game -> Interlevel loading -> Resume
+                                    appState = AppState::INTERLEVEL;
+                                    interlevelTimer = 0.0f;
+                                    isNewGame = false;
+                                    interlevelStarted = false;
+                                } else if (idx == 1) {
+                                    // New Game with existing save -> Prompt Confirmation
+                                    appState = AppState::CONFIRM_ERASE;
+                                    wndOptions.show("Start New Game?",
+                                        "Your current game progress will be permanently erased.",
+                                        { "Yes, start new game", "No, return" },
+                                        [&](int confIdx) {
+                                            if (confIdx == 0) {
+                                                SaveManager::deleteSave();
+                                                appState = AppState::HERO_SELECT;
+                                            } else {
+                                                appState = AppState::TITLE;
+                                            }
+                                        });
+                                } else {
+                                    appState = AppState::TITLE;
+                                }
+                            });
+                        appState = AppState::PROMPT_LOAD;
+                    } else {
+                        // No save: straight to Hero Selection
+                        appState = AppState::HERO_SELECT;
+                    }
+                } else if (titleScene.getPendingAction() == pd::scenes::TitleAction::SETTINGS) {
+                    titleScene.clearAction();
+                    wndTitleSettings.show(false);
+                } else if (titleScene.getPendingAction() != pd::scenes::TitleAction::NONE) {
+                    titleScene.clearAction();
                 }
-            } else if (titleScene.getPendingAction() != pd::scenes::TitleAction::NONE) {
-                titleScene.clearAction();
             }
 
             Profiler::beginRender();
@@ -477,6 +491,9 @@ int main(int argc, char* argv[]) {
             C2D_TargetClear(bottomTarget, C2D_Color32(0x10, 0x0c, 0x18, 0xFF));
             C2D_SceneBegin(bottomTarget);
             titleScene.drawBottom(textBuf);
+            if (wndTitleSettings.isOpen()) {
+                wndTitleSettings.draw(textBuf);
+            }
 
             C3D_FrameEnd(0);
             Profiler::endRender();

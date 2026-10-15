@@ -30,6 +30,7 @@ public:
     Hero::HeroClass getSelectedClass() const { return m_currentClass; }
     SelectAction getPendingAction() const { return m_pendingAction; }
     void clearAction() { m_pendingAction = SelectAction::NONE; }
+    void refreshUnlocked();
 
 private:
     SelectAction m_pendingAction = SelectAction::NONE;
