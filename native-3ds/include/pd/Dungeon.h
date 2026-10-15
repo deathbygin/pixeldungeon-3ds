@@ -31,6 +31,7 @@ public:
     static void switchLevel(int newDepth);
 
     static void spawnMobs(int count = 4);
+    static std::unique_ptr<Mob> createMobForDepth(int depth);
     static void observe();
     static void updateVisibility() { observe(); }
 

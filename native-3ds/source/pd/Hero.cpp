@@ -265,7 +265,9 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
         move(nextCell);
         spend(TICK / speed());
         next();
-        currentLevel->press(nextCell, this);
+        if (!flying) {
+            currentLevel->press(nextCell, this);
+        }
         waitingForInput = false;
         return true;
     }
@@ -276,7 +278,9 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
         next();
 
         // Level press (traps, high grass, etc.)
-        currentLevel->press(nextCell, this);
+        if (!flying) {
+            currentLevel->press(nextCell, this);
+        }
 
         // Passive search upon moving
         search(currentLevel, false);
@@ -406,7 +410,7 @@ bool Hero::search(Level* currentLevel, bool intentional) {
     if (!currentLevel) return false;
 
     bool smthFound = false;
-    float awareness = (heroClass == HeroClass::Rogue) ? 0.30f : 0.15f;
+    updateAwareness();
     float searchSkill = intentional ? (2.0f * awareness - awareness * awareness) : awareness;
 
     int cx = pos % Level::WIDTH;

@@ -56,6 +56,8 @@ public:
     static constexpr int CHASM_WATER            = 46;
     static constexpr int WATER_TILES            = 48;
     static constexpr int WATER                  = 63;
+    static constexpr int TELEPORTATION_TRAP         = 64;
+    static constexpr int SECRET_TELEPORTATION_TRAP  = 65;
 
     // Bit flags
     static constexpr int PASSABLE        = 0x01;

@@ -262,53 +262,57 @@ void Dungeon::spawnMobs(int count) {
         }
         if (cell == -1) continue;
 
-        std::unique_ptr<Mob> mob;
-        if (depth == 1) {
-            mob = std::make_unique<Rat>();
-        } else if (depth <= 2) {
-            mob = (Random::Int(2) == 0) ? std::unique_ptr<Mob>(std::make_unique<Rat>()) : std::unique_ptr<Mob>(std::make_unique<Gnoll>());
-        } else if (depth <= 4) {
-            int r = Random::Int(5);
-            if (r == 0) mob = std::make_unique<Rat>();
-            else if (r == 1) mob = std::make_unique<Gnoll>();
-            else if (r == 2) mob = std::make_unique<Crab>();
-            else if (r == 3) mob = std::make_unique<Swarm>();
-            else mob = std::make_unique<Thief>();
-        } else if (depth <= 9) {
-            // Prison: Skeletons, Thieves, Shamans, Swarms, Bats
-            int r = Random::Int(5);
-            if (r == 0) mob = std::make_unique<Skeleton>();
-            else if (r == 1) mob = std::make_unique<Thief>();
-            else if (r == 2) mob = std::make_unique<Shaman>();
-            else if (r == 3) mob = std::make_unique<Swarm>();
-            else mob = std::make_unique<Bat>();
-        } else if (depth <= 14) {
-            // Caves: Bats, Brutes, Shamans, Monks
-            int r = Random::Int(4);
-            if (r == 0) mob = std::make_unique<Bat>();
-            else if (r == 1) mob = std::make_unique<Brute>();
-            else if (r == 2) mob = std::make_unique<Shaman>();
-            else mob = std::make_unique<Monk>();
-        } else if (depth <= 19) {
-            // Metropolis: Monks, Warlocks, Golems, Succubus
-            int r = Random::Int(4);
-            if (r == 0) mob = std::make_unique<Monk>();
-            else if (r == 1) mob = std::make_unique<Warlock>();
-            else if (r == 2) mob = std::make_unique<Golem>();
-            else mob = std::make_unique<Succubus>();
-        } else {
-            // Demon Halls: Succubus, Evil Eye, Scorpio
-            int r = Random::Int(3);
-            if (r == 0) mob = std::make_unique<Succubus>();
-            else if (r == 1) mob = std::make_unique<Eye>();
-            else mob = std::make_unique<Scorpio>();
-        }
+        std::unique_ptr<Mob> mob = createMobForDepth(depth);
+        if (!mob) continue;
 
         mob->place(cell);
         mob->state = (Random::Int(2) == 0) ? Mob::State::SLEEPING : Mob::State::WANDERING;
         Actor::occupyCell(mob.get());
         Actor::add(mob.get(), Random::Float(1.0f));
         mobs.push_back(std::move(mob));
+    }
+}
+
+std::unique_ptr<Mob> Dungeon::createMobForDepth(int depth) {
+    if (depth <= 1) {
+        return std::make_unique<Rat>();
+    } else if (depth <= 2) {
+        return (Random::Int(2) == 0) ? std::unique_ptr<Mob>(std::make_unique<Rat>()) : std::unique_ptr<Mob>(std::make_unique<Gnoll>());
+    } else if (depth <= 4) {
+        int r = Random::Int(5);
+        if (r == 0) return std::make_unique<Rat>();
+        else if (r == 1) return std::make_unique<Gnoll>();
+        else if (r == 2) return std::make_unique<Crab>();
+        else if (r == 3) return std::make_unique<Swarm>();
+        else return std::make_unique<Thief>();
+    } else if (depth <= 9) {
+        // Prison: Skeletons, Thieves, Shamans, Swarms, Bats
+        int r = Random::Int(5);
+        if (r == 0) return std::make_unique<Skeleton>();
+        else if (r == 1) return std::make_unique<Thief>();
+        else if (r == 2) return std::make_unique<Shaman>();
+        else if (r == 3) return std::make_unique<Swarm>();
+        else return std::make_unique<Bat>();
+    } else if (depth <= 14) {
+        // Caves: Bats, Brutes, Shamans, Monks
+        int r = Random::Int(4);
+        if (r == 0) return std::make_unique<Bat>();
+        else if (r == 1) return std::make_unique<Brute>();
+        else if (r == 2) return std::make_unique<Shaman>();
+        else return std::make_unique<Monk>();
+    } else if (depth <= 19) {
+        // Metropolis: Monks, Warlocks, Golems, Succubus
+        int r = Random::Int(4);
+        if (r == 0) return std::make_unique<Monk>();
+        else if (r == 1) return std::make_unique<Warlock>();
+        else if (r == 2) return std::make_unique<Golem>();
+        else return std::make_unique<Succubus>();
+    } else {
+        // Demon Halls: Succubus, Evil Eye, Scorpio
+        int r = Random::Int(3);
+        if (r == 0) return std::make_unique<Succubus>();
+        else if (r == 1) return std::make_unique<Eye>();
+        else return std::make_unique<Scorpio>();
     }
 }
 

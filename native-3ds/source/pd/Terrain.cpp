@@ -85,6 +85,7 @@ int Terrain::flags(int tile) {
         case LIGHTNING_TRAP:
         case GRIPPING_TRAP:
         case SUMMONING_TRAP:
+        case TELEPORTATION_TRAP:
             return PASSABLE | AVOID;
 
         case SECRET_TOXIC_TRAP:
@@ -95,6 +96,7 @@ int Terrain::flags(int tile) {
         case SECRET_LIGHTNING_TRAP:
         case SECRET_GRIPPING_TRAP:
         case SECRET_SUMMONING_TRAP:
+        case SECRET_TELEPORTATION_TRAP:
             return PASSABLE | SECRET;
 
         case INACTIVE_TRAP:
@@ -125,6 +127,8 @@ int Terrain::discover(int tile) {
             return GRIPPING_TRAP;
         case SECRET_SUMMONING_TRAP:
             return SUMMONING_TRAP;
+        case SECRET_TELEPORTATION_TRAP:
+            return TELEPORTATION_TRAP;
         default:
             return tile;
     }

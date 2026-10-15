@@ -68,6 +68,10 @@ public:
         return (c < 0 || c >= LENGTH) || losBlocking[c];
     }
 
+    bool isFlamable(int c) const {
+        return (c >= 0 && c < LENGTH) && Terrain::isFlamable(map[c]);
+    }
+
     void destroy(int cell);
     void trample(int cell, Char* ch);
     void press(int cell, Char* ch);

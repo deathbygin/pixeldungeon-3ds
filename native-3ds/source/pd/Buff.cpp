@@ -113,6 +113,24 @@ bool Burning::act() {
               0xee7722FF, 4, 15.0f, 35.0f, -40.0f);
     FX::floatingText(target->pos, std::to_string(dmg), 0xee7722FF);
 
+    // Flammable inventory check for Hero
+    if (target == Dungeon::hero.get()) {
+        Hero* hero = Dungeon::hero.get();
+        std::vector<size_t> scrollIndices;
+        for (size_t i = 0; i < hero->belongings.backpack.size(); ++i) {
+            if (hero->belongings.backpack[i] && hero->belongings.backpack[i]->category() == ItemCategory::Scroll) {
+                scrollIndices.push_back(i);
+            }
+        }
+        if (!scrollIndices.empty() && Random::Int(2) == 0) {
+            size_t idx = scrollIndices[Random::Int(static_cast<int>(scrollIndices.size()))];
+            std::string name = hero->belongings.backpack[idx]->displayName();
+            hero->belongings.backpack.erase(hero->belongings.backpack.begin() + idx);
+            GLog::w(name + " burns up!");
+            FX::burst(hero->pos, 0xee7722FF, 6);
+        }
+    }
+
     // Stepping into water immediately extinguishes flame
     if (Dungeon::level && Dungeon::level->water[target->pos]) {
         FX::waterSplash(target->pos, 6);
@@ -316,6 +334,9 @@ void Levitation::attachTo(Char* ch) {
 void Levitation::detach() {
     if (target) {
         target->flying = false;
+        if (Dungeon::level) {
+            Dungeon::level->press(target->pos, target);
+        }
     }
     Buff::detach();
 }

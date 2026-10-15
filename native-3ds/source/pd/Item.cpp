@@ -1125,6 +1125,10 @@ void Potion::shatter(int cell) {
             break;
         }
     }
+
+    if (Dungeon::level) {
+        Dungeon::level->press(cell, nullptr);
+    }
 }
 
 // -----------------------------------------------------------------------------

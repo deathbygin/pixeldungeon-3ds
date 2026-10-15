@@ -50,6 +50,9 @@ int DungeonTilemap::getVisualTileIndex(int terrainType) {
     if (Terrain::isSecret(terrainType)) {
         return Terrain::EMPTY; // Mask secret traps as regular floor
     }
+    if (terrainType == Terrain::TELEPORTATION_TRAP) {
+        return Terrain::SUMMONING_TRAP; // Rune trap sprite from tilesheet
+    }
     return terrainType;
 }
 

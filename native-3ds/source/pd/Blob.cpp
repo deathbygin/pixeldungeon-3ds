@@ -6,6 +6,8 @@
 #include "pd/Dungeon.h"
 #include "pd/Random.h"
 #include "pd/Badges.h"
+#include "pd/FX.h"
+#include "pd/Heap.h"
 #include <algorithm>
 #include <cstring>
 
@@ -85,6 +87,7 @@ void Blob::evolve(const Level* level) {
                     }
                     if (dmg > 0) {
                         ch->damage(dmg, nullptr);
+                        FX::floatingText(ch->pos, std::to_string(dmg), 0x38b764FF);
                         if (!ch->isAlive() && ch == Dungeon::hero.get()) {
                             Badges::validateDeathFromGas();
                         }
@@ -93,6 +96,16 @@ void Blob::evolve(const Level* level) {
                     ch->affect<Paralysis>(1);
                 } else if (type == BlobType::FIRE) {
                     ch->affect<Burning>(5);
+                }
+            }
+
+            if (type == BlobType::FIRE && level) {
+                if (level->isFlamable(i)) {
+                    const_cast<Level*>(level)->destroy(i);
+                }
+                Heap* h = level->getHeap(i);
+                if (h) {
+                    h->burn();
                 }
             }
         }

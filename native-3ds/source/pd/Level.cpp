@@ -73,12 +73,15 @@ void Level::set(int cell, int tile) {
 void Level::destroy(int cell) {
     if (cell < 0 || cell >= LENGTH) return;
     int t = map[cell];
-    if (t == Terrain::DOOR || t == Terrain::SECRET_DOOR) {
-        set(cell, Terrain::OPEN_DOOR);
-    } else if (t == Terrain::HIGH_GRASS) {
-        set(cell, Terrain::GRASS);
+    if (t == Terrain::DOOR || t == Terrain::SECRET_DOOR || t == Terrain::LOCKED_DOOR) {
+        set(cell, Terrain::EMBERS);
+        FX::burst(cell, 0xff7708FF, 6);
+    } else if (t == Terrain::HIGH_GRASS || t == Terrain::GRASS) {
+        set(cell, Terrain::EMBERS);
+        FX::burst(cell, 0xff7708FF, 4);
     } else if (t == Terrain::BARRICADE || t == Terrain::BOOKSHELF) {
         set(cell, Terrain::EMBERS);
+        FX::burst(cell, 0xff7708FF, 8);
     } else if (!Terrain::isUnstitchable(t)) {
         set(cell, Terrain::EMBERS);
     } else {
@@ -143,6 +146,9 @@ void Level::trample(int cell, Char* ch) {
 void Level::press(int cell, Char* ch) {
     if (cell < 0 || cell >= LENGTH) return;
 
+    // Flying / levitating characters pass harmlessly over traps and chasms
+    if (ch && ch->flying) return;
+
     if (pit[cell] && ch == Dungeon::hero.get()) {
         Chasm::heroFall(cell);
         return;
@@ -156,7 +162,8 @@ void Level::press(int cell, Char* ch) {
         tile == Terrain::ALARM_TRAP || tile == Terrain::SECRET_ALARM_TRAP ||
         tile == Terrain::LIGHTNING_TRAP || tile == Terrain::SECRET_LIGHTNING_TRAP ||
         tile == Terrain::GRIPPING_TRAP || tile == Terrain::SECRET_GRIPPING_TRAP ||
-        tile == Terrain::SUMMONING_TRAP || tile == Terrain::SECRET_SUMMONING_TRAP) {
+        tile == Terrain::SUMMONING_TRAP || tile == Terrain::SECRET_SUMMONING_TRAP ||
+        tile == Terrain::TELEPORTATION_TRAP || tile == Terrain::SECRET_TELEPORTATION_TRAP) {
         Traps::trigger(tile, cell, ch);
     } else if (tile == Terrain::HIGH_GRASS) {
         trample(cell, ch);
@@ -168,6 +175,7 @@ void Level::press(int cell, Char* ch) {
 
 void Level::mobPress(Mob* mob) {
     if (!mob) return;
+    if (mob->flying) return; // Flying creatures pass harmlessly over traps and chasms
     int cell = mob->pos;
     if (cell < 0 || cell >= LENGTH) return;
 
@@ -180,7 +188,8 @@ void Level::mobPress(Mob* mob) {
     if (tile == Terrain::FIRE_TRAP || tile == Terrain::TOXIC_TRAP ||
         tile == Terrain::PARALYTIC_TRAP || tile == Terrain::POISON_TRAP ||
         tile == Terrain::ALARM_TRAP || tile == Terrain::LIGHTNING_TRAP ||
-        tile == Terrain::GRIPPING_TRAP || tile == Terrain::SUMMONING_TRAP) {
+        tile == Terrain::GRIPPING_TRAP || tile == Terrain::SUMMONING_TRAP ||
+        tile == Terrain::TELEPORTATION_TRAP) {
         Traps::trigger(tile, cell, mob);
     } else if (tile == Terrain::HIGH_GRASS) {
         trample(cell, mob);
@@ -369,14 +378,14 @@ bool Level::build() {
                     int trapTypes[] = {
                         Terrain::FIRE_TRAP, Terrain::TOXIC_TRAP, Terrain::PARALYTIC_TRAP,
                         Terrain::POISON_TRAP, Terrain::ALARM_TRAP, Terrain::LIGHTNING_TRAP,
-                        Terrain::GRIPPING_TRAP, Terrain::SUMMONING_TRAP
+                        Terrain::GRIPPING_TRAP, Terrain::SUMMONING_TRAP, Terrain::TELEPORTATION_TRAP
                     };
                     int secretTypes[] = {
                         Terrain::SECRET_FIRE_TRAP, Terrain::SECRET_TOXIC_TRAP, Terrain::SECRET_PARALYTIC_TRAP,
                         Terrain::SECRET_POISON_TRAP, Terrain::SECRET_ALARM_TRAP, Terrain::SECRET_LIGHTNING_TRAP,
-                        Terrain::SECRET_GRIPPING_TRAP, Terrain::SECRET_SUMMONING_TRAP
+                        Terrain::SECRET_GRIPPING_TRAP, Terrain::SECRET_SUMMONING_TRAP, Terrain::SECRET_TELEPORTATION_TRAP
                     };
-                    int idx = Random::Int(8);
+                    int idx = Random::Int(9);
                     bool isSec = (Random::Float() < 0.70f);
                     map[tc] = isSec ? secretTypes[idx] : trapTypes[idx];
                 }

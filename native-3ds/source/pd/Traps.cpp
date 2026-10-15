@@ -19,10 +19,11 @@ namespace pd {
 
 void Traps::trigger(int tile, int cell, Char* ch) {
     if (cell < 0 || cell >= Level::LENGTH) return;
+    if (ch && ch->flying) return; // Flying / levitating characters pass harmlessly over traps
 
     bool isSecret = Terrain::isSecret(tile);
     if (isSecret && ch == Dungeon::hero.get()) {
-        GLog::i("A hidden plate clicks under your foot!");
+        GLog::i("A hidden pressure plate clicks!");
     }
 
     bool isTrap = false;
@@ -31,8 +32,39 @@ void Traps::trigger(int tile, int cell, Char* ch) {
         case Terrain::SECRET_FIRE_TRAP:
         case Terrain::FIRE_TRAP: {
             isTrap = true;
-            FX::seedBlob(cell, Blob::BlobType::FIRE, 20);
-            FX::burst(cell, 0xff7708FFu, 6);
+            FX::seedBlob(cell, Blob::BlobType::FIRE, 40);
+            FX::burst(cell, 0xff7708FFu, 10);
+            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_BURNING).get());
+
+            if (Dungeon::level) {
+                if (Dungeon::level->isFlamable(cell)) {
+                    Dungeon::level->destroy(cell);
+                }
+                Heap* h = Dungeon::level->getHeap(cell);
+                if (h) {
+                    h->burn();
+                }
+            }
+
+            if (ch) {
+                ch->affect<Burning>(5);
+                if (ch == Dungeon::hero.get()) {
+                    Hero* hero = Dungeon::hero.get();
+                    std::vector<size_t> scrollIndices;
+                    for (size_t i = 0; i < hero->belongings.backpack.size(); ++i) {
+                        if (hero->belongings.backpack[i] && hero->belongings.backpack[i]->category() == ItemCategory::Scroll) {
+                            scrollIndices.push_back(i);
+                        }
+                    }
+                    if (!scrollIndices.empty()) {
+                        size_t idx = scrollIndices[Random::Int(static_cast<int>(scrollIndices.size()))];
+                        std::string name = hero->belongings.backpack[idx]->displayName();
+                        hero->belongings.backpack.erase(hero->belongings.backpack.begin() + idx);
+                        GLog::w(name + " burns up!");
+                        FX::burst(hero->pos, 0xee7722FF, 6);
+                    }
+                }
+            }
             break;
         }
 
@@ -40,6 +72,8 @@ void Traps::trigger(int tile, int cell, Char* ch) {
         case Terrain::TOXIC_TRAP: {
             isTrap = true;
             FX::seedBlob(cell, Blob::BlobType::TOXIC_GAS, 300 + 20 * Dungeon::depth);
+            FX::splash(cell, 0x40cc55FF, 10);
+            FX::burst(cell, 0x40cc55FF, 8);
             break;
         }
 
@@ -47,6 +81,8 @@ void Traps::trigger(int tile, int cell, Char* ch) {
         case Terrain::PARALYTIC_TRAP: {
             isTrap = true;
             FX::seedBlob(cell, Blob::BlobType::PARALYTIC_GAS, 80 + 5 * Dungeon::depth);
+            FX::splash(cell, 0xcccc55FF, 10);
+            FX::burst(cell, 0xcccc55FF, 8);
             break;
         }
 
@@ -59,7 +95,8 @@ void Traps::trigger(int tile, int cell, Char* ch) {
                     p->duration = 4 + Dungeon::depth / 2;
                 }
             }
-            FX::burst(cell, 0xbb66eeFFu, 4);
+            FX::splash(cell, 0xbb66eeFFu, 8);
+            FX::burst(cell, 0xbb66eeFFu, 6);
             break;
         }
 
@@ -69,11 +106,15 @@ void Traps::trigger(int tile, int cell, Char* ch) {
             for (auto& m : Dungeon::mobs) {
                 if (m && m.get() != ch) {
                     m->beckon(cell);
+                    m->state = Mob::State::HUNTING;
+                    m->target = (ch ? ch->pos : cell);
+                    m->alerted = true;
+                    m->notice();
                 }
             }
             if (Dungeon::visible[cell]) {
                 GLog::w("The trap emits a piercing sound that echoes throughout the dungeon!");
-                FX::burst(cell, 0xdd3333FFu, 6);
+                FX::burst(cell, 0xdd3333FFu, 8);
             }
             noosa::Audio::play(noosa::Audio::getSample(Assets::SND_ALERT).get());
             break;
@@ -82,9 +123,18 @@ void Traps::trigger(int tile, int cell, Char* ch) {
         case Terrain::SECRET_LIGHTNING_TRAP:
         case Terrain::LIGHTNING_TRAP: {
             isTrap = true;
+            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_LIGHTNING).get());
+            FX::burst(cell, 0x66cceeFFu, 8);
+            FX::burst(cell, 0xffffffffu, 6);
+
             if (ch) {
                 int dmg = std::max(1, Random::IntRange(ch->HP / 3, 2 * ch->HP / 3));
+                if (Dungeon::level && Dungeon::level->water[ch->pos] && !ch->flying) {
+                    dmg *= 2;
+                }
                 ch->damage(dmg, nullptr);
+                FX::floatingText(ch->pos, std::to_string(dmg), 0x66cceeFF);
+
                 if (ch == Dungeon::hero.get()) {
                     if (noosa::Camera::main) {
                         noosa::Camera::main->shake(0.3f, 2.0f);
@@ -94,8 +144,35 @@ void Traps::trigger(int tile, int cell, Char* ch) {
                     }
                 }
             }
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_LIGHTNING).get());
-            FX::burst(cell, 0x66cceeFFu, 6);
+
+            // Conductive shock propagation along connected water cells
+            if (Dungeon::level) {
+                bool inWater = Dungeon::level->water[cell];
+                const int neighbours8[8] = {
+                    -Level::WIDTH - 1, -Level::WIDTH, -Level::WIDTH + 1,
+                    -1,                               +1,
+                    +Level::WIDTH - 1, +Level::WIDTH, +Level::WIDTH + 1
+                };
+
+                for (int i = 0; i < 8; ++i) {
+                    int n = cell + neighbours8[i];
+                    if (n >= 0 && n < Level::LENGTH) {
+                        if (inWater || Dungeon::level->water[n]) {
+                            Char* nch = Actor::findChar(n);
+                            if (nch && nch != ch && !nch->flying && nch->isAlive()) {
+                                int ndmg = std::max(1, Random::IntRange(nch->HP / 4, nch->HP / 2));
+                                if (Dungeon::level->water[n]) ndmg *= 2;
+                                nch->damage(ndmg, nullptr);
+                                FX::floatingText(n, std::to_string(ndmg), 0x66cceeFF);
+                                FX::burst(n, 0x66cceeFFu, 6);
+                                if (nch == Dungeon::hero.get() && !nch->isAlive()) {
+                                    GLog::n("You were killed by a discharge of a lightning trap...");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             break;
         }
 
@@ -104,19 +181,28 @@ void Traps::trigger(int tile, int cell, Char* ch) {
             isTrap = true;
             if (ch) {
                 int dmg = std::max(0, (Dungeon::depth + 3) - Random::IntRange(0, ch->dr() / 2));
-                auto* b = ch->affect<Bleeding>();
-                if (b) b->level = dmg;
+                if (dmg > 0) {
+                    ch->damage(dmg, nullptr);
+                    FX::floatingText(ch->pos, std::to_string(dmg), 0xe43b44FF);
+                    auto* b = ch->affect<Bleeding>();
+                    if (b) b->level = dmg;
+                }
+                ch->affect<Roots>();
                 ch->affect<Cripple>();
+                FX::blood(ch->pos, 10);
+                FX::slash(ch->pos);
+            } else {
+                FX::slash(cell);
+                FX::burst(cell, 0x888888FF, 6);
             }
-            FX::slash(cell);
             break;
         }
 
         case Terrain::SECRET_SUMMONING_TRAP:
         case Terrain::SUMMONING_TRAP: {
             isTrap = true;
-            if (Dungeon::depth % 5 != 0) { // Not boss floors
-                int nMobs = 1;
+            if (Dungeon::depth % 5 != 0) { // Not on boss floors
+                int nMobs = 2;
                 if (Random::Int(2) == 0) {
                     nMobs++;
                     if (Random::Int(2) == 0) nMobs++;
@@ -124,16 +210,16 @@ void Traps::trigger(int tile, int cell, Char* ch) {
 
                 // Check 8 neighbors for unoccupied passable spots
                 std::vector<int> candidates;
-                for (int dy = -1; dy <= 1; ++dy) {
-                    for (int dx = -1; dx <= 1; ++dx) {
-                        if (dx == 0 && dy == 0) continue;
-                        int cx = (cell % Level::WIDTH) + dx;
-                        int cy = (cell / Level::WIDTH) + dy;
-                        if (cx >= 0 && cx < Level::WIDTH && cy >= 0 && cy < Level::HEIGHT) {
-                            int p = cy * Level::WIDTH + cx;
-                            if (Dungeon::level && Dungeon::level->isPassable(p) && !Dungeon::level->pit[p] && Actor::findChar(p) == nullptr) {
-                                candidates.push_back(p);
-                            }
+                const int neighbours8[8] = {
+                    -Level::WIDTH - 1, -Level::WIDTH, -Level::WIDTH + 1,
+                    -1,                               +1,
+                    +Level::WIDTH - 1, +Level::WIDTH, +Level::WIDTH + 1
+                };
+                for (int i = 0; i < 8; ++i) {
+                    int p = cell + neighbours8[i];
+                    if (p >= 0 && p < Level::LENGTH && Dungeon::level) {
+                        if (Dungeon::level->isPassable(p) && !Dungeon::level->pit[p] && Actor::findChar(p) == nullptr) {
+                            candidates.push_back(p);
                         }
                     }
                 }
@@ -143,33 +229,57 @@ void Traps::trigger(int tile, int cell, Char* ch) {
                     int spawnPos = candidates[idx];
                     candidates.erase(candidates.begin() + idx);
 
-                    std::unique_ptr<Mob> mob;
-                    if (Dungeon::depth <= 2) {
-                        mob = (Random::Int(2) == 0) ? std::unique_ptr<Mob>(std::make_unique<Rat>()) : std::unique_ptr<Mob>(std::make_unique<Gnoll>());
-                    } else if (Dungeon::depth <= 4) {
-                        int r = Random::Int(4);
-                        if (r == 0) mob = std::make_unique<Rat>();
-                        else if (r == 1) mob = std::make_unique<Gnoll>();
-                        else if (r == 2) mob = std::make_unique<Crab>();
-                        else mob = std::make_unique<Skeleton>();
-                    } else {
-                        int r = Random::Int(3);
-                        if (r == 0) mob = std::make_unique<Gnoll>();
-                        else if (r == 1) mob = std::make_unique<Crab>();
-                        else mob = std::make_unique<Skeleton>();
-                    }
-
+                    std::unique_ptr<Mob> mob = Dungeon::createMobForDepth(Dungeon::depth);
                     if (mob) {
-                        mob->move(spawnPos);
+                        mob->place(spawnPos);
                         mob->state = Mob::State::WANDERING;
                         Actor::occupyCell(mob.get());
                         Actor::add(mob.get(), 1.0f);
+                        FX::burst(spawnPos, 0x770088FFu, 8);
                         Dungeon::mobs.push_back(std::move(mob));
                     }
                     nMobs--;
                 }
             }
             FX::burst(cell, 0x770088FFu, 8);
+            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_TELEPORT).get());
+            break;
+        }
+
+        case Terrain::SECRET_TELEPORTATION_TRAP:
+        case Terrain::TELEPORTATION_TRAP: {
+            isTrap = true;
+            if (ch) {
+                int newPos = -1;
+                int count = 10;
+                do {
+                    newPos = Dungeon::level ? Dungeon::level->randomDestination() : -1;
+                    if (count-- <= 0) break;
+                } while (newPos == -1);
+
+                if (newPos != -1) {
+                    int oldPos = ch->pos;
+                    FX::burst(oldPos, 0xaa44ffFF, 8);
+                    ch->move(newPos);
+                    FX::burst(newPos, 0xaa44ffFF, 8);
+
+                    if (ch == Dungeon::hero.get()) {
+                        GLog::i("In a blink of an eye you were teleported to another location of the level.");
+                        Dungeon::observe();
+                    } else {
+                        Mob* m = static_cast<Mob*>(ch);
+                        if (m) {
+                            m->state = Mob::State::WANDERING;
+                            m->target = -1;
+                            m->enemy = nullptr;
+                            m->enemySeen = false;
+                        }
+                    }
+                }
+            } else {
+                FX::burst(cell, 0xaa44ffFF, 6);
+            }
+            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_TELEPORT).get());
             break;
         }
 
