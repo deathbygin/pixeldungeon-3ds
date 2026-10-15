@@ -1,4 +1,6 @@
 #include "pd/windows/WndStory.h"
+#include "noosa/Audio.h"
+#include "pd/Assets.h"
 
 namespace pd::windows {
 
@@ -74,8 +76,9 @@ void WndStory::show(int chapterId) {
 bool WndStory::update(const pd::ui::TouchController& touch, u32 kDown) {
     if (!m_open) return false;
 
-    // Tap anywhere or press A / B / START to dismiss
-    if (touch.justReleased() || (kDown & (KEY_A | KEY_B | KEY_START))) {
+    // Tap anywhere or press A / B / X / Y / START / SELECT to dismiss
+    if (touch.justReleased() || (kDown & (KEY_A | KEY_B | KEY_X | KEY_Y | KEY_START | KEY_SELECT))) {
+        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
         hide();
         return true;
     }

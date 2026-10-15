@@ -601,121 +601,121 @@ int main(int argc, char* argv[]) {
         // ---------------------------------------------------------------------
         // STATE 6: ACTIVE GAMEPLAY
         // ---------------------------------------------------------------------
-        if (wndStory.isOpen()) {
+        bool storyWasOpen = wndStory.isOpen();
+        if (storyWasOpen) {
             wndStory.update(screenTouch, kDown);
-            kDown = 0;
-            kHeld = 0;
-            kUp = 0;
         }
 
         Hero* hero = Dungeon::hero.get();
         Level* level = Dungeon::level.get();
 
-        // ---------------------------------------------------------------------
-        // 1. Bottom Screen UI & Hardware Buttons [A, B, X, Y, L, R]
-        // ---------------------------------------------------------------------
-        // Resting interrupt on directional / input actions
-        if (hero && hero->restoreHealth) {
-            if ((kDown & ~KEY_A) || (kHeld & (KEY_DUP | KEY_DDOWN | KEY_DLEFT | KEY_DRIGHT))) {
-                hero->interrupt();
+        if (!storyWasOpen) {
+            // -----------------------------------------------------------------
+            // 1. Bottom Screen UI & Hardware Buttons [A, B, X, Y, L, R]
+            // -----------------------------------------------------------------
+            // Resting interrupt on directional / input actions
+            if (hero && hero->restoreHealth) {
+                if ((kDown & ~KEY_A) || (kHeld & (KEY_DUP | KEY_DDOWN | KEY_DLEFT | KEY_DRIGHT))) {
+                    hero->interrupt();
+                }
             }
-        }
 
-        bool actionConsumed = bottomUI.update(hero, level, kDown, kHeld, kUp);
-        if (actionConsumed) {
-            Dungeon::mobs.erase(
-                std::remove_if(Dungeon::mobs.begin(), Dungeon::mobs.end(),
-                               [](const std::unique_ptr<Mob>& m) { return !m || !m->isAlive(); }),
-                Dungeon::mobs.end()
-            );
-            FX::evolveBlobs(level);
-        } else if (hero && hero->restoreHealth) {
-            // Hero is resting: advance turns smoothly
-            static float restDelay = 0.0f;
-            restDelay += dt;
-            if (restDelay >= 0.12f) {
-                restDelay = 0.0f;
-                Actor::process();
-                FX::evolveBlobs(level);
+            bool actionConsumed = bottomUI.update(hero, level, kDown, kHeld, kUp);
+            if (actionConsumed) {
                 Dungeon::mobs.erase(
                     std::remove_if(Dungeon::mobs.begin(), Dungeon::mobs.end(),
                                    [](const std::unique_ptr<Mob>& m) { return !m || !m->isAlive(); }),
                     Dungeon::mobs.end()
                 );
-                if (!hero->isAlive()) {
-                    sndHit.play(0.8f, 0.0f);
-                    SaveManager::deleteSave();
-                    GLog::n("HERO PERISHED! Save erased.");
-                }
-            }
-        }
-
-        // ---------------------------------------------------------------------
-        // 2. D-pad & Circle Pad Movement (Supports 8-directional analog movement)
-        // ---------------------------------------------------------------------
-        if (!actionConsumed && !bottomUI.isInventoryOpen() && !bottomUI.isTargeting() && !FX::isMissileActive() && hero && hero->isAlive() && !hero->restoreHealth) {
-            int heroX = hero->pos % Level::WIDTH;
-            int heroY = hero->pos / Level::WIDTH;
-            int targetCell = -1;
-
-            static float moveDelay = 0.0f;
-            moveDelay -= dt;
-
-            circlePosition cpad;
-            hidCircleRead(&cpad);
-
-            int dx = 0;
-            int dy = 0;
-            if (kHeld & KEY_DUP)    dy = -1;
-            if (kHeld & KEY_DDOWN)  dy = 1;
-            if (kHeld & KEY_DLEFT)  dx = -1;
-            if (kHeld & KEY_DRIGHT) dx = 1;
-
-            // Circle pad analog thresholds (supports diagonal directions)
-            if (cpad.dx > 45)  dx = 1;
-            if (cpad.dx < -45) dx = -1;
-            if (cpad.dy > 45)  dy = -1;
-            if (cpad.dy < -45) dy = 1;
-
-            if (dx != 0 || dy != 0) {
-                targetCell = (heroY + dy) * Level::WIDTH + (heroX + dx);
-            }
-
-            if (targetCell >= 0 && moveDelay <= 0.0f) {
-                bool isInitialTap = (kDown & (KEY_DUP | KEY_DDOWN | KEY_DLEFT | KEY_DRIGHT)) != 0;
-                moveDelay = isInitialTap ? 0.20f : 0.12f;
-
-                Char* targetEnemy = Actor::findChar(targetCell);
-                int prevTargetHp = targetEnemy ? targetEnemy->HP : 0;
-
-                if (hero->stepTo(targetCell, level)) {
-                    if (targetEnemy) {
-                        sndHit.play(0.6f, 0.0f);
-                        int dealt = prevTargetHp - targetEnemy->HP;
-                        if (targetEnemy->isAlive()) {
-                            GLog::i("Hero hit " + targetEnemy->name + " for " + std::to_string(dealt) + " dmg!");
-                        } else {
-                            GLog::p("Hero defeated " + targetEnemy->name + "!");
-                        }
-                    } else {
-                        sndStep.play(0.25f, 0.0f);
-                    }
-
-                    // Run continuous turn timeline scheduler
+                FX::evolveBlobs(level);
+            } else if (hero && hero->restoreHealth) {
+                // Hero is resting: advance turns smoothly
+                static float restDelay = 0.0f;
+                restDelay += dt;
+                if (restDelay >= 0.12f) {
+                    restDelay = 0.0f;
                     Actor::process();
                     FX::evolveBlobs(level);
                     Dungeon::mobs.erase(
                         std::remove_if(Dungeon::mobs.begin(), Dungeon::mobs.end(),
-                                       [](const std::unique_ptr<Mob>& m) {
-                                           return !m || (!m->isAlive() && (!m->sprite || m->sprite->isDead()));
-                                       }),
+                                       [](const std::unique_ptr<Mob>& m) { return !m || !m->isAlive(); }),
                         Dungeon::mobs.end()
                     );
-
                     if (!hero->isAlive()) {
                         sndHit.play(0.8f, 0.0f);
                         SaveManager::deleteSave();
                         GLog::n("HERO PERISHED! Save erased.");
+                    }
+                }
+            }
+
+            // -----------------------------------------------------------------
+            // 2. D-pad & Circle Pad Movement (Supports 8-directional analog movement)
+            // -----------------------------------------------------------------
+            if (!actionConsumed && !bottomUI.isInventoryOpen() && !bottomUI.isTargeting() && !FX::isMissileActive() && hero && hero->isAlive() && !hero->restoreHealth) {
+                int heroX = hero->pos % Level::WIDTH;
+                int heroY = hero->pos / Level::WIDTH;
+                int targetCell = -1;
+
+                static float moveDelay = 0.0f;
+                moveDelay -= dt;
+
+                circlePosition cpad;
+                hidCircleRead(&cpad);
+
+                int dx = 0;
+                int dy = 0;
+                if (kHeld & KEY_DUP)    dy = -1;
+                if (kHeld & KEY_DDOWN)  dy = 1;
+                if (kHeld & KEY_DLEFT)  dx = -1;
+                if (kHeld & KEY_DRIGHT) dx = 1;
+
+                // Circle pad analog thresholds (supports diagonal directions)
+                if (cpad.dx > 45)  dx = 1;
+                if (cpad.dx < -45) dx = -1;
+                if (cpad.dy > 45)  dy = -1;
+                if (cpad.dy < -45) dy = 1;
+
+                if (dx != 0 || dy != 0) {
+                    targetCell = (heroY + dy) * Level::WIDTH + (heroX + dx);
+                }
+
+                if (targetCell >= 0 && moveDelay <= 0.0f) {
+                    bool isInitialTap = (kDown & (KEY_DUP | KEY_DDOWN | KEY_DLEFT | KEY_DRIGHT)) != 0;
+                    moveDelay = isInitialTap ? 0.20f : 0.12f;
+
+                    Char* targetEnemy = Actor::findChar(targetCell);
+                    int prevTargetHp = targetEnemy ? targetEnemy->HP : 0;
+
+                    if (hero->stepTo(targetCell, level)) {
+                        if (targetEnemy) {
+                            sndHit.play(0.6f, 0.0f);
+                            int dealt = prevTargetHp - targetEnemy->HP;
+                            if (targetEnemy->isAlive()) {
+                                GLog::i("Hero hit " + targetEnemy->name + " for " + std::to_string(dealt) + " dmg!");
+                            } else {
+                                GLog::p("Hero defeated " + targetEnemy->name + "!");
+                            }
+                        } else {
+                            sndStep.play(0.25f, 0.0f);
+                        }
+
+                        // Run continuous turn timeline scheduler
+                        Actor::process();
+                        FX::evolveBlobs(level);
+                        Dungeon::mobs.erase(
+                            std::remove_if(Dungeon::mobs.begin(), Dungeon::mobs.end(),
+                                           [](const std::unique_ptr<Mob>& m) {
+                                               return !m || (!m->isAlive() && (!m->sprite || m->sprite->isDead()));
+                                           }),
+                            Dungeon::mobs.end()
+                        );
+
+                        if (!hero->isAlive()) {
+                            sndHit.play(0.8f, 0.0f);
+                            SaveManager::deleteSave();
+                            GLog::n("HERO PERISHED! Save erased.");
+                        }
                     }
                 }
             }
