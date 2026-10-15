@@ -32,6 +32,8 @@ public:
     static const char* getChapterText(int chapterId);
 
 private:
+    void wrapText(const std::string& text, float maxW);
+
     bool m_open = false;
     int m_chapterId = 0;
     std::string m_chapterTitle;

@@ -600,13 +600,14 @@ int main(int argc, char* argv[]) {
             C2D_TargetClear(topTarget, C2D_Color32(0x00, 0x00, 0x00, 0xFF));
             C2D_SceneBegin(topTarget);
 
-            C2D_Text descText;
-            C2D_TextParse(&descText, textBuf, "Descending...");
-            C2D_TextOptimize(&descText);
-            float dW = 0.0f, dH = 0.0f;
-            C2D_TextGetDimensions(&descText, 0.55f, 0.55f, &dW, &dH);
+            std::string loadingMsg = isNewGame ? "Descending..." : "Loading...";
+            float dW = BitmapFont::width(BitmapFont::FontType::Font2x, loadingMsg);
+            float dH = BitmapFont::height(BitmapFont::FontType::Font2x);
+            float dX = std::round((400.0f - dW) * 0.5f);
+            float dY = std::round((240.0f - dH) * 0.5f);
             u8 a = static_cast<u8>(textAlpha * 255.0f);
-            C2D_DrawText(&descText, C2D_WithColor, (400.0f - dW) * 0.5f, (240.0f - dH) * 0.5f, 0.5f, 0.55f, 0.55f, C2D_Color32(0xFF, 0xFF, 0xFF, a));
+            u32 col = C2D_Color32(0xFF, 0xFF, 0xFF, a);
+            BitmapFont::draw(BitmapFont::FontType::Font2x, loadingMsg, dX, dY, 0.5f, col);
 
             // Bottom Screen: Black fade
             C2D_TargetClear(bottomTarget, C2D_Color32(0x00, 0x00, 0x00, 0xFF));
