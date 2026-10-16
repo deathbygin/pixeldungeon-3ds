@@ -904,6 +904,7 @@ void Painter::paintPit(Level* level, Room* room) {
     while (level->map[remains] == Terrain::EMPTY_WELL && ++tries < 50) {
         remains = room->random();
     }
+    level->pitLandingCell = remains;
 
     Heap* skel = level->drop(std::make_unique<IronKey>(Dungeon::depth), remains);
     if (skel) {

@@ -3,6 +3,7 @@
 #include "pd/Random.h"
 #include "pd/Badges.h"
 #include "pd/GLog.h"
+#include "pd/Item.h"
 #include <algorithm>
 #include <unordered_map>
 #include <ctime>
@@ -10,6 +11,8 @@
 #include "pd/FX.h"
 
 namespace pd {
+
+LevelTransition Dungeon::pendingTransition = LevelTransition::NONE;
 
 static std::unordered_map<int, std::unique_ptr<Level>> s_cachedLevels;
 static std::unordered_map<int, std::vector<std::unique_ptr<Mob>>> s_cachedMobs;
@@ -40,10 +43,17 @@ void Dungeon::dropToChasm(std::unique_ptr<Item> item) {
 void Dungeon::placeChasmItems() {
     auto it = droppedItems.find(depth);
     if (it != droppedItems.end() && level) {
+        int pitPos = level->hasPitRoom() ? level->pitCell() : -1;
         for (auto& item : it->second) {
             if (item) {
-                int pos = level->randomDestination();
-                level->drop(std::move(item), pos);
+                int pos = (pitPos != -1) ? pitPos : level->randomRespawnCell();
+                if (Potion* p = item->asPotion()) {
+                    p->shatter(pos);
+                } else if (PlantSeed* s = item->asPlantSeed()) {
+                    level->plant(s->plantType, pos);
+                } else {
+                    level->drop(std::move(item), pos);
+                }
             }
         }
         droppedItems.erase(it);
@@ -162,7 +172,7 @@ void Dungeon::resetLevel() {
     Actor::process();
 }
 
-void Dungeon::switchLevel(int newDepth) {
+void Dungeon::switchLevel(int newDepth, bool isFall) {
     if (!hero || newDepth < 1) return;
 
     // 1. Stash current level and mobs into cache
@@ -190,8 +200,13 @@ void Dungeon::switchLevel(int newDepth) {
             s_cachedMobs.erase(itMobs);
         }
 
-        // Place hero at stairs
-        int spawnCell = descending ? level->entrance : level->exit;
+        // Place hero at stairs or pit/respawn cell
+        int spawnCell;
+        if (isFall) {
+            spawnCell = level->hasPitRoom() ? level->pitCell() : level->randomRespawnCell();
+        } else {
+            spawnCell = descending ? level->entrance : level->exit;
+        }
         hero->place(spawnCell);
         Actor::occupyCell(hero.get());
         Actor::add(hero.get());
@@ -214,12 +229,11 @@ void Dungeon::switchLevel(int newDepth) {
         }
         mobs.clear();
 
-        int spawnPos = descending ? level->entrance : level->exit;
-        for (const auto& r : level->rooms) {
-            if (r && r->type == Room::Type::PIT) {
-                spawnPos = level->pitCell();
-                break;
-            }
+        int spawnPos;
+        if (isFall) {
+            spawnPos = level->hasPitRoom() ? level->pitCell() : level->randomRespawnCell();
+        } else {
+            spawnPos = descending ? level->entrance : level->exit;
         }
         hero->place(spawnPos);
         Actor::occupyCell(hero.get());

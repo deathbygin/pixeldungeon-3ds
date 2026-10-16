@@ -55,6 +55,7 @@
 #include "pd/Ballistica.h"
 #include "pd/MissileSprite.h"
 #include "pd/Sample.h"
+#include "pd/Chasm.h"
 
 // Dual-Screen UI Subsystems (Phase 4)
 #include "pd/ui/TouchController.h"
@@ -362,7 +363,8 @@ int main(int argc, char* argv[]) {
         NEW_GAME,
         RESUME,
         DESCEND,
-        ASCEND
+        ASCEND,
+        FALL
     };
     InterlevelMode interlevelMode = InterlevelMode::NEW_GAME;
     float interlevelTimer = 0.0f;
@@ -631,6 +633,28 @@ int main(int argc, char* argv[]) {
                     }
                     bottomUI.reset();
                     bottomUI.log("Ascended to Depth " + std::to_string(Dungeon::depth) + " as " + Dungeon::hero->name + ".");
+                } else if (interlevelMode == InterlevelMode::FALL) {
+                    Sample::play(Assets::SND_FALLING);
+                    if (Dungeon::hero) {
+                        Hunger* hunger = Dungeon::hero->getBuff<Hunger>();
+                        if (hunger && !hunger->isStarving()) {
+                            hunger->satisfy(-Hunger::STARVING / 10.0f);
+                        }
+                    }
+                    SaveManager::saveGame();
+                    int nextDepth = Dungeon::depth + 1;
+                    if (Dungeon::bossLevel(nextDepth)) {
+                        Sample::play(Assets::SND_BOSS);
+                    }
+                    Dungeon::switchLevel(nextDepth, /*isFall=*/true);
+                    tilemap.loadForDepth(Dungeon::depth);
+                    if (Dungeon::hero) {
+                        float hx = (Dungeon::hero->pos % Level::WIDTH) * 16.0f + 8.0f;
+                        float hy = (Dungeon::hero->pos / Level::WIDTH) * 16.0f + 8.0f;
+                        topCamera.setCenter(hx, hy);
+                    }
+                    bottomUI.reset();
+                    bottomUI.log("Fell to Depth " + std::to_string(Dungeon::depth) + " as " + Dungeon::hero->name + ".");
                 }
             }
 
@@ -648,6 +672,8 @@ int main(int argc, char* argv[]) {
                     else if (Dungeon::depth == 11) wndStory.show(pd::windows::WndStory::ID_CAVES);
                     else if (Dungeon::depth == 16) wndStory.show(pd::windows::WndStory::ID_METROPOLIS);
                     else if (Dungeon::depth == 21) wndStory.show(pd::windows::WndStory::ID_HALLS);
+                } else if (interlevelMode == InterlevelMode::FALL) {
+                    Chasm::heroLand();
                 }
             }
 
@@ -660,7 +686,8 @@ int main(int argc, char* argv[]) {
             C2D_SceneBegin(topTarget);
 
             std::string loadingMsg = (interlevelMode == InterlevelMode::ASCEND) ? "Ascending..." :
-                                     ((interlevelMode == InterlevelMode::RESUME) ? "Loading..." : "Descending...");
+                                     ((interlevelMode == InterlevelMode::RESUME) ? "Loading..." :
+                                     ((interlevelMode == InterlevelMode::FALL) ? "Falling..." : "Descending..."));
             float dW = BitmapFont::width(BitmapFont::FontType::Font2x, loadingMsg);
             float dH = BitmapFont::height(BitmapFont::FontType::Font2x);
             float dX = std::round((400.0f - dW) * 0.5f);
@@ -703,23 +730,38 @@ int main(int argc, char* argv[]) {
 
             bool actionConsumed = bottomUI.update(hero, level, kDown, kHeld, kUp);
 
-            // Handle level transitions (Descent, Ascent, Victory)
-            if (bottomUI.getPendingTransition() == LevelTransition::DESCEND) {
+            // Handle level transitions (Descent, Ascent, Victory, Fall)
+            LevelTransition trans = bottomUI.getPendingTransition();
+            if (trans == LevelTransition::NONE) {
+                trans = Dungeon::pendingTransition;
+            }
+            if (trans == LevelTransition::DESCEND) {
                 bottomUI.clearPendingTransition();
+                Dungeon::pendingTransition = LevelTransition::NONE;
                 appState = AppState::INTERLEVEL;
                 interlevelMode = InterlevelMode::DESCEND;
                 interlevelTimer = 0.0f;
                 interlevelStarted = false;
                 continue;
-            } else if (bottomUI.getPendingTransition() == LevelTransition::ASCEND) {
+            } else if (trans == LevelTransition::ASCEND) {
                 bottomUI.clearPendingTransition();
+                Dungeon::pendingTransition = LevelTransition::NONE;
                 appState = AppState::INTERLEVEL;
                 interlevelMode = InterlevelMode::ASCEND;
                 interlevelTimer = 0.0f;
                 interlevelStarted = false;
                 continue;
-            } else if (bottomUI.getPendingTransition() == LevelTransition::WIN) {
+            } else if (trans == LevelTransition::FALL) {
                 bottomUI.clearPendingTransition();
+                Dungeon::pendingTransition = LevelTransition::NONE;
+                appState = AppState::INTERLEVEL;
+                interlevelMode = InterlevelMode::FALL;
+                interlevelTimer = 0.0f;
+                interlevelStarted = false;
+                continue;
+            } else if (trans == LevelTransition::WIN) {
+                bottomUI.clearPendingTransition();
+                Dungeon::pendingTransition = LevelTransition::NONE;
                 SaveManager::deleteSave();
                 noosa::Music::play(pd::Assets::HAPPY, true);
                 wndOptions.show("HAPPY ENDING!",
@@ -753,6 +795,15 @@ int main(int argc, char* argv[]) {
                     Dungeon::mobs.end()
                 );
                 FX::evolveBlobs(level);
+                if (Dungeon::pendingTransition == LevelTransition::FALL) {
+                    bottomUI.clearPendingTransition();
+                    Dungeon::pendingTransition = LevelTransition::NONE;
+                    appState = AppState::INTERLEVEL;
+                    interlevelMode = InterlevelMode::FALL;
+                    interlevelTimer = 0.0f;
+                    interlevelStarted = false;
+                    continue;
+                }
             } else if (hero && hero->restoreHealth && !bottomUI.isPauseMenuOpen()) {
                 // Hero is resting: advance turns smoothly
                 static float restDelay = 0.0f;
@@ -770,6 +821,15 @@ int main(int argc, char* argv[]) {
                         Sample::play(Assets::SND_DEATH);
                         SaveManager::deleteSave();
                         GLog::n("HERO PERISHED! Save erased.");
+                    }
+                    if (Dungeon::pendingTransition == LevelTransition::FALL) {
+                        bottomUI.clearPendingTransition();
+                        Dungeon::pendingTransition = LevelTransition::NONE;
+                        appState = AppState::INTERLEVEL;
+                        interlevelMode = InterlevelMode::FALL;
+                        interlevelTimer = 0.0f;
+                        interlevelStarted = false;
+                        continue;
                     }
                 }
             }
@@ -854,6 +914,16 @@ int main(int argc, char* argv[]) {
                             } else if (level->map[hero->pos] == Terrain::ENTRANCE) {
                                 bottomUI.promptStairs(false);
                             }
+                        }
+
+                        if (Dungeon::pendingTransition == LevelTransition::FALL) {
+                            bottomUI.clearPendingTransition();
+                            Dungeon::pendingTransition = LevelTransition::NONE;
+                            appState = AppState::INTERLEVEL;
+                            interlevelMode = InterlevelMode::FALL;
+                            interlevelTimer = 0.0f;
+                            interlevelStarted = false;
+                            continue;
                         }
                     }
                 }

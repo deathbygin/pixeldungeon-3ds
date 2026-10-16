@@ -3,6 +3,7 @@
 #include "Hero.h"
 #include "Level.h"
 #include "Mob.h"
+#include "LevelTransition.h"
 #include <memory>
 #include <vector>
 #include <unordered_map>
@@ -13,6 +14,8 @@ class FogOfWar;
 
 class Dungeon {
 public:
+    static LevelTransition pendingTransition;
+
     static std::unique_ptr<Hero> hero;
     static std::unique_ptr<Level> level;
     static std::vector<std::unique_ptr<Mob>> mobs;
@@ -32,7 +35,7 @@ public:
     static void resetLevel();
     static void nextLevel();
     static void prevLevel();
-    static void switchLevel(int newDepth);
+    static void switchLevel(int newDepth, bool isFall = false);
     static void announceLevelEntrance();
 
     static void spawnMobs(int count = 4);

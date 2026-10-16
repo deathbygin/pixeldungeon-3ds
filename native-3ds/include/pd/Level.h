@@ -69,6 +69,9 @@ public:
         if (item) itemsToSpawn.push_back(std::move(item));
     }
     std::unique_ptr<Item> itemToSpawnAsPrize();
+    int pitLandingCell = -1;
+    bool hasPitRoom() const;
+    int randomRespawnCell() const;
     virtual int pitCell() const;
     Room* room(int pos) const;
 

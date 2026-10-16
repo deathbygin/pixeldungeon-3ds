@@ -36,13 +36,59 @@ std::unique_ptr<Item> Level::itemToSpawnAsPrize() {
     return nullptr;
 }
 
+bool Level::hasPitRoom() const {
+    if (pitLandingCell != -1) return true;
+    for (const auto& r : rooms) {
+        if (r && r->type == Room::Type::PIT) return true;
+    }
+    return false;
+}
+
 int Level::pitCell() const {
+    if (pitLandingCell != -1) {
+        return pitLandingCell;
+    }
     for (const auto& r : rooms) {
         if (r && r->type == Room::Type::PIT) {
             return r->random();
         }
     }
-    return entrance;
+    return randomRespawnCell();
+}
+
+int Level::randomRespawnCell() const {
+    // 1. Try to find a passable, non-pit cell far (Chebyshev distance >= 8) from the entrance
+    for (int attempts = 0; attempts < 100; ++attempts) {
+        int c = -1;
+        if (!rooms.empty()) {
+            size_t r = Random::Int(static_cast<int>(rooms.size()));
+            if (rooms[r] && rooms[r]->type != Room::Type::NONE) {
+                c = rooms[r]->random();
+            }
+        }
+        if (c < 0) {
+            c = Random::Int(LENGTH);
+        }
+        if (isPassable(c) && !pit[c] && c != entrance) {
+            int ex = entrance % WIDTH;
+            int ey = entrance / WIDTH;
+            int cx = c % WIDTH;
+            int cy = c / WIDTH;
+            int dist = std::max(std::abs(cx - ex), std::abs(cy - ey));
+            if (dist >= 8 && Actor::findChar(c) == nullptr) {
+                return c;
+            }
+        }
+    }
+    // 2. Fallback: Any passable cell not on entrance and not on a pit
+    for (int attempts = 0; attempts < 100; ++attempts) {
+        int c = Random::Int(LENGTH);
+        if (isPassable(c) && !pit[c] && c != entrance && Actor::findChar(c) == nullptr) {
+            return c;
+        }
+    }
+    // 3. Absolute fallback
+    return randomDestination();
 }
 
 Room* Level::room(int pos) const {

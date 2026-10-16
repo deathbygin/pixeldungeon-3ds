@@ -22,14 +22,11 @@ class Level;
 class Item;
 }
 
+#include "pd/LevelTransition.h"
+
 namespace pd::ui {
 
-enum class LevelTransition {
-    NONE,
-    DESCEND,
-    ASCEND,
-    WIN
-};
+using pd::LevelTransition;
 
 class BottomScreenUI {
 public:

@@ -9,12 +9,16 @@
 #include "pd/Assets.h"
 #include "pd/Badges.h"
 #include "pd/Sample.h"
+#include "pd/SaveManager.h"
 #include "noosa/Audio.h"
 #include "noosa/Camera.h"
 
 namespace pd {
 
+bool Chasm::jumpConfirmed = false;
+
 void Chasm::heroFall(int pos) {
+    jumpConfirmed = false;
     Sample::play(Assets::SND_FALLING);
 
     if (Dungeon::hero && Dungeon::hero->isAlive()) {
@@ -26,8 +30,7 @@ void Chasm::heroFall(int pos) {
             Level::pitRoomNeeded = true;
         }
 
-        Dungeon::nextLevel();
-        heroLand();
+        Dungeon::pendingTransition = LevelTransition::FALL;
     }
 }
 
@@ -35,16 +38,25 @@ void Chasm::heroLand() {
     Hero* hero = Dungeon::hero.get();
     if (!hero) return;
 
-    FX::burst(hero->pos, 0xcc2222FFu, 10);
+    Sample::play(Assets::SND_BONES);
+    Sample::play(Assets::SND_HIT);
+
     if (noosa::Camera::main) {
-        noosa::Camera::main->shake(0.2f, 4.0f);
+        noosa::Camera::main->shake(0.25f, 5.0f);
     }
 
+    FX::burst(hero->pos, 0xcc1111FFu, 16);
+
     hero->affect<Cripple>();
+    hero->affect<Bleeding>(5);
+
     int dmg = Random::IntRange(hero->HT / 3, hero->HT / 2);
+    FX::floatingText(hero->pos, std::to_string(dmg), 0xcc1111FFu);
     hero->damage(dmg, nullptr);
 
     if (!hero->isAlive()) {
+        Sample::play(Assets::SND_DEATH);
+        SaveManager::deleteSave();
         GLog::n("You fell to death...");
         Badges::validateDeathFromFalling();
     }
