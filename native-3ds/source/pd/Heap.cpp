@@ -143,4 +143,15 @@ void Heap::burn() {
     }
 }
 
+void Heap::freeze() {
+    if (type != Type::HEAP) return;
+
+    for (auto& item : items) {
+        if (item && item->name == "Mystery Meat") {
+            item->name = "Frozen Carpaccio";
+            item->image = ItemSpriteSheet::CARPACCIO;
+        }
+    }
+}
+
 } // namespace pd

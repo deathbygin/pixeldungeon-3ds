@@ -41,6 +41,7 @@ public:
     void drop(std::unique_ptr<Item> item);
 
     void burn();
+    void freeze();
 };
 
 } // namespace pd

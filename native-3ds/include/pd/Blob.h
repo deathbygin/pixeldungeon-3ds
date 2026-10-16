@@ -11,7 +11,10 @@ public:
         TOXIC_GAS,
         PARALYTIC_GAS,
         FIRE,
-        CONFUSION_GAS
+        CONFUSION_GAS,
+        CORROSIVE_GAS,
+        REGROWTH,
+        FOLIAGE
     };
 
     BlobType type = BlobType::TOXIC_GAS;
@@ -26,10 +29,17 @@ public:
     bool act() override;
 
     void clear();
+    void clear(int cell);
     void seed(int cell, int amount = 100);
     void evolve(const Level* level);
 
     uint32_t getParticleColor() const;
+    const char* tileDesc() const;
+};
+
+class Freezing {
+public:
+    static bool affect(int cell, Blob* fire = nullptr);
 };
 
 } // namespace pd

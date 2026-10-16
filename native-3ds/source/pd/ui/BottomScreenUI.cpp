@@ -1362,6 +1362,27 @@ void BottomScreenUI::inspectCell(int cell, pd::Level* level) {
     std::string tName = Level::tileName(tile);
     std::string tDesc = Level::tileDesc(tile);
 
+    // Check for active blobs on the cell (Fire, Toxic Gas, Paralytic Gas, etc.)
+    static const Blob::BlobType blobTypes[] = {
+        Blob::BlobType::FIRE,
+        Blob::BlobType::TOXIC_GAS,
+        Blob::BlobType::PARALYTIC_GAS,
+        Blob::BlobType::CONFUSION_GAS,
+        Blob::BlobType::CORROSIVE_GAS,
+        Blob::BlobType::REGROWTH,
+        Blob::BlobType::FOLIAGE
+    };
+    for (auto bt : blobTypes) {
+        Blob* b = FX::getBlob(bt);
+        if (b && b->cur[cell] > 0 && Dungeon::visible[cell]) {
+            const char* bd = b->tileDesc();
+            if (bd) {
+                if (!tDesc.empty()) tDesc += "\n\n";
+                tDesc += bd;
+            }
+        }
+    }
+
     if (tDesc.empty()) {
         log(tName, C2D_Color32(0xff, 0xcc, 0x66, 0xFF));
     } else {

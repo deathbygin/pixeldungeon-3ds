@@ -152,6 +152,9 @@ void Dungeon::resetLevel() {
     Actor::add(FX::getBlob(Blob::BlobType::TOXIC_GAS), Actor::TICK);
     Actor::add(FX::getBlob(Blob::BlobType::PARALYTIC_GAS), Actor::TICK);
     Actor::add(FX::getBlob(Blob::BlobType::CONFUSION_GAS), Actor::TICK);
+    Actor::add(FX::getBlob(Blob::BlobType::CORROSIVE_GAS), Actor::TICK);
+    Actor::add(FX::getBlob(Blob::BlobType::REGROWTH), Actor::TICK);
+    Actor::add(FX::getBlob(Blob::BlobType::FOLIAGE), Actor::TICK);
     observe();
     announceLevelEntrance();
     Actor::process();
@@ -235,6 +238,9 @@ void Dungeon::switchLevel(int newDepth) {
     Actor::add(FX::getBlob(Blob::BlobType::TOXIC_GAS), Actor::TICK);
     Actor::add(FX::getBlob(Blob::BlobType::PARALYTIC_GAS), Actor::TICK);
     Actor::add(FX::getBlob(Blob::BlobType::CONFUSION_GAS), Actor::TICK);
+    Actor::add(FX::getBlob(Blob::BlobType::CORROSIVE_GAS), Actor::TICK);
+    Actor::add(FX::getBlob(Blob::BlobType::REGROWTH), Actor::TICK);
+    Actor::add(FX::getBlob(Blob::BlobType::FOLIAGE), Actor::TICK);
     placeChasmItems();
     observe();
     announceLevelEntrance();

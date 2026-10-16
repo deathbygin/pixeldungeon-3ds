@@ -1115,16 +1115,8 @@ void Potion::shatter(int cell) {
                     int ny = cy + dy;
                     if (nx >= 0 && nx < Level::WIDTH && ny >= 0 && ny < Level::HEIGHT) {
                         int c = ny * Level::WIDTH + nx;
-                        if (fire && fire->cur[c] > 0) {
-                            fire->volume -= fire->cur[c];
-                            fire->cur[c] = 0;
-                        }
-                        Char* ch = Actor::findChar(c);
-                        if (ch) {
-                            ch->affect<Frost>();
-                        }
-                        if (Dungeon::visible[c]) {
-                            FX::burst(c, 0x00ffffff, 4);
+                        if (Dungeon::level && !Dungeon::level->isLosBlocking(c)) {
+                            Freezing::affect(c, fire);
                         }
                     }
                 }
@@ -1137,6 +1129,8 @@ void Potion::shatter(int cell) {
         case PotionType::PURITY: {
             Blob* toxic = FX::getBlob(Blob::BlobType::TOXIC_GAS);
             Blob* para = FX::getBlob(Blob::BlobType::PARALYTIC_GAS);
+            Blob* conf = FX::getBlob(Blob::BlobType::CONFUSION_GAS);
+            Blob* corr = FX::getBlob(Blob::BlobType::CORROSIVE_GAS);
             int cx = cell % Level::WIDTH;
             int cy = cell / Level::WIDTH;
             bool procd = false;
@@ -1148,13 +1142,19 @@ void Potion::shatter(int cell) {
                     if (nx >= 0 && nx < Level::WIDTH && ny >= 0 && ny < Level::HEIGHT) {
                         int c = ny * Level::WIDTH + nx;
                         if (toxic && toxic->cur[c] > 0) {
-                            toxic->volume -= toxic->cur[c];
-                            toxic->cur[c] = 0;
+                            toxic->clear(c);
                             procd = true;
                         }
                         if (para && para->cur[c] > 0) {
-                            para->volume -= para->cur[c];
-                            para->cur[c] = 0;
+                            para->clear(c);
+                            procd = true;
+                        }
+                        if (conf && conf->cur[c] > 0) {
+                            conf->clear(c);
+                            procd = true;
+                        }
+                        if (corr && corr->cur[c] > 0) {
+                            corr->clear(c);
                             procd = true;
                         }
                         if (Dungeon::visible[c]) {

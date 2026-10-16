@@ -80,17 +80,7 @@ void SeedRegistry::init() {
                     int ny = cy + dy;
                     if (nx >= 0 && nx < Level::WIDTH && ny >= 0 && ny < Level::HEIGHT) {
                         int c = ny * Level::WIDTH + nx;
-                        if (fire && fire->cur[c] > 0) {
-                            fire->volume -= fire->cur[c];
-                            fire->cur[c] = 0;
-                        }
-                        Char* ch = Actor::findChar(c);
-                        if (ch) {
-                            ch->affect<Frost>();
-                        }
-                        if (Dungeon::visible[c]) {
-                            FX::burst(c, 0x00ffffff, 5);
-                        }
+                        Freezing::affect(c, fire);
                     }
                 }
             }
@@ -243,7 +233,7 @@ void SeedRegistry::init() {
                     if (target == Dungeon::hero.get()) {
                         GLog::i("In a blink of an eye you were teleported to another location of the level.");
                         Dungeon::observe();
-                    } else {
+                    } else if (target) {
                         Mob* m = target->asMob();
                         if (m) {
                             m->state = Mob::State::WANDERING;
