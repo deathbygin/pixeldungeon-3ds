@@ -64,6 +64,10 @@ public:
     Mob* asMob() override { return this; }
 
     virtual MobType mobType() const { return MobType::Rat; }
+    virtual bool isBoss() const {
+        MobType t = mobType();
+        return t == MobType::Goo || t == MobType::Tengu || t == MobType::DM300 || t == MobType::King || t == MobType::Yog;
+    }
     virtual std::string description() const;
     std::string status() const;
     std::string statePreview() const;

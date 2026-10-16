@@ -17,6 +17,7 @@
 #include "pd/Sample.h"
 #include "noosa/Audio.h"
 #include "noosa/Camera.h"
+#include "pd/ui/BottomScreenUI.h"
 #include <sstream>
 #include <algorithm>
 
@@ -355,6 +356,16 @@ int Weapon::damageRoll(Hero* hero) const {
         }
     }
     return dmg;
+}
+
+void Weapon::upgrade(bool enchant) {
+    if (isEnchanted()) {
+        if (!enchant && Random::Int(level) > 0) {
+            GLog::w("Incompatible magic erased the enchantment!");
+            enchantment = Enchantment::NONE;
+        }
+    }
+    Item::upgrade();
 }
 
 void Weapon::enchant(Enchantment ench) {
@@ -1818,8 +1829,59 @@ Item* Armor::random() {
     return this;
 }
 
+void Armor::upgrade(bool inscribe) {
+    if (isInscribed()) {
+        if (!inscribe && Random::Int(level) > 0) {
+            GLog::w("Incompatible magic erased the enchantment!");
+            glyph = Glyph::NONE;
+        }
+    }
+    Item::upgrade();
+}
+
+void Armor::inscribe(Glyph g) {
+    if (g == Glyph::NONE) {
+        int r = Random::Int(13);
+        switch (r) {
+            case 0: glyph = Glyph::BOUNCE; break;
+            case 1: glyph = Glyph::AFFECTION; break;
+            case 2: glyph = Glyph::ANTI_ENTROPY; break;
+            case 3: glyph = Glyph::AUTO_REPAIR; break;
+            case 4: glyph = Glyph::DISPLACEMENT; break;
+            case 5: glyph = Glyph::ENTANGLEMENT; break;
+            case 6: glyph = Glyph::EVIL_AURORA; break;
+            case 7: glyph = Glyph::FLOW; break;
+            case 8: glyph = Glyph::POTENTIAL; break;
+            case 9: glyph = Glyph::METABOLISM; break;
+            case 10: glyph = Glyph::MULTI_VISION; break;
+            case 11: glyph = Glyph::STENCH; break;
+            case 12: glyph = Glyph::VISCOSITY; break;
+        }
+    } else {
+        glyph = g;
+    }
+}
+
 std::string Armor::displayName() const {
     std::string s = name;
+    if (isInscribed()) {
+        switch (glyph) {
+            case Glyph::BOUNCE: s += " of Bounce"; break;
+            case Glyph::AFFECTION: s += " of Affection"; break;
+            case Glyph::ANTI_ENTROPY: s += " of Anti-entropy"; break;
+            case Glyph::AUTO_REPAIR: s += " of Auto-repair"; break;
+            case Glyph::DISPLACEMENT: s += " of Displacement"; break;
+            case Glyph::ENTANGLEMENT: s += " of Entanglement"; break;
+            case Glyph::EVIL_AURORA: s += " of Evil Aurora"; break;
+            case Glyph::FLOW: s += " of Flow"; break;
+            case Glyph::POTENTIAL: s += " of Potential"; break;
+            case Glyph::METABOLISM: s += " of Metabolism"; break;
+            case Glyph::MULTI_VISION: s += " of Multi-vision"; break;
+            case Glyph::STENCH: s += " of Stench"; break;
+            case Glyph::VISCOSITY: s += " of Viscosity"; break;
+            default: break;
+        }
+    }
     if (levelKnown) {
         if (cursed && cursedKnown) s = "cursed " + s;
         if (level > 0) s += " +" + std::to_string(level);
@@ -2477,12 +2539,12 @@ void Potion::shatter(int cell) {
 // -----------------------------------------------------------------------------
 // Scroll
 // -----------------------------------------------------------------------------
-static const std::string s_scrollRunes[Scroll::SCROLL_COUNT] = {
+static const std::string s_scrollRunes[Scroll::RUNIC_SCROLL_COUNT] = {
     "KAUNAN", "SOWILO", "LAGUZ", "YNGVI", "GYFU", "RAIDO",
     "ISAZ", "MANNAZ", "NAUDIZ", "BERKANAN", "ODAL", "TIWAZ"
 };
 
-static const int s_scrollImages[Scroll::SCROLL_COUNT] = {
+static const int s_scrollImages[Scroll::RUNIC_SCROLL_COUNT] = {
     ItemSpriteSheet::SCROLL_KAUNAN,
     ItemSpriteSheet::SCROLL_SOWILO,
     ItemSpriteSheet::SCROLL_LAGUZ,
@@ -2509,7 +2571,8 @@ static const std::string s_scrollTrueNames[Scroll::SCROLL_COUNT] = {
     "Scroll of Psionic Blast",
     "Scroll of Mirror Image",
     "Scroll of Upgrade",
-    "Scroll of Enchantment"
+    "Scroll of Enchantment",
+    "Scroll of Wipe Out"
 };
 
 static const std::string s_scrollTrueDescs[Scroll::SCROLL_COUNT] = {
@@ -2524,15 +2587,16 @@ static const std::string s_scrollTrueDescs[Scroll::SCROLL_COUNT] = {
     "Unleashes devastating psychic shockwaves that harm and disorient all visible enemies.",
     "Conjures illusory mirror clones that confuse foes and fight at your side.",
     "Permanently enhances an item's statistics and cleanses harmful curses.",
-    "Infuses an item with rare, mystical enchantments and arcane power."
+    "Infuses an item with rare, mystical enchantments and arcane power.",
+    "Read this scroll to unleash the wrath of the dungeon spirits, killing everything on the current level. Well, almost everything. Some of the more powerful creatures may be not affected."
 };
 
 static std::vector<int> s_scrollRuneMap = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 };
-static std::vector<bool> s_scrollKnown(Scroll::SCROLL_COUNT, false);
+static std::vector<bool> s_scrollKnown(Scroll::RUNIC_SCROLL_COUNT, false);
 
 void Scroll::initLabels() {
     s_scrollRuneMap = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 };
-    for (int i = static_cast<int>(SCROLL_COUNT) - 1; i > 0; --i) {
+    for (int i = static_cast<int>(RUNIC_SCROLL_COUNT) - 1; i > 0; --i) {
         int j = Random::Int(i + 1);
         std::swap(s_scrollRuneMap[i], s_scrollRuneMap[j]);
     }
@@ -2540,26 +2604,28 @@ void Scroll::initLabels() {
 }
 
 bool Scroll::isKnown(ScrollType tp) {
+    if (tp == ScrollType::WIPE_OUT) return true;
     size_t idx = static_cast<size_t>(tp);
-    return idx < SCROLL_COUNT ? s_scrollKnown[idx] : false;
+    return idx < RUNIC_SCROLL_COUNT ? s_scrollKnown[idx] : false;
 }
 
 void Scroll::setKnown(ScrollType tp) {
+    if (tp == ScrollType::WIPE_OUT) return;
     size_t idx = static_cast<size_t>(tp);
-    if (idx >= SCROLL_COUNT) return;
+    if (idx >= RUNIC_SCROLL_COUNT) return;
     s_scrollKnown[idx] = true;
 
     // 11 out of 12 deduction rule
     int knownCount = 0;
     int unknownIdx = -1;
-    for (size_t i = 0; i < SCROLL_COUNT; ++i) {
+    for (size_t i = 0; i < RUNIC_SCROLL_COUNT; ++i) {
         if (s_scrollKnown[i]) {
             knownCount++;
         } else {
             unknownIdx = static_cast<int>(i);
         }
     }
-    if (knownCount == static_cast<int>(SCROLL_COUNT) - 1 && unknownIdx >= 0) {
+    if (knownCount == static_cast<int>(RUNIC_SCROLL_COUNT) - 1 && unknownIdx >= 0) {
         s_scrollKnown[unknownIdx] = true;
     }
 
@@ -2585,14 +2651,17 @@ void Scroll::setKnown(ScrollType tp) {
 }
 
 const std::string& Scroll::runeName(ScrollType tp) {
+    static const std::string emptyRune = "";
+    if (tp == ScrollType::WIPE_OUT) return emptyRune;
     size_t idx = static_cast<size_t>(tp);
-    int rIdx = (idx < SCROLL_COUNT) ? s_scrollRuneMap[idx] : 0;
+    int rIdx = (idx < RUNIC_SCROLL_COUNT) ? s_scrollRuneMap[idx] : 0;
     return s_scrollRunes[rIdx];
 }
 
 int Scroll::imageForType(ScrollType tp) {
+    if (tp == ScrollType::WIPE_OUT) return ItemSpriteSheet::SCROLL_WIPE_OUT;
     size_t idx = static_cast<size_t>(tp);
-    int rIdx = (idx < SCROLL_COUNT) ? s_scrollRuneMap[idx] : 0;
+    int rIdx = (idx < RUNIC_SCROLL_COUNT) ? s_scrollRuneMap[idx] : 0;
     return s_scrollImages[rIdx];
 }
 
@@ -2615,10 +2684,10 @@ const std::vector<bool>& Scroll::getKnownTable() {
 }
 
 void Scroll::restoreStatus(const std::vector<int>& mapping, const std::vector<bool>& known) {
-    if (mapping.size() == SCROLL_COUNT) {
+    if (mapping.size() == RUNIC_SCROLL_COUNT) {
         s_scrollRuneMap = mapping;
     }
-    if (known.size() == SCROLL_COUNT) {
+    if (known.size() == RUNIC_SCROLL_COUNT) {
         s_scrollKnown = known;
     }
 }
@@ -2632,7 +2701,7 @@ void Scroll::updatePerception() {
     identified = isKnown(type);
     levelKnown = identified;
     cursedKnown = true;
-    name = identified ? trueName(type) : ("scroll \"" + runeName(type) + "\"");
+    name = (type == ScrollType::WIPE_OUT || identified) ? trueName(type) : ("scroll \"" + runeName(type) + "\"");
 }
 
 Item* Scroll::identify() {
@@ -2642,10 +2711,68 @@ Item* Scroll::identify() {
 }
 
 std::string Scroll::displayName() const {
-    std::string s = isKnown(type) ? trueName(type) : ("scroll \"" + runeName(type) + "\"");
+    std::string s = (type == ScrollType::WIPE_OUT || isKnown(type)) ? trueName(type) : ("scroll \"" + runeName(type) + "\"");
     if (quantity > 1) s += " x" + std::to_string(quantity);
     return s;
 }
+
+int Scroll::price() const {
+    if (type == ScrollType::WIPE_OUT) return 100 * quantity;
+    if (!isKnown(type)) return 15 * quantity;
+    switch (type) {
+        case ScrollType::IDENTIFY:     return 30 * quantity;
+        case ScrollType::MAGIC_MAPPING:return 25 * quantity;
+        case ScrollType::REMOVE_CURSE: return 30 * quantity;
+        case ScrollType::TELEPORTATION:return 40 * quantity;
+        case ScrollType::TERROR:       return 50 * quantity;
+        case ScrollType::LULLABY:      return 50 * quantity;
+        case ScrollType::PSIONIC_BLAST:return 80 * quantity;
+        case ScrollType::RECHARGING:
+        case ScrollType::CHALLENGE:
+        case ScrollType::MIRROR_IMAGE:
+        case ScrollType::UPGRADE:
+        case ScrollType::ENCHANTMENT:
+        default:
+            return 15 * quantity;
+    }
+}
+
+std::unique_ptr<Scroll> Scroll::createRandom() {
+    static const ScrollType types[] = {
+        ScrollType::IDENTIFY,
+        ScrollType::TELEPORTATION,
+        ScrollType::REMOVE_CURSE,
+        ScrollType::RECHARGING,
+        ScrollType::MAGIC_MAPPING,
+        ScrollType::CHALLENGE,
+        ScrollType::TERROR,
+        ScrollType::LULLABY,
+        ScrollType::PSIONIC_BLAST,
+        ScrollType::MIRROR_IMAGE,
+        ScrollType::UPGRADE,
+        ScrollType::ENCHANTMENT
+    };
+    static const float probs[] = { 30.0f, 10.0f, 15.0f, 10.0f, 15.0f, 12.0f, 8.0f, 8.0f, 4.0f, 6.0f, 0.0f, 1.0f };
+    float total = 0.0f;
+    for (float p : probs) total += p;
+    float roll = Random::Float(total);
+    float cum = 0.0f;
+    for (size_t i = 0; i < 12; ++i) {
+        cum += probs[i];
+        if (roll < cum) {
+            return std::make_unique<Scroll>(types[i]);
+        }
+    }
+    return std::make_unique<Scroll>(ScrollType::IDENTIFY);
+}
+
+Item* Scroll::random() {
+    auto rolled = createRandom();
+    type = rolled->type;
+    image = rolled->image;
+    return this;
+}
+
 
 std::unique_ptr<Item> Scroll::clone(int qty) const {
     auto s = std::make_unique<Scroll>(type);
@@ -2662,121 +2789,147 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
     if (!hero) return false;
 
     if (action == "READ") {
+        if (hero->buff(BuffType::Blindness)) {
+            GLog::w("You can't read a scroll while blinded");
+            return false;
+        }
+        if (hero->buff(BuffType::Sleep) || hero->buff(BuffType::Paralysis)) {
+            return false;
+        }
+
         HeroSprite* hspr = hero->getSprite() ? hero->getSprite()->asHeroSprite() : nullptr;
         if (hspr) hspr->read();
 
-        setKnown(type);
-        updatePerception();
-
         switch (type) {
             case ScrollType::IDENTIFY: {
-                Sample::play(Assets::SND_READ);
-                FX::burst(hero->pos, 0x00ffffFFu, 12);
-                bool found = false;
-                for (auto& item : hero->belongings.backpack) {
-                    if (item && !item->isIdentified()) {
-                        item->identify();
-                        FX::floatingText(hero->pos, "IDENTIFIED", 0x00ffffFFu);
-                        GLog::i("It is " + item->displayName() + "!");
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found) {
-                    if (hero->belongings.equippedWeapon && !hero->belongings.equippedWeapon->isIdentified()) {
-                        hero->belongings.equippedWeapon->identify();
-                        GLog::i("It is " + hero->belongings.equippedWeapon->displayName() + "!");
-                    } else if (hero->belongings.equippedArmor && !hero->belongings.equippedArmor->isIdentified()) {
-                        hero->belongings.equippedArmor->identify();
-                        GLog::i("It is " + hero->belongings.equippedArmor->displayName() + "!");
-                    } else {
-                        GLog::i("You have nothing to identify.");
-                    }
+                setKnown(type);
+                updatePerception();
+                if (ui::BottomScreenUI::instance()) {
+                    ui::BottomScreenUI::instance()->selectItem(ui::WndBag::Mode::UNIDENTIFIED, "Select an item to identify", [this, hero](Item* target) {
+                        if (target) {
+                            target->identify();
+                            FX::burst(hero->pos, 0x00ffffFFu, 12);
+                            FX::floatingText(hero->pos, "IDENTIFIED", 0x00ffffFFu);
+                            GLog::i("It is " + target->displayName() + "!");
+                            Sample::play(Assets::SND_READ);
+                            hero->removeBuff(BuffType::Invisibility);
+                            this->quantity--;
+                            if (this->quantity <= 0) {
+                                hero->belongings.drop(this);
+                            }
+                            hero->spendAndNext(Actor::TICK);
+                            Actor::process();
+                        }
+                    });
+                    return false;
                 }
                 break;
             }
-            case ScrollType::UPGRADE:
-                Sample::play(Assets::SND_READ);
-                if (hero->belongings.equippedWeapon) {
-                    hero->belongings.equippedWeapon->upgrade();
-                    FX::burst(hero->pos, 0xffd700FF, 10);
-                    FX::floatingText(hero->pos, "+1 LVL", 0xffd700FF);
-                    GLog::p("Your weapon glows and grows sharper!");
-                } else if (hero->belongings.equippedArmor) {
-                    hero->belongings.equippedArmor->upgrade();
-                    FX::burst(hero->pos, 0xffd700FF, 10);
-                    FX::floatingText(hero->pos, "+1 LVL", 0xffd700FF);
-                    GLog::p("Your armor glows and reinforces!");
+            case ScrollType::UPGRADE: {
+                setKnown(type);
+                updatePerception();
+                if (ui::BottomScreenUI::instance()) {
+                    ui::BottomScreenUI::instance()->selectItem(ui::WndBag::Mode::UPGRADEABLE, "Select an item to upgrade", [this, hero](Item* target) {
+                        if (target) {
+                            if (target->cursed) {
+                                target->cursed = false;
+                            }
+                            if (target->isBroken()) {
+                                target->fix();
+                            } else {
+                                if (auto* w = target->asWeapon()) {
+                                    w->upgrade(false);
+                                } else if (auto* a = target->asArmor()) {
+                                    a->upgrade(false);
+                                } else {
+                                    target->upgrade();
+                                }
+                            }
+                            FX::burst(hero->pos, 0xffd700FF, 10);
+                            FX::floatingText(hero->pos, "+1 LVL", 0xffd700FF);
+                            char buf[128];
+                            std::snprintf(buf, sizeof(buf), "your %s certainly looks better now", target->displayName().c_str());
+                            GLog::p(buf);
+                            Sample::play(Assets::SND_READ);
+                            hero->removeBuff(BuffType::Invisibility);
+                            this->quantity--;
+                            if (this->quantity <= 0) {
+                                hero->belongings.drop(this);
+                            }
+                            hero->spendAndNext(Actor::TICK);
+                            Actor::process();
+                        }
+                    });
+                    return false;
                 }
                 break;
-            case ScrollType::TELEPORTATION: {
-                Sample::play(Assets::SND_READ);
-                if (Dungeon::level) {
-                    for (int tries = 0; tries < 100; ++tries) {
-                        int cell = Random::Int(Level::LENGTH);
-                        if (Dungeon::level->isPassable(cell) && !Actor::findChar(cell)) {
-                            FX::burst(hero->pos, 0x9955ffFF, 8);
-                            hero->place(cell);
-                            FX::burst(hero->pos, 0x9955ffFF, 8);
-                            Dungeon::observe();
-                            GLog::p("You feel a sudden shift in space!");
-                            break;
+            }
+            case ScrollType::ENCHANTMENT: {
+                setKnown(type);
+                updatePerception();
+                if (ui::BottomScreenUI::instance()) {
+                    ui::BottomScreenUI::instance()->selectItem(ui::WndBag::Mode::ENCHANTABLE, "Select an enchantable item", [this, hero](Item* target) {
+                        if (target) {
+                            if (target->cursed) {
+                                target->cursed = false;
+                            }
+                            if (auto* w = target->asWeapon()) {
+                                w->enchant();
+                            } else if (auto* a = target->asArmor()) {
+                                a->inscribe();
+                            }
+                            target->fix();
+                            FX::burst(hero->pos, 0xff00ffFF, 16);
+                            char buf[128];
+                            std::snprintf(buf, sizeof(buf), "your %s glows in the dark", target->displayName().c_str());
+                            GLog::w(buf);
+                            Sample::play(Assets::SND_READ);
+                            hero->removeBuff(BuffType::Invisibility);
+                            this->quantity--;
+                            if (this->quantity <= 0) {
+                                hero->belongings.drop(this);
+                            }
+                            hero->spendAndNext(Actor::TICK);
+                            Actor::process();
                         }
-                    }
+                    });
+                    return false;
                 }
                 break;
             }
             case ScrollType::MAGIC_MAPPING: {
+                setKnown(type);
+                updatePerception();
+                hero->removeBuff(BuffType::Invisibility);
                 Sample::play(Assets::SND_READ);
-                Sample::play(Assets::SND_SECRET);
+                bool noticed = false;
                 if (Dungeon::level) {
                     for (int i = 0; i < Level::LENGTH; ++i) {
-                        if (Dungeon::level->map[i] != Terrain::WALL) {
+                        int terr = Dungeon::level->map[i];
+                        if (terr != Terrain::WALL && terr != Terrain::CHASM) {
                             Dungeon::level->mapped[i] = true;
-                            Dungeon::level->visited[i] = true;
+                        }
+                        if (Terrain::isSecret(terr)) {
+                            Dungeon::level->mapped[i] = true;
+                            Dungeon::level->map[i] = Terrain::discover(terr);
+                            if (Dungeon::visible[i]) {
+                                noticed = true;
+                            }
                         }
                     }
                     Dungeon::observe();
                     FX::burst(hero->pos, 0x44aaffFF, 12);
-                    GLog::p("You now sense the layout of this level!");
-                }
-                break;
-            }
-            case ScrollType::REMOVE_CURSE: {
-                bool procced = false;
-                if (hero->belongings.equippedWeapon && hero->belongings.equippedWeapon->cursed) {
-                    hero->belongings.equippedWeapon->cursed = false;
-                    procced = true;
-                }
-                if (hero->belongings.equippedArmor && hero->belongings.equippedArmor->cursed) {
-                    hero->belongings.equippedArmor->cursed = false;
-                    procced = true;
-                }
-                if (hero->belongings.equippedRing1 && hero->belongings.equippedRing1->cursed) {
-                    hero->belongings.equippedRing1->cursed = false;
-                    procced = true;
-                }
-                if (hero->belongings.equippedRing2 && hero->belongings.equippedRing2->cursed) {
-                    hero->belongings.equippedRing2->cursed = false;
-                    procced = true;
-                }
-                for (auto& item : hero->belongings.backpack) {
-                    if (item && item->cursed) {
-                        item->cursed = false;
-                        procced = true;
+                    if (noticed) {
+                        Sample::play(Assets::SND_SECRET);
                     }
-                }
-                hero->removeBuff(BuffType::Weakness);
-                Sample::play(Assets::SND_READ);
-                FX::burst(hero->pos, 0xdda0ddFFu, 16);
-                if (procced) {
-                    GLog::p("Your pack glows with a cleansing light, and a malevolent energy disperses.");
-                } else {
-                    GLog::i("Your pack glows with a cleansing light, but nothing happens.");
+                    GLog::i("You are now aware of the level layout.");
                 }
                 break;
             }
             case ScrollType::RECHARGING: {
+                setKnown(type);
+                updatePerception();
+                hero->removeBuff(BuffType::Invisibility);
                 int count = 0;
                 if (hero->belongings.equippedWeapon) {
                     if (auto* w = hero->belongings.equippedWeapon->asWand()) {
@@ -2805,7 +2958,69 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
                 }
                 break;
             }
+            case ScrollType::REMOVE_CURSE: {
+                setKnown(type);
+                updatePerception();
+                hero->removeBuff(BuffType::Invisibility);
+                bool procced = false;
+                if (hero->belongings.equippedWeapon && hero->belongings.equippedWeapon->cursed) {
+                    hero->belongings.equippedWeapon->cursed = false;
+                    procced = true;
+                }
+                if (hero->belongings.equippedArmor && hero->belongings.equippedArmor->cursed) {
+                    hero->belongings.equippedArmor->cursed = false;
+                    procced = true;
+                }
+                if (hero->belongings.equippedRing1 && hero->belongings.equippedRing1->cursed) {
+                    hero->belongings.equippedRing1->cursed = false;
+                    procced = true;
+                }
+                if (hero->belongings.equippedRing2 && hero->belongings.equippedRing2->cursed) {
+                    hero->belongings.equippedRing2->cursed = false;
+                    procced = true;
+                }
+                for (auto& item : hero->belongings.backpack) {
+                    if (item && item->cursed) {
+                        item->cursed = false;
+                        procced = true;
+                    }
+                }
+                hero->removeBuff(BuffType::Weakness);
+                Sample::play(Assets::SND_READ);
+                FX::burst(hero->pos, 0xdda0ddFF, 16);
+                if (procced) {
+                    GLog::p("Your pack glows with a cleansing light, and a malevolent energy disperses.");
+                } else {
+                    GLog::i("Your pack glows with a cleansing light, but nothing happens.");
+                }
+                break;
+            }
+            case ScrollType::TELEPORTATION: {
+                setKnown(type);
+                updatePerception();
+                hero->removeBuff(BuffType::Invisibility);
+                Sample::play(Assets::SND_READ);
+                if (Dungeon::bossLevel() || !Dungeon::level) {
+                    GLog::w("Strong magic aura of this place prevents you from teleporting!");
+                } else {
+                    int target = Dungeon::level->randomRespawnCell();
+                    if (target == -1) {
+                        GLog::w("Strong magic aura of this place prevents you from teleporting!");
+                    } else {
+                        FX::burst(hero->pos, 0x9955ffFF, 8);
+                        hero->place(target);
+                        Dungeon::level->press(target, hero);
+                        Dungeon::observe();
+                        FX::burst(hero->pos, 0x9955ffFF, 8);
+                        GLog::i("In a blink of an eye you were teleported to another location of the level.");
+                    }
+                }
+                break;
+            }
             case ScrollType::CHALLENGE: {
+                setKnown(type);
+                updatePerception();
+                hero->removeBuff(BuffType::Invisibility);
                 Sample::play(Assets::SND_CHALLENGE);
                 FX::burst(hero->pos, 0xff0000FF, 16);
                 GLog::w("The scroll emits a challenging roar that echoes throughout the dungeon!");
@@ -2818,9 +3033,19 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
                         }
                     }
                 }
+                if (Dungeon::level) {
+                    for (auto& h : Dungeon::level->heaps) {
+                        if (h && h->type == Heap::Type::MIMIC) {
+                            h->open(hero);
+                        }
+                    }
+                }
                 break;
             }
             case ScrollType::TERROR: {
+                setKnown(type);
+                updatePerception();
+                hero->removeBuff(BuffType::Invisibility);
                 Sample::play(Assets::SND_READ);
                 FX::burst(hero->pos, 0xff0000FF, 16);
                 int count = 0;
@@ -2842,6 +3067,9 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
                 break;
             }
             case ScrollType::LULLABY: {
+                setKnown(type);
+                updatePerception();
+                hero->removeBuff(BuffType::Invisibility);
                 Sample::play(Assets::SND_LULLABY);
                 FX::burst(hero->pos, 0x6699ffFF, 12);
                 int count = 0;
@@ -2863,8 +3091,14 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
                 break;
             }
             case ScrollType::PSIONIC_BLAST: {
+                setKnown(type);
+                updatePerception();
+                hero->removeBuff(BuffType::Invisibility);
+                FX::flash(0xFFFFFFFF, 0.5f);
+                if (noosa::Camera::main) {
+                    noosa::Camera::main->shake(0.35f, 4.0f);
+                }
                 Sample::play(Assets::SND_BLAST);
-                FX::burst(hero->pos, 0xffffffFF, 20);
                 GLog::w("A burst of psychic energy explodes around you!");
                 for (auto& m : Dungeon::mobs) {
                     if (m && m->isAlive() && Dungeon::visible[m->pos]) {
@@ -2877,6 +3111,9 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
                 break;
             }
             case ScrollType::MIRROR_IMAGE: {
+                setKnown(type);
+                updatePerception();
+                hero->removeBuff(BuffType::Invisibility);
                 Sample::play(Assets::SND_READ);
                 FX::burst(hero->pos, 0x00ffffFF, 12);
                 GLog::p("Illusory mirror images appear to aid you!");
@@ -2889,7 +3126,7 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
                 };
                 for (int d : NEIGHBOURS8) {
                     int p = hero->pos + d;
-                    if (p >= 0 && p < Level::LENGTH && Dungeon::level && Dungeon::level->isPassable(p) && !Actor::findChar(p)) {
+                    if (p >= 0 && p < Level::LENGTH && Dungeon::level && (Dungeon::level->isPassable(p) || Dungeon::level->avoid[p]) && !Actor::findChar(p)) {
                         respawnPoints.push_back(p);
                     }
                 }
@@ -2912,14 +3149,25 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
                 }
                 break;
             }
-            case ScrollType::ENCHANTMENT:
-                Sample::play(Assets::SND_READ);
-                if (hero->belongings.equippedWeapon) {
-                    hero->belongings.equippedWeapon->upgrade();
-                    FX::burst(hero->pos, 0xff00ffFF, 16);
-                    GLog::p("Your weapon glows with arcane enchantment!");
+            case ScrollType::WIPE_OUT: {
+                hero->removeBuff(BuffType::Invisibility);
+                FX::flash(0xFF6644FF, 0.5f);
+                Sample::play(Assets::SND_CURSED);
+                for (auto& m : Dungeon::mobs) {
+                    if (m && m->isAlive() && !m->isBoss()) {
+                        m->die(hero);
+                    }
                 }
+                if (Dungeon::level) {
+                    for (auto& h : Dungeon::level->heaps) {
+                        if (h && (h->type == Heap::Type::FOR_SALE || h->type == Heap::Type::MIMIC)) {
+                            h->type = Heap::Type::HEAP;
+                        }
+                    }
+                }
+                GLog::w("A cataclysmic energy wipes out all foes on this floor!");
                 break;
+            }
         }
 
         quantity--;

@@ -29,6 +29,35 @@ int Dungeon::deepestFloor = 1;
 bool Dungeon::nightMode = false;
 std::unordered_map<int, std::vector<std::unique_ptr<Item>>> Dungeon::droppedItems;
 
+int Dungeon::scrollsOfUpgrade = 0;
+int Dungeon::scrollsOfEnchantment = 0;
+int Dungeon::potionOfStrength = 0;
+
+static bool quotaChance(const int* quota, int quotaLen, int number) {
+    for (int i = 0; i < quotaLen; i += 2) {
+        int qDepth = quota[i];
+        if (Dungeon::depth <= qDepth) {
+            int qNumber = quota[i + 1];
+            return Random::Float() < static_cast<float>(qNumber - number) / (qDepth - Dungeon::depth + 1);
+        }
+    }
+    return false;
+}
+
+bool Dungeon::posNeeded() {
+    static const int quota[] = {4, 2, 9, 4, 14, 6, 19, 8, 24, 9};
+    return quotaChance(quota, 10, potionOfStrength);
+}
+
+bool Dungeon::souNeeded() {
+    static const int quota[] = {5, 3, 10, 6, 15, 9, 20, 12, 25, 13};
+    return quotaChance(quota, 10, scrollsOfUpgrade);
+}
+
+bool Dungeon::soeNeeded() {
+    return Random::Int(12 * (1 + scrollsOfEnchantment)) < depth;
+}
+
 bool Dungeon::bossLevel(int d) {
     if (d == -1) d = depth;
     return d == 5 || d == 10 || d == 15 || d == 20 || d == 25;
@@ -118,6 +147,9 @@ void Dungeon::newGame() {
     depth = 1;
     gold = 0;
     deepestFloor = 1;
+    scrollsOfUpgrade = 0;
+    scrollsOfEnchantment = 0;
+    potionOfStrength = 0;
     Potion::initColors();
     Scroll::initLabels();
     Wand::initWoods();

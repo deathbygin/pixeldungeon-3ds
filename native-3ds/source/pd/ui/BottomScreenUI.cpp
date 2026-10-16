@@ -19,10 +19,23 @@
 
 namespace pd::ui {
 
+BottomScreenUI* BottomScreenUI::s_instance = nullptr;
+
 BottomScreenUI::BottomScreenUI() {
+    s_instance = this;
     m_logConsole.y = 158.0f;
     m_logConsole.height = 48.0f;
     initLogger();
+}
+
+BottomScreenUI::~BottomScreenUI() {
+    if (s_instance == this) {
+        s_instance = nullptr;
+    }
+}
+
+void BottomScreenUI::selectItem(WndBag::Mode mode, const std::string& title, std::function<void(Item*)> onSelect) {
+    m_wndBag.openForSelection(mode, title, std::move(onSelect));
 }
 
 BottomScreenUI::BottomScreenUI(BottomScreenUI&& other) noexcept {
@@ -797,10 +810,13 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
                     std::string act = (qIt->category() == ItemCategory::Potion) ? "DRINK" :
                                       (qIt->category() == ItemCategory::Scroll) ? "READ" : "USE";
                     log(act + " " + qIt->displayName(), C2D_Color32(0x38, 0x9e, 0x38, 0xFF));
-                    qIt->execute(hero, act);
-                    if (qIt->quantity <= 0) hero->belongings.drop(qIt);
-                    Actor::process();
-                    return true;
+                    bool used = qIt->execute(hero, act);
+                    if (used) {
+                        if (qIt->quantity <= 0) hero->belongings.drop(qIt);
+                        Actor::process();
+                        return true;
+                    }
+                    return false;
                 }
             } else {
                 log("Quickslot 1 is empty!", C2D_Color32(0xd6, 0x30, 0x30, 0xFF));

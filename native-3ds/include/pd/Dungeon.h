@@ -28,6 +28,14 @@ public:
     static int deepestFloor;
     static bool nightMode;
 
+    static int scrollsOfUpgrade;
+    static int scrollsOfEnchantment;
+    static int potionOfStrength;
+
+    static bool souNeeded();
+    static bool soeNeeded();
+    static bool posNeeded();
+
     static bool bossLevel(int d = -1);
 
     static void init();

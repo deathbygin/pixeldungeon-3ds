@@ -31,7 +31,10 @@ using pd::LevelTransition;
 class BottomScreenUI {
 public:
     BottomScreenUI();
-    ~BottomScreenUI() = default;
+    ~BottomScreenUI();
+
+    static BottomScreenUI* instance() { return s_instance; }
+    void selectItem(WndBag::Mode mode, const std::string& title, std::function<void(Item*)> onSelect);
 
     BottomScreenUI(BottomScreenUI&& other) noexcept;
     BottomScreenUI& operator=(BottomScreenUI&& other) noexcept;
@@ -141,6 +144,8 @@ private:
     void drawMinimap(const pd::Level* level, const pd::Hero* hero) const;
     void drawRightGlanceCard(const pd::Hero* hero, C2D_TextBuf textBuf) const;
     void updateQuickslots(pd::Hero* hero);
+
+    static BottomScreenUI* s_instance;
 };
 
 } // namespace pd::ui

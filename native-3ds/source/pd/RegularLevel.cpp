@@ -457,6 +457,21 @@ int RegularLevel::randomDropCell() {
 }
 
 void RegularLevel::createItems() {
+    if (!Dungeon::bossLevel()) {
+        if (Dungeon::souNeeded()) {
+            addItemToSpawn(std::make_unique<Scroll>(Scroll::ScrollType::UPGRADE));
+            Dungeon::scrollsOfUpgrade++;
+        }
+        if (Dungeon::soeNeeded()) {
+            addItemToSpawn(std::make_unique<Scroll>(Scroll::ScrollType::ENCHANTMENT));
+            Dungeon::scrollsOfEnchantment++;
+        }
+        if (Dungeon::posNeeded()) {
+            addItemToSpawn(std::make_unique<Potion>(Potion::PotionType::STRENGTH));
+            Dungeon::potionOfStrength++;
+        }
+    }
+
     int nItems = 3;
     while (Random::Float() < 0.4f) {
         nItems++;
@@ -488,7 +503,7 @@ void RegularLevel::createItems() {
         if (roll < 0.25f) {
             item = std::make_unique<Potion>(static_cast<Potion::PotionType>(Random::Int(12)));
         } else if (roll < 0.50f) {
-            item = std::make_unique<Scroll>(static_cast<Scroll::ScrollType>(Random::Int(12)));
+            item = Scroll::createRandom();
         } else if (roll < 0.70f) {
             item = std::make_unique<Food>();
         } else if (roll < 0.85f) {

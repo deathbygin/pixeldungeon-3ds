@@ -1210,6 +1210,11 @@ int main(int argc, char* argv[]) {
 
             // Render Core Visual Effects & Particles
             FX::draw(&topCamera, textBuf);
+
+            // Full-Screen Flash Overlay (Psionic Blast, Wipe Out, etc.)
+            if (FX::isFlashing()) {
+                C2D_DrawRectSolid(0.0f, 0.0f, 0.88f, 400.0f, 240.0f, FX::getFlashColor());
+            }
         }
 
         // Real-time Performance Profiling Overlay (toggled via [SELECT])

@@ -29,6 +29,9 @@ Blob FX::s_waterOfAwareness(Blob::BlobType::WATER_OF_AWARENESS);
 Blob FX::s_waterOfTransmutation(Blob::BlobType::WATER_OF_TRANSMUTATION);
 
 float FX::s_blobEmitTimer = 0.0f;
+static float s_flashDuration = 0.0f;
+static float s_flashElapsed = 0.0f;
+static uint32_t s_flashColor = 0xFFFFFFFF;
 
 void FX::init() {
     clear();
@@ -56,9 +59,40 @@ void FX::clear() {
     s_waterOfAwareness.clear();
     s_waterOfTransmutation.clear();
     s_blobEmitTimer = 0.0f;
+    s_flashDuration = 0.0f;
+    s_flashElapsed = 0.0f;
+}
+
+void FX::flash(uint32_t color, float duration) {
+    s_flashColor = color;
+    s_flashDuration = duration;
+    s_flashElapsed = 0.0f;
+}
+
+bool FX::isFlashing() {
+    return s_flashElapsed < s_flashDuration && s_flashDuration > 0.0f;
+}
+
+uint32_t FX::getFlashColor() {
+    if (!isFlashing()) return 0;
+    float alphaRatio = 1.0f - (s_flashElapsed / s_flashDuration);
+    if (alphaRatio < 0.0f) alphaRatio = 0.0f;
+    if (alphaRatio > 1.0f) alphaRatio = 1.0f;
+
+    uint8_t r = (s_flashColor >> 24) & 0xFF;
+    uint8_t g = (s_flashColor >> 16) & 0xFF;
+    uint8_t b = (s_flashColor >> 8)  & 0xFF;
+    uint8_t a = (s_flashColor)       & 0xFF;
+    uint8_t scaledA = static_cast<uint8_t>(a * alphaRatio);
+
+    return C2D_Color32(r, g, b, scaledA);
 }
 
 void FX::update(float dt) {
+    if (s_flashElapsed < s_flashDuration) {
+        s_flashElapsed += dt;
+    }
+
     for (auto& p : s_particles) if (p.active) p.update(dt);
     for (auto& r : s_ripples)   if (r.active) r.update(dt);
     for (auto& c : s_checked)   if (c.active) c.update(dt);

@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <functional>
 
 namespace pd {
 class Hero;
@@ -16,6 +17,14 @@ namespace pd::ui {
 
 class WndBag {
 public:
+    enum class Mode {
+        ALL,
+        UNIDENTIFIED,
+        UPGRADEABLE,
+        ENCHANTABLE,
+        QUICKSLOT
+    };
+
     static constexpr int COLS = 4;
     static constexpr int ROWS = 5;
     static constexpr float SLOT_SIZE = 28.0f;
@@ -43,7 +52,12 @@ public:
     ~WndBag() = default;
 
     void open();
+    void openForSelection(Mode mode, const std::string& title, std::function<void(pd::Item*)> listener);
     void close();
+
+    bool isSelectionMode() const { return m_selectionMode != Mode::ALL || m_selectionListener != nullptr; }
+    Mode getSelectionMode() const { return m_selectionMode; }
+    bool isItemEligible(const pd::Item* it) const;
 
     // Updates touch and hardware inputs.
     // Returns true if a turn-advancing action occurred.
@@ -61,6 +75,10 @@ private:
     pd::Item* m_subItem = nullptr;
     std::vector<std::string> m_subActions;
     int m_selectedAction = 0;
+
+    Mode m_selectionMode = Mode::ALL;
+    std::string m_selectionTitle;
+    std::function<void(pd::Item*)> m_selectionListener = nullptr;
 
     std::shared_ptr<noosa::Texture> m_texItems;
     std::shared_ptr<noosa::Texture> m_texIcons;

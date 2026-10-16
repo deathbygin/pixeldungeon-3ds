@@ -64,6 +64,8 @@ public:
     virtual bool isUpgradable() const { return false; }
     virtual void upgrade() { level++; cursed = false; cursedKnown = true; }
     virtual void degrade() { level--; }
+    virtual bool isBroken() const { return false; }
+    virtual void fix() {}
     virtual Item* random();
 
     virtual bool isIdentified() const { return identified; }
@@ -107,6 +109,8 @@ public:
     ItemCategory category() const override { return ItemCategory::Weapon; }
     bool isEquippable() const override { return true; }
     bool isUpgradable() const override { return true; }
+    void upgrade() override { upgrade(false); }
+    virtual void upgrade(bool enchant);
     bool isIdentified() const override { return identified && levelKnown; }
     Item* identify() override;
     Item* random() override;
@@ -377,6 +381,8 @@ public:
     ItemCategory category() const override { return ItemCategory::Armor; }
     bool isEquippable() const override { return true; }
     bool isUpgradable() const override { return true; }
+    void upgrade() override { upgrade(false); }
+    virtual void upgrade(bool inscribe);
     bool isIdentified() const override { return identified && levelKnown; }
     Item* identify() override;
     Item* random() override;
@@ -385,6 +391,26 @@ public:
     std::string info() const override;
     std::string displayName() const override;
     virtual int typicalSTR() const;
+
+    enum class Glyph {
+        NONE,
+        BOUNCE,
+        AFFECTION,
+        ANTI_ENTROPY,
+        AUTO_REPAIR,
+        DISPLACEMENT,
+        ENTANGLEMENT,
+        EVIL_AURORA,
+        FLOW,
+        POTENTIAL,
+        METABOLISM,
+        MULTI_VISION,
+        STENCH,
+        VISCOSITY
+    };
+    Glyph glyph = Glyph::NONE;
+    bool isInscribed() const { return glyph != Glyph::NONE; }
+    void inscribe(Glyph g = Glyph::NONE);
 
     int drRoll() const;
     int proc(Char* attacker, Char* defender, int damage);
@@ -459,9 +485,11 @@ public:
         PSIONIC_BLAST,
         MIRROR_IMAGE,
         UPGRADE,
-        ENCHANTMENT
+        ENCHANTMENT,
+        WIPE_OUT
     };
-    static constexpr size_t SCROLL_COUNT = 12;
+    static constexpr size_t RUNIC_SCROLL_COUNT = 12;
+    static constexpr size_t SCROLL_COUNT = 13;
 
     ScrollType type = ScrollType::UPGRADE;
 
@@ -476,6 +504,9 @@ public:
     std::string info() const override;
     std::string displayName() const override;
     std::unique_ptr<Item> clone(int qty = 1) const override;
+    int price() const override;
+    Item* random() override;
+    static std::unique_ptr<Scroll> createRandom();
 
     void updatePerception();
 

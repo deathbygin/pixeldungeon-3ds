@@ -184,7 +184,7 @@ bool SaveManager::getSaveSummary(int& outDepth, int& outLevel, int& outHeroClass
         // Skip potion map (POTION_COUNT * (sizeof(int32_t) + sizeof(uint8_t)))
         // and scroll map (SCROLL_COUNT * (sizeof(int32_t) + sizeof(uint8_t)))
         long skipBytes = Potion::POTION_COUNT * (sizeof(int32_t) + sizeof(uint8_t)) +
-                         Scroll::SCROLL_COUNT * (sizeof(int32_t) + sizeof(uint8_t));
+                         Scroll::RUNIC_SCROLL_COUNT * (sizeof(int32_t) + sizeof(uint8_t));
         if (version >= 5) {
             skipBytes += 12 * (sizeof(int32_t) + sizeof(uint8_t));
         }
@@ -251,7 +251,7 @@ bool SaveManager::saveGame(const std::string& customPath) {
     }
     const auto& scrMap = Scroll::getRuneMapping();
     const auto& scrKnown = Scroll::getKnownTable();
-    for (size_t i = 0; i < Scroll::SCROLL_COUNT; ++i) {
+    for (size_t i = 0; i < Scroll::RUNIC_SCROLL_COUNT; ++i) {
         int32_t m = (i < scrMap.size()) ? scrMap[i] : static_cast<int32_t>(i);
         uint8_t k = (i < scrKnown.size() && scrKnown[i]) ? 1 : 0;
         std::fwrite(&m, sizeof(int32_t), 1, fp);
@@ -535,9 +535,9 @@ bool SaveManager::loadGame(const std::string& customPath) {
         }
         Potion::restoreStatus(potMap, potKnown);
 
-        std::vector<int> scrMap(Scroll::SCROLL_COUNT);
-        std::vector<bool> scrKnown(Scroll::SCROLL_COUNT);
-        for (size_t i = 0; i < Scroll::SCROLL_COUNT; ++i) {
+        std::vector<int> scrMap(Scroll::RUNIC_SCROLL_COUNT);
+        std::vector<bool> scrKnown(Scroll::RUNIC_SCROLL_COUNT);
+        for (size_t i = 0; i < Scroll::RUNIC_SCROLL_COUNT; ++i) {
             int32_t m = 0;
             uint8_t k = 0;
             std::fread(&m, sizeof(int32_t), 1, fp);

@@ -33,12 +33,43 @@ void WndBag::open() {
     m_subWindowOpen = false;
     m_subItem = nullptr;
     m_selectedSlot = 0;
+    m_selectionMode = Mode::ALL;
+    m_selectionTitle.clear();
+    m_selectionListener = nullptr;
+}
+
+void WndBag::openForSelection(Mode mode, const std::string& title, std::function<void(pd::Item*)> listener) {
+    isOpen = true;
+    m_subWindowOpen = false;
+    m_subItem = nullptr;
+    m_selectedSlot = 0;
+    m_selectionMode = mode;
+    m_selectionTitle = title;
+    m_selectionListener = std::move(listener);
 }
 
 void WndBag::close() {
     isOpen = false;
     m_subWindowOpen = false;
     m_subItem = nullptr;
+    m_selectionMode = Mode::ALL;
+    m_selectionTitle.clear();
+    m_selectionListener = nullptr;
+}
+
+bool WndBag::isItemEligible(const pd::Item* it) const {
+    if (!it) return false;
+    switch (m_selectionMode) {
+        case Mode::UNIDENTIFIED:
+            return !it->isIdentified();
+        case Mode::UPGRADEABLE:
+            return it->isUpgradable();
+        case Mode::ENCHANTABLE:
+            return (it->category() == ItemCategory::Weapon || it->category() == ItemCategory::Armor);
+        case Mode::ALL:
+        default:
+            return true;
+    }
 }
 
 pd::Item* WndBag::getSelectedItem(pd::Hero* hero) const {
@@ -150,13 +181,21 @@ bool WndBag::update(pd::Hero* hero, const TouchController& touch, u32 kDown, std
                 }
 
                 outMessage = action + " " + m_subItem->displayName();
-                m_subItem->execute(hero, action);
-                if (m_subItem->quantity <= 0) {
-                    hero->belongings.drop(m_subItem);
+                bool used = m_subItem->execute(hero, action);
+                if (isSelectionMode()) {
+                    closeSubWindow();
+                    return false;
+                }
+                if (used) {
+                    if (m_subItem->quantity <= 0) {
+                        hero->belongings.drop(m_subItem);
+                    }
+                    closeSubWindow();
+                    close();
+                    return true; // Advancing turn
                 }
                 closeSubWindow();
-                close();
-                return true; // Advancing turn
+                return false;
             }
         }
 
@@ -165,6 +204,62 @@ bool WndBag::update(pd::Hero* hero, const TouchController& touch, u32 kDown, std
         if (kDown & KEY_DRIGHT) m_selectedAction = std::min(static_cast<int>(m_subActions.size()) - 1, m_selectedAction + 1);
         if (kDown & KEY_DUP)    m_selectedAction = std::max(0, m_selectedAction - 2);
         if (kDown & KEY_DDOWN)  m_selectedAction = std::min(static_cast<int>(m_subActions.size()) - 1, m_selectedAction + 2);
+
+        return false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Selection Mode (e.g. Scroll of Identify, Upgrade, Enchantment)
+    // -------------------------------------------------------------------------
+    if (isSelectionMode()) {
+        if (kDown & (KEY_B | KEY_X)) {
+            Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
+            auto listener = std::move(m_selectionListener);
+            close();
+            if (listener) listener(nullptr);
+            return false;
+        }
+
+        // D-Pad Grid navigation
+        if (kDown & KEY_DLEFT)  m_selectedSlot = (m_selectedSlot % COLS > 0) ? m_selectedSlot - 1 : m_selectedSlot;
+        if (kDown & KEY_DRIGHT) m_selectedSlot = (m_selectedSlot % COLS < COLS - 1) ? m_selectedSlot + 1 : m_selectedSlot;
+        if (kDown & KEY_DUP)    m_selectedSlot = std::max(0, m_selectedSlot - COLS);
+        if (kDown & KEY_DDOWN)  m_selectedSlot = std::min(COLS * ROWS - 1, m_selectedSlot + COLS);
+
+        // Slot click / tap detection
+        for (int r = 0; r < ROWS; ++r) {
+            for (int c = 0; c < COLS; ++c) {
+                int slotIdx = r * COLS + c;
+                float sx = GRID_START_X + c * (SLOT_SIZE + SLOT_MARGIN);
+                float sy = GRID_START_Y + r * (SLOT_SIZE + SLOT_MARGIN);
+                noosa::RectF rSlot(sx, sy, SLOT_SIZE, SLOT_SIZE);
+
+                if (touch.clicked(rSlot)) {
+                    m_selectedSlot = slotIdx;
+                    pd::Item* it = getSelectedItem(hero);
+                    if (it && isItemEligible(it)) {
+                        Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
+                        auto listener = std::move(m_selectionListener);
+                        close();
+                        if (listener) listener(it);
+                        return false;
+                    }
+                    return false;
+                }
+            }
+        }
+
+        if (kDown & KEY_A) {
+            pd::Item* it = getSelectedItem(hero);
+            if (it && isItemEligible(it)) {
+                Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
+                auto listener = std::move(m_selectionListener);
+                close();
+                if (listener) listener(it);
+                return false;
+            }
+            return false;
+        }
 
         return false;
     }
@@ -214,6 +309,7 @@ bool WndBag::update(pd::Hero* hero, const TouchController& touch, u32 kDown, std
         return false;
     }
 
+
     return false;
 }
 
@@ -244,8 +340,16 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
         C2D_DrawImage(imgTab, &pT, nullptr);
     }
 
-    // 4. Yellow Title Banner "Backpack" using authentic Font2x
-    BitmapFont::draw(BitmapFont::FontType::Font2x, "Backpack", WIN_X + 90.0f, WIN_Y + 2.0f, zText, 0xFFFF44FF);
+    // 4. Yellow Title Banner using authentic Font2x or Font1x
+    if (isSelectionMode() && !m_selectionTitle.empty()) {
+        if (m_selectionTitle.length() > 14) {
+            BitmapFont::draw(BitmapFont::FontType::Font1x, m_selectionTitle, WIN_X + 20.0f, WIN_Y + 4.0f, zText, 0xFFFF44FF);
+        } else {
+            BitmapFont::draw(BitmapFont::FontType::Font2x, m_selectionTitle, WIN_X + 45.0f, WIN_Y + 2.0f, zText, 0xFFFF44FF);
+        }
+    } else {
+        BitmapFont::draw(BitmapFont::FontType::Font2x, "Backpack", WIN_X + 90.0f, WIN_Y + 2.0f, zText, 0xFFFF44FF);
+    }
 
     // 5. 4x5 Recessed Item Grid (Slot size 28x28, margin 2px)
     int potW = m_texItems ? m_texItems->potWidth() : 128;
@@ -383,6 +487,13 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
                 C2D_ImageTint tint;
                 C2D_PlainImageTint(&tint, C2D_Color32(0xff, 0xff, 0xff, 0x44), 1.0f);
                 C2D_DrawImage(imgPH, &pPH, &tint);
+            }
+
+            // In selection mode, dim ineligible or empty slots
+            if (isSelectionMode()) {
+                if (slotIdx == 19 || !it || !isItemEligible(it)) {
+                    C2D_DrawRectSolid(sx, sy, zItem + 0.03f, SLOT_SIZE, SLOT_SIZE, C2D_Color32(0x00, 0x00, 0x00, 0xAA));
+                }
             }
         }
     }

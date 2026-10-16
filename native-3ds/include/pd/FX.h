@@ -59,6 +59,11 @@ public:
     static void deathRay(int fromCell, int toCell, std::function<void()> callback = nullptr);
     static bool isMissileActive();
 
+    // Full-Screen Flash FX
+    static void flash(uint32_t color = 0xFFFFFFFF, float duration = 0.35f);
+    static bool isFlashing();
+    static uint32_t getFlashColor();
+
 private:
     static PixelParticle s_particles[MAX_PARTICLES];
     static Ripple s_ripples[MAX_RIPPLES];
