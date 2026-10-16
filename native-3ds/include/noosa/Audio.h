@@ -78,6 +78,8 @@ public:
     static int allocateChannel();
 
 private:
+    static constexpr int BGM_CHANNEL = 0;
+    static constexpr int FIRST_SFX_CHANNEL = 1;
     static constexpr int NUM_CHANNELS = 16;
     static bool s_initialized;
     static bool s_soundFxEnabled;

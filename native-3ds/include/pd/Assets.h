@@ -136,6 +136,11 @@ public:
     inline static const std::string SND_BEACON    = "romfs:/snd_beacon.mp3";
     inline static const std::string SND_BEE       = "romfs:/snd_bee.mp3";
 
+    // Background Music Tracks
+    inline static const std::string THEME         = "romfs:/theme.mp3";
+    inline static const std::string TUNE          = "romfs:/game.mp3";
+    inline static const std::string HAPPY         = "romfs:/surface.mp3";
+
     // Helper returning depth-appropriate tilesheet
     static const std::string& getTilesetForDepth(int depth) {
         if (depth <= 5)  return TILES_SEWERS;

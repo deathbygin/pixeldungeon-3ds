@@ -1,4 +1,5 @@
 #include "noosa/Audio.h"
+#include "noosa/Music.h"
 #define MINIMP3_IMPLEMENTATION
 #include "noosa/minimp3_ex.h"
 #include <cstdio>
@@ -276,6 +277,8 @@ bool Audio::init() {
         std::memset(&s_waveBufs[i], 0, sizeof(ndspWaveBuf));
     }
 
+    Music::init();
+
     s_initialized = true;
     return true;
 }
@@ -283,7 +286,9 @@ bool Audio::init() {
 void Audio::exit() {
     if (!s_initialized) return;
 
+    Music::exit();
     stopAll();
+    ndspChnReset(BGM_CHANNEL);
     clearCache();
     ndspExit();
     s_initialized = false;
@@ -292,24 +297,28 @@ void Audio::exit() {
 void Audio::stopAll() {
     if (!s_initialized) return;
 
-    for (int i = 0; i < NUM_CHANNELS; ++i) {
+    for (int i = FIRST_SFX_CHANNEL; i < NUM_CHANNELS; ++i) {
         ndspChnReset(i);
     }
 }
 
 int Audio::allocateChannel() {
-    static int nextChannel = 0;
+    static int nextChannel = FIRST_SFX_CHANNEL;
 
-    // First search for an idle channel
-    for (int i = 0; i < NUM_CHANNELS; ++i) {
-        if (!ndspChnIsPlaying(i)) {
-            return i;
+    // Search for an idle SFX channel among channels 1..15
+    for (int i = 0; i < NUM_CHANNELS - FIRST_SFX_CHANNEL; ++i) {
+        int ch = FIRST_SFX_CHANNEL + (nextChannel - FIRST_SFX_CHANNEL + i) % (NUM_CHANNELS - FIRST_SFX_CHANNEL);
+        if (!ndspChnIsPlaying(ch) && 
+            s_waveBufs[ch].status != NDSP_WBUF_QUEUED && 
+            s_waveBufs[ch].status != NDSP_WBUF_PLAYING) {
+            nextChannel = FIRST_SFX_CHANNEL + (ch - FIRST_SFX_CHANNEL + 1) % (NUM_CHANNELS - FIRST_SFX_CHANNEL);
+            return ch;
         }
     }
 
-    // Fallback: round-robin channel stealing
+    // Fallback: round-robin channel stealing among SFX channels
     int ch = nextChannel;
-    nextChannel = (nextChannel + 1) % NUM_CHANNELS;
+    nextChannel = FIRST_SFX_CHANNEL + (nextChannel - FIRST_SFX_CHANNEL + 1) % (NUM_CHANNELS - FIRST_SFX_CHANNEL);
     ndspChnReset(ch);
     return ch;
 }
@@ -323,6 +332,7 @@ void Audio::setSoundFxEnabled(bool enabled) {
 
 void Audio::setMusicEnabled(bool enabled) {
     s_musicEnabled = enabled;
+    Music::enable(enabled);
 }
 
 int Audio::play(SoundSample* sample, float volume, float pan, float pitch, bool loop) {

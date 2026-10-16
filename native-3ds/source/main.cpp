@@ -27,6 +27,7 @@
 #include "noosa/MovieClip.h"
 #include "noosa/Camera.h"
 #include "noosa/Audio.h"
+#include "noosa/Music.h"
 #include "noosa/Profiler.h"
 
 // Core Game Logic (Phase 3)
@@ -405,6 +406,9 @@ int main(int argc, char* argv[]) {
         }
     };
 
+    // Start Title Screen Background Music
+    noosa::Music::play(pd::Assets::THEME, true);
+
     u64 lastTime = osGetTime();
 
     // -------------------------------------------------------------------------
@@ -415,6 +419,9 @@ int main(int argc, char* argv[]) {
         float dt = (curTime - lastTime) / 1000.0f;
         lastTime = curTime;
         if (dt > 0.1f) dt = 0.1f;
+
+        pd::Sample::update(dt);
+        noosa::Music::update();
 
         Profiler::beginUpdate();
 
@@ -633,6 +640,7 @@ int main(int argc, char* argv[]) {
 
             if (interlevelTimer >= INTERLEVEL_DURATION) {
                 appState = AppState::GAME;
+                noosa::Music::play(pd::Assets::TUNE, true);
                 if (interlevelMode == InterlevelMode::NEW_GAME) {
                     wndStory.show(pd::windows::WndStory::ID_SEWERS);
                 } else if (interlevelMode == InterlevelMode::DESCEND) {
@@ -713,11 +721,13 @@ int main(int argc, char* argv[]) {
             } else if (bottomUI.getPendingTransition() == LevelTransition::WIN) {
                 bottomUI.clearPendingTransition();
                 SaveManager::deleteSave();
+                noosa::Music::play(pd::Assets::HAPPY, true);
                 wndOptions.show("HAPPY ENDING!",
                     "You have retrieved the Amulet of Yendor and ascended back to the surface! You are victorious!",
                     { "Return to Title" },
                     [&](int) {
                         appState = AppState::TITLE;
+                        noosa::Music::play(pd::Assets::THEME, true);
                     });
                 appState = AppState::PROMPT_LOAD;
                 continue;
@@ -728,6 +738,7 @@ int main(int argc, char* argv[]) {
                 bottomUI.clearPendingGameAction();
                 SaveManager::saveGame();
                 appState = AppState::TITLE;
+                noosa::Music::play(pd::Assets::THEME, true);
                 continue;
             } else if (bottomUI.getPendingGameAction() == pd::windows::GameAction::EXIT_GAME) {
                 bottomUI.clearPendingGameAction();
@@ -815,6 +826,9 @@ int main(int argc, char* argv[]) {
                             } else {
                                 GLog::p("Hero defeated " + targetEnemy->name + "!");
                             }
+                        } else if (hero->lastStepPickedUp()) {
+                            // Item was automatically picked up; pickUp() already triggered the authentic sound effect
+                            // (SND_ITEM, SND_GOLD, or SND_DEWDROP). Suppress footstep so the pickup sound is crystal clear.
                         } else {
                             Sample::play((level && level->water[targetCell]) ? Assets::SND_WATER : Assets::SND_STEP, 0.8f, Random::Float(0.95f, 1.05f));
                         }

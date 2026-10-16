@@ -230,6 +230,7 @@ std::string Hero::hungerStatus() const {
 bool Hero::stepTo(int nextCell, Level* currentLevel) {
     interrupt();
     halted = false;
+    m_lastStepPickedUp = false;
 
     if (!currentLevel || nextCell < 0 || nextCell >= Level::LENGTH) {
         return false;
@@ -340,8 +341,6 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
         return true;
     }
 
-    bool wasHighGrass = (currentLevel->get(nextCell) == Terrain::HIGH_GRASS);
-
     if (currentLevel->isPassable(nextCell)) {
         move(nextCell);
         spend(TICK / speed());
@@ -367,25 +366,19 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
         }
 
         // Stepping onto an item tile:
-        // When no enemies are aggro'd (hunting the hero), items are automatically picked up!
+        // Automatically pick up items lying on the floor!
         Heap* heap = currentLevel->getHeap(nextCell);
         if (heap && !heap->isEmpty() && heap->type == Heap::Type::HEAP) {
-            bool hasAggroEnemy = false;
-            for (const auto& mob : Dungeon::mobs) {
-                if (mob && mob->isAlive() && mob->state == Mob::State::HUNTING) {
-                    hasAggroEnemy = true;
-                    break;
-                }
-            }
-
             Item* item = heap->peek();
-            bool canAutoPick = !hasAggroEnemy && !wasHighGrass;
-            if (canAutoPick && item && item->name == "Dewdrop" && HP >= HT) {
+            bool canAutoPick = true;
+            if (item && item->name == "Dewdrop" && HP >= HT) {
                 canAutoPick = false; // Don't waste dew if already at full health
             }
 
             if (canAutoPick) {
-                pickUp(currentLevel, false);
+                if (pickUp(currentLevel, false)) {
+                    m_lastStepPickedUp = true;
+                }
             } else if (item) {
                 GLog::i("You see " + item->displayName() + " lying here.");
             }

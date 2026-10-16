@@ -57,9 +57,12 @@ public:
     // Turn actions
     bool stepTo(int nextCell, Level* currentLevel);
     bool pickUp(Level* currentLevel = nullptr, bool spendTurn = true);
+    bool lastStepPickedUp() const { return m_lastStepPickedUp; }
     void openContainer(Heap* heap, int targetCell);
     void rest(bool tillHealthy = true);
     bool search(Level* currentLevel, bool intentional = true);
+
+    bool m_lastStepPickedUp = false;
 
     bool shoot(Char* enemy, MissileWeapon* wep);
 
