@@ -135,6 +135,11 @@ void Level::destroy(int cell) {
             set(cell, Terrain::EMBERS);
         }
     }
+
+    Plant* p = getPlant(cell);
+    if (p) {
+        p->wither();
+    }
 }
 
 void Level::trample(int cell, Char* ch) {
@@ -196,6 +201,11 @@ void Level::press(int cell, Char* ch) {
         set(cell, Terrain::OPEN_DOOR);
         noosa::Audio::play(noosa::Audio::getSample(Assets::SND_OPEN).get());
     }
+
+    Plant* plant = getPlant(cell);
+    if (plant) {
+        plant->activate(ch);
+    }
 }
 
 void Level::mobPress(Mob* mob) {
@@ -221,6 +231,11 @@ void Level::mobPress(Mob* mob) {
     } else if (tile == Terrain::DOOR) {
         set(cell, Terrain::OPEN_DOOR);
         noosa::Audio::play(noosa::Audio::getSample(Assets::SND_OPEN).get());
+    }
+
+    Plant* plant = getPlant(cell);
+    if (plant) {
+        plant->activate(mob);
     }
 }
 
@@ -260,6 +275,37 @@ void Level::removeHeap(Heap* heap) {
                            [heap](const std::unique_ptr<Heap>& h) { return h.get() == heap; });
     if (it != heaps.end()) {
         heaps.erase(it);
+    }
+}
+
+Plant* Level::getPlant(int cell) const {
+    for (const auto& p : plants) {
+        if (p && p->pos == cell) {
+            return p.get();
+        }
+    }
+    return nullptr;
+}
+
+Plant* Level::plant(PlantSeed::PlantType type, int cell) {
+    if (cell < 0 || cell >= LENGTH) return nullptr;
+
+    Plant* existing = getPlant(cell);
+    if (existing) {
+        existing->wither();
+    }
+
+    auto newPlant = std::make_unique<Plant>(type, cell);
+    Plant* ptr = newPlant.get();
+    plants.push_back(std::move(newPlant));
+    return ptr;
+}
+
+void Level::uproot(int cell) {
+    auto it = std::find_if(plants.begin(), plants.end(),
+                           [cell](const std::unique_ptr<Plant>& p) { return p && p->pos == cell; });
+    if (it != plants.end()) {
+        plants.erase(it);
     }
 }
 

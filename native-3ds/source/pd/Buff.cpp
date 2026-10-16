@@ -808,4 +808,58 @@ void SoulMark::attachTo(Char* ch) {
     }
 }
 
+// -----------------------------------------------------------------------------
+// Plant Buffs (Sungrass & Earthroot)
+// -----------------------------------------------------------------------------
+std::string HerbalHealing::desc() const {
+    return "Soothing sap is slowly mending your wounds as long as you remain stationary.";
+}
+
+void HerbalHealing::attachTo(Char* ch) {
+    Buff::attachTo(ch);
+    if (ch) pos = ch->pos;
+    Actor::add(this, STEP);
+}
+
+bool HerbalHealing::act() {
+    if (!target || target->pos != pos || target->HP >= target->HT) {
+        detach();
+    } else {
+        target->HP = std::min(target->HT, target->HP + std::max(1, target->HT / 10));
+        FX::burst(target->pos, 0xffee44FF, 3);
+        spend(STEP);
+    }
+    return true;
+}
+
+std::string EarthrootArmor::desc() const {
+    return "Tough, pliable roots encase you in an earthen shell, absorbing physical damage until you move.";
+}
+
+void EarthrootArmor::attachTo(Char* ch) {
+    Buff::attachTo(ch);
+    if (ch) pos = ch->pos;
+    Actor::add(this, STEP);
+}
+
+bool EarthrootArmor::act() {
+    if (!target || target->pos != pos) {
+        detach();
+    } else {
+        spend(STEP);
+    }
+    return true;
+}
+
+int EarthrootArmor::absorb(int damage) {
+    if (damage >= level) {
+        int rem = damage - level;
+        detach();
+        return rem;
+    } else {
+        level -= damage;
+        return 0;
+    }
+}
+
 } // namespace pd

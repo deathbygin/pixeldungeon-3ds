@@ -4,6 +4,7 @@
 #include "Room.h"
 #include "PathFinder.h"
 #include "Heap.h"
+#include "pd/Plant.h"
 #include <vector>
 #include <memory>
 
@@ -116,6 +117,12 @@ public:
     Heap* getHeap(int cell) const;
     Heap* drop(std::unique_ptr<Item> item, int cell);
     void removeHeap(Heap* heap);
+
+    // Plant management
+    std::vector<std::unique_ptr<Plant>> plants;
+    Plant* getPlant(int cell) const;
+    Plant* plant(PlantSeed::PlantType type, int cell);
+    void uproot(int cell);
 
     static const char* tileName(int tile);
     static const char* tileDesc(int tile);

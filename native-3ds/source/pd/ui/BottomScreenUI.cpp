@@ -223,6 +223,12 @@ std::string BottomScreenUI::getHoverPreviewText(int cell, const pd::Level* level
         }
     }
 
+    // 3b. Active Plant
+    Plant* plant = level->getPlant(cell);
+    if (plant && (level->visited[cell] || Dungeon::visible[cell])) {
+        return "Plant: " + plant->plantName;
+    }
+
     // 4. Terrain & Traps
     int terr = level->map[cell];
     switch (terr) {
@@ -1277,6 +1283,13 @@ void BottomScreenUI::inspectCell(int cell, pd::Level* level) {
             }
             return;
         }
+    }
+
+    // 3b. Check for active plant on the cell
+    Plant* plant = level->getPlant(cell);
+    if (plant && (level->visited[cell] || Dungeon::visible[cell])) {
+        showMessage(plant->plantName + "\n\n" + plant->desc());
+        return;
     }
 
     // 4. Traps & Specialized Dungeon Terrain

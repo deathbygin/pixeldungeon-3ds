@@ -307,6 +307,16 @@ void WndHero::draw(const pd::Hero* hero, C2D_TextBuf textBuf) {
                     col = 0xFFEE55FF;
                     iconIndex = 22;
                     break;
+                case BuffType::HerbalHealing:
+                    bDesc = "Restoring health while remaining stationary.";
+                    col = 0x55EE55FF;
+                    iconIndex = 2;
+                    break;
+                case BuffType::EarthrootArmor:
+                    bDesc = "Herbal armor absorbing physical damage.";
+                    col = 0xDD9933FF;
+                    iconIndex = 18;
+                    break;
                 default:
                     bDesc = "Active effect.";
                     break;

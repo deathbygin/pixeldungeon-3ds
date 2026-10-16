@@ -10,7 +10,8 @@ public:
     enum class BlobType {
         TOXIC_GAS,
         PARALYTIC_GAS,
-        FIRE
+        FIRE,
+        CONFUSION_GAS
     };
 
     BlobType type = BlobType::TOXIC_GAS;

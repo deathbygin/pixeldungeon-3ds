@@ -67,6 +67,7 @@ private:
     static Blob s_toxicGas;
     static Blob s_paralyticGas;
     static Blob s_fire;
+    static Blob s_confusionGas;
 
     static float s_blobEmitTimer;
 };

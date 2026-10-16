@@ -40,6 +40,7 @@ public:
     virtual ~Item() = default;
 
     virtual ItemCategory category() const { return ItemCategory::Generic; }
+    virtual class PlantSeed* asPlantSeed() { return nullptr; }
     virtual std::vector<std::string> actions(Hero* hero);
     virtual bool execute(Hero* hero, const std::string& action);
 
@@ -466,6 +467,7 @@ public:
     PlantType plantType = PlantType::FIREBLOOM;
 
     explicit PlantSeed(PlantType pt);
+    PlantSeed* asPlantSeed() override { return this; }
     bool isStackable() const override { return true; }
     bool isIdentified() const override { return true; }
     std::vector<std::string> actions(Hero* hero) override;

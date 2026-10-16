@@ -8,6 +8,7 @@
 #include "pd/Badges.h"
 #include "pd/FX.h"
 #include "pd/Heap.h"
+#include "pd/Plant.h"
 #include <algorithm>
 #include <cstring>
 
@@ -75,6 +76,12 @@ void Blob::evolve(const Level* level) {
                     Heap* heap = level->getHeap(pos);
                     if (heap) {
                         heap->burn();
+                    }
+
+                    // Burn and activate any plants on the tile
+                    Plant* plant = level->getPlant(pos);
+                    if (plant) {
+                        plant->activate(nullptr);
                     }
 
                     fire = cur[pos] - 1;
@@ -176,6 +183,8 @@ void Blob::evolve(const Level* level) {
                         }
                     } else if (type == BlobType::PARALYTIC_GAS) {
                         ch->affect<Paralysis>(1);
+                    } else if (type == BlobType::CONFUSION_GAS) {
+                        ch->affect<Vertigo>();
                     }
                 }
             }
@@ -191,6 +200,8 @@ uint32_t Blob::getParticleColor() const {
         return 0xe4d83bFF; // Paralytic yellow
     case BlobType::FIRE:
         return 0xee7722FF; // Flame orange
+    case BlobType::CONFUSION_GAS:
+        return 0xbf55ecFF; // Shimmering purple
     default:
         return 0xFFFFFFFF;
     }

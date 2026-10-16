@@ -12,6 +12,7 @@
 #include "pd/GLog.h"
 #include "pd/Assets.h"
 #include "pd/Ballistica.h"
+#include "pd/Plant.h"
 #include "noosa/Audio.h"
 #include <sstream>
 #include <algorithm>
@@ -2226,7 +2227,9 @@ std::vector<std::string> PlantSeed::actions(Hero* hero) {
 bool PlantSeed::execute(Hero* hero, const std::string& action) {
     if (!hero) return false;
     if (action == "PLANT") {
-        onThrow(hero->pos);
+        PlantType pt = plantType;
+        quantity--;
+        OnSeedImpact(pt, hero->pos);
         hero->spendAndNext(Actor::TICK);
         return true;
     }
@@ -2234,28 +2237,14 @@ bool PlantSeed::execute(Hero* hero, const std::string& action) {
 }
 
 void PlantSeed::onThrow(int cell) {
-    if (!Dungeon::level) return;
-
-    // Planting logic:
-    // If thrown into open chasm, drops into chasm
-    if (Dungeon::level->map[cell] == Terrain::CHASM || Dungeon::level->pit[cell]) {
-        std::unique_ptr<Item> self(this);
-        Dungeon::dropToChasm(std::move(self));
-        return;
-    }
-
-    // High grass / plantable ground
-    if (Dungeon::visible[cell]) {
-        FX::splash(cell, 0x44aa44FF, 6);
-        GLog::i("The seed lands on the ground.");
-    }
-
-    std::unique_ptr<Item> self(this);
-    Dungeon::level->drop(std::move(self), cell);
+    PlantType pt = plantType;
+    delete this;
+    OnSeedImpact(pt, cell);
 }
 
 std::string PlantSeed::info() const {
-    return "Throw this seed to the place where you want to plant it.";
+    const auto& eff = SeedRegistry::get(plantType);
+    return "Throw this seed to the place where you want to grow " + eff.plantName + ".\n\n" + eff.description;
 }
 
 std::string PlantSeed::displayName() const {

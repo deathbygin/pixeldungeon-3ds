@@ -151,6 +151,7 @@ void Dungeon::resetLevel() {
     Actor::add(FX::getBlob(Blob::BlobType::FIRE), Actor::TICK);
     Actor::add(FX::getBlob(Blob::BlobType::TOXIC_GAS), Actor::TICK);
     Actor::add(FX::getBlob(Blob::BlobType::PARALYTIC_GAS), Actor::TICK);
+    Actor::add(FX::getBlob(Blob::BlobType::CONFUSION_GAS), Actor::TICK);
     observe();
     announceLevelEntrance();
     Actor::process();
@@ -233,6 +234,7 @@ void Dungeon::switchLevel(int newDepth) {
     Actor::add(FX::getBlob(Blob::BlobType::FIRE), Actor::TICK);
     Actor::add(FX::getBlob(Blob::BlobType::TOXIC_GAS), Actor::TICK);
     Actor::add(FX::getBlob(Blob::BlobType::PARALYTIC_GAS), Actor::TICK);
+    Actor::add(FX::getBlob(Blob::BlobType::CONFUSION_GAS), Actor::TICK);
     placeChasmItems();
     observe();
     announceLevelEntrance();

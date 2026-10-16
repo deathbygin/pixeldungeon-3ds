@@ -750,6 +750,7 @@ bool SaveManager::loadGame(const std::string& customPath) {
 
     // 5b. Ground Heaps State (v2+)
     level->heaps.clear();
+    level->plants.clear();
     if (version >= 2) {
         uint32_t heapCount = 0;
         std::fread(&heapCount, sizeof(uint32_t), 1, fp);

@@ -91,6 +91,16 @@ void Char::move(int step) {
         }
     }
 
+    // Detach stationary plant buffs upon moving away
+    EarthrootArmor* earthArmor = getBuff<EarthrootArmor>();
+    if (earthArmor) {
+        earthArmor->detach();
+    }
+    HerbalHealing* herbalHealing = getBuff<HerbalHealing>();
+    if (herbalHealing) {
+        herbalHealing->detach();
+    }
+
     // Bleeding damage upon movement
     Bleeding* b = getBuff<Bleeding>();
     if (b && isAlive()) {
@@ -220,6 +230,12 @@ void Char::damage(int dmg, Actor* src) {
         if (Random::Int(dmg) >= Random::Int(HP)) {
             pBuff->detach();
         }
+    }
+
+    // 4. Earthroot Armor damage absorption
+    EarthrootArmor* armor = getBuff<EarthrootArmor>();
+    if (armor && dmg > 0) {
+        dmg = armor->absorb(dmg);
     }
 
     HP = std::max(0, HP - dmg);

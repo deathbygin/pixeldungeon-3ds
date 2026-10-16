@@ -85,6 +85,7 @@ bool SewerBossLevel::build() {
     std::fill_n(visited, LENGTH, false);
     std::fill_n(fieldOfView, LENGTH, false);
     heaps.clear();
+    plants.clear();
     secretDoors = 0;
 
     if (!initRooms()) return false;
@@ -275,6 +276,7 @@ bool PrisonBossLevel::build() {
     std::fill_n(visited, LENGTH, false);
     std::fill_n(fieldOfView, LENGTH, false);
     heaps.clear();
+    plants.clear();
     secretDoors = 0;
 
     if (!initRooms()) return false;
@@ -452,6 +454,7 @@ bool CavesBossLevel::build() {
     std::fill_n(visited, LENGTH, false);
     std::fill_n(fieldOfView, LENGTH, false);
     heaps.clear();
+    plants.clear();
     rooms.clear();
 
     const int ROOM_LEFT   = WIDTH / 2 - 2;
@@ -597,6 +600,7 @@ bool CityBossLevel::build() {
     std::fill_n(visited, LENGTH, false);
     std::fill_n(fieldOfView, LENGTH, false);
     heaps.clear();
+    plants.clear();
     rooms.clear();
 
     const int TOP = 2;
@@ -709,6 +713,7 @@ bool HallsBossLevel::build() {
     std::fill_n(visited, LENGTH, false);
     std::fill_n(fieldOfView, LENGTH, false);
     heaps.clear();
+    plants.clear();
     rooms.clear();
 
     const int ROOM_LEFT   = WIDTH / 2 - 1;
@@ -780,6 +785,7 @@ bool LastLevel::build() {
     std::fill_n(visited, LENGTH, false);
     std::fill_n(fieldOfView, LENGTH, false);
     heaps.clear();
+    plants.clear();
     rooms.clear();
 
     const int SIZE = 7;

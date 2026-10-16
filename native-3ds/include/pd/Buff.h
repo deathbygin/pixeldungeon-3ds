@@ -39,7 +39,9 @@ enum class BuffType {
     Weakness,
     SoulMark,
     GasesImmunity,
-    Rage
+    Rage,
+    HerbalHealing,
+    EarthrootArmor
 };
 
 class Combo;
@@ -562,6 +564,45 @@ public:
     std::string desc() const override;
 
     void attachTo(Char* ch) override;
+};
+
+// =============================================================================
+// Plant Buffs (Sungrass & Earthroot)
+// =============================================================================
+class HerbalHealing : public Buff {
+public:
+    static constexpr BuffType STATIC_TYPE = BuffType::HerbalHealing;
+    static constexpr float STEP = 5.0f;
+    int pos = -1;
+
+    BuffType type() const override { return STATIC_TYPE; }
+    std::string name() const override { return "Herbal healing"; }
+    int icon() const override { return 2; }
+    std::string desc() const override;
+
+    void attachTo(Char* ch) override;
+    bool act() override;
+};
+
+class EarthrootArmor : public Buff {
+public:
+    static constexpr BuffType STATIC_TYPE = BuffType::EarthrootArmor;
+    static constexpr float STEP = 1.0f;
+    int pos = -1;
+    int level = 0;
+
+    EarthrootArmor(int lvl = 0) : level(lvl) {}
+
+    BuffType type() const override { return STATIC_TYPE; }
+    std::string name() const override { return "Herbal armor"; }
+    int icon() const override { return 18; }
+    std::string desc() const override;
+
+    void attachTo(Char* ch) override;
+    bool act() override;
+    int absorb(int damage);
+    void setLevel(int val) { if (level < val) level = val; }
+    int getLevel() const { return level; }
 };
 
 } // namespace pd

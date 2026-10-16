@@ -217,6 +217,7 @@ int main(int argc, char* argv[]) {
     auto kingTex  = Texture::get(Assets::KING);
     auto yogTex   = Texture::get(Assets::YOG);
     auto itemsTex = Texture::get(Assets::ITEMS);
+    auto plantsTex = Texture::get(Assets::PLANTS);
 
     std::shared_ptr<TextureFilm> heroFilm;
     std::shared_ptr<TextureFilm> ratFilm;
@@ -242,6 +243,7 @@ int main(int argc, char* argv[]) {
     std::shared_ptr<TextureFilm> kingFilm;
     std::shared_ptr<TextureFilm> yogFilm;
     std::shared_ptr<TextureFilm> itemsFilm;
+    std::shared_ptr<TextureFilm> plantsFilm;
 
     if (heroTex && heroTex->isLoaded())       heroFilm     = std::make_shared<TextureFilm>(heroTex, 12, 15);
     if (ratTex && ratTex->isLoaded())         ratFilm      = std::make_shared<TextureFilm>(ratTex, 16, 15);
@@ -267,6 +269,7 @@ int main(int argc, char* argv[]) {
     if (kingTex && kingTex->isLoaded())       kingFilm     = std::make_shared<TextureFilm>(kingTex, 16, 16);
     if (yogTex && yogTex->isLoaded())         yogFilm      = std::make_shared<TextureFilm>(yogTex, 20, 19);
     if (itemsTex && itemsTex->isLoaded())     itemsFilm    = std::make_shared<TextureFilm>(itemsTex, 16, 16);
+    if (plantsTex && plantsTex->isLoaded())   plantsFilm   = std::make_shared<TextureFilm>(plantsTex, 16, 16);
 
     // Procedural fallback spritesheet if RomFS is unavailable
     auto sheetData = generateGameSpriteSheet();
@@ -952,6 +955,20 @@ int main(int argc, char* argv[]) {
                         charImg.z = 0.25f;
                         charImg.tint = Color(255, 255, 255, 255);
                         charImg.setFilm(itemsFilm, heap->image());
+                        charImg.draw(&topCamera);
+                    }
+                }
+            }
+
+            // Render Active Plants on the ground
+            if (plantsFilm) {
+                for (const auto& plant : level->plants) {
+                    if (plant && (level->visited[plant->pos] || Dungeon::visible[plant->pos])) {
+                        charImg.x = (plant->pos % Level::WIDTH) * 16.0f;
+                        charImg.y = (plant->pos / Level::WIDTH) * 16.0f;
+                        charImg.z = 0.24f;
+                        charImg.tint = Color(255, 255, 255, 255);
+                        charImg.setFilm(plantsFilm, plant->image);
                         charImg.draw(&topCamera);
                     }
                 }

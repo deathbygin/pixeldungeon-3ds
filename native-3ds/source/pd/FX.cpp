@@ -16,6 +16,7 @@ std::vector<std::unique_ptr<MissileSprite>> FX::s_missiles;
 Blob FX::s_toxicGas(Blob::BlobType::TOXIC_GAS);
 Blob FX::s_paralyticGas(Blob::BlobType::PARALYTIC_GAS);
 Blob FX::s_fire(Blob::BlobType::FIRE);
+Blob FX::s_confusionGas(Blob::BlobType::CONFUSION_GAS);
 
 float FX::s_blobEmitTimer = 0.0f;
 
@@ -34,6 +35,7 @@ void FX::clear() {
     s_toxicGas.clear();
     s_paralyticGas.clear();
     s_fire.clear();
+    s_confusionGas.clear();
     s_blobEmitTimer = 0.0f;
 }
 
@@ -88,6 +90,7 @@ void FX::update(float dt) {
         emitBlobParticles(s_toxicGas);
         emitBlobParticles(s_paralyticGas);
         emitBlobParticles(s_fire);
+        emitBlobParticles(s_confusionGas);
     }
 }
 
@@ -216,6 +219,7 @@ void FX::evolveBlobs(const Level* level) {
     s_toxicGas.evolve(level);
     s_paralyticGas.evolve(level);
     s_fire.evolve(level);
+    s_confusionGas.evolve(level);
 }
 
 Blob* FX::getBlob(Blob::BlobType type) {
@@ -223,6 +227,7 @@ Blob* FX::getBlob(Blob::BlobType type) {
     case Blob::BlobType::TOXIC_GAS:     return &s_toxicGas;
     case Blob::BlobType::PARALYTIC_GAS: return &s_paralyticGas;
     case Blob::BlobType::FIRE:          return &s_fire;
+    case Blob::BlobType::CONFUSION_GAS: return &s_confusionGas;
     default:                            return nullptr;
     }
 }
