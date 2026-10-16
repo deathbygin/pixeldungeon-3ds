@@ -347,7 +347,7 @@ void BottomScreenUI::updateQuickslots(pd::Hero* hero) {
 bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHeld, u32 kUp) {
     m_touch.update(kDown, kHeld, kUp);
 
-    if (!hero || !hero->isAlive()) return false;
+    if (!hero) return false;
 
     updateQuickslots(hero);
 
@@ -401,6 +401,11 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
         std::string bagMsg;
         bool actionTaken = m_wndBag.update(hero, m_touch, kDown, bagMsg);
 
+        if (!hero->isAlive()) {
+            // Dead hero can view inventory and inspect items, but not take gameplay actions
+            return false;
+        }
+
         if (bagMsg == "START_TARGETING") {
             pd::Item* targetIt = m_wndBag.getSelectedItem(hero);
             if (targetIt) {
@@ -429,7 +434,7 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
 
     // 3. Ranged Targeting Mode (Aiming wand/missile)
     if (m_isTargeting) {
-        if (!m_targetItem) {
+        if (!hero->isAlive() || !m_targetItem) {
             cancelTargeting();
             return false;
         }
@@ -672,12 +677,16 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
     }
 
     if (kDown & KEY_SELECT) {
+        if (!hero->isAlive()) {
+            toggleWndHero();
+            return false;
+        }
         startExamine(hero ? hero->pos : 0);
         return false;
     }
 
     // 5. Minimap Touch Inspection
-    if (!m_wndBag.isOpen && !m_wndHero.isOpen() && level && hero) {
+    if (!m_wndBag.isOpen && !m_wndHero.isOpen() && level && hero && hero->isAlive()) {
         float vpX = 10.0f;
         float vpY = 42.0f;
         float vpW = 142.0f;
@@ -707,6 +716,7 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
     Toolbar::Action tbAction = m_toolbar.update(m_touch, kDown, hero);
     switch (tbAction) {
         case Toolbar::Action::WAIT: {
+            if (!hero->isAlive()) return false;
             if (level && hero) {
                 if (level->map[hero->pos] == Terrain::EXIT) {
                     promptStairs(true);
@@ -732,6 +742,7 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
         }
 
         case Toolbar::Action::SEARCH: {
+            if (!hero->isAlive()) return false;
             hero->search(level, true);
             Actor::process();
             return true;
@@ -752,6 +763,7 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
         }
 
         case Toolbar::Action::QUICK1: {
+            if (!hero->isAlive()) return false;
             pd::Item* qIt = m_toolbar.getQuickItem1();
             if (qIt) {
                 if (Wand* w = qIt->asWand()) {
@@ -780,6 +792,7 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
         }
 
         case Toolbar::Action::QUICK2: {
+            if (!hero->isAlive()) return false;
             pd::Item* qIt = m_toolbar.getQuickItem2();
             if (qIt) {
                 if (Wand* w = qIt->asWand()) {

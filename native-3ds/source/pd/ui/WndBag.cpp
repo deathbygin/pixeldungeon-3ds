@@ -63,6 +63,11 @@ void WndBag::openSubWindow(pd::Item* it, pd::Hero* hero) {
     m_selectedAction = 0;
     m_subActions.clear();
 
+    if (!hero || !hero->isAlive()) {
+        m_subActions.push_back("CLOSE");
+        return;
+    }
+
     bool isEquipped = (it == hero->belongings.equippedWeapon || it == hero->belongings.equippedArmor ||
                        it == hero->belongings.equippedRing1 || it == hero->belongings.equippedRing2);
 
