@@ -177,6 +177,7 @@ void Hero::live() {
 
 void Hero::interrupt() {
     restoreHealth = false;
+    halted = true;
 }
 
 bool Hero::act() {
@@ -227,6 +228,7 @@ std::string Hero::hungerStatus() const {
 
 bool Hero::stepTo(int nextCell, Level* currentLevel) {
     interrupt();
+    halted = false;
 
     if (!currentLevel || nextCell < 0 || nextCell >= Level::LENGTH) {
         return false;
@@ -440,7 +442,28 @@ bool Hero::search(Level* currentLevel, bool intentional) {
 
     bool smthFound = false;
     updateAwareness();
+
+    int positive = 0;
+    int negative = 0;
+    auto checkRing = [&](Item* r) {
+        if (r && r->name == "Ring of Detection") {
+            int bonus = r->level;
+            if (bonus > positive) {
+                positive = bonus;
+            } else if (bonus < 0) {
+                negative += bonus;
+            }
+        }
+    };
+    checkRing(belongings.equippedRing1);
+    checkRing(belongings.equippedRing2);
+
+    int distance = 1 + positive + negative;
     float searchSkill = intentional ? (2.0f * awareness - awareness * awareness) : awareness;
+    if (distance <= 0) {
+        searchSkill /= static_cast<float>(2 - distance);
+        distance = 1;
+    }
 
     int cx = pos % Level::WIDTH;
     int cy = pos / Level::WIDTH;
@@ -451,13 +474,22 @@ bool Hero::search(Level* currentLevel, bool intentional) {
             HeroSprite* heroSprite = spr->asHeroSprite();
             if (heroSprite) heroSprite->operate(pos);
         }
+        FX::floatingText(pos, "search", 0xFFFFFFFF);
+        FX::ripple(pos);
+        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_MISS).get());
     }
 
-    for (int dy = -1; dy <= 1; ++dy) {
-        for (int dx = -1; dx <= 1; ++dx) {
-            int x = cx + dx;
-            int y = cy + dy;
-            if (x < 0 || x >= Level::WIDTH || y < 0 || y >= Level::HEIGHT) continue;
+    int ax = std::max(0, cx - distance);
+    int bx = std::min(Level::WIDTH - 1, cx + distance);
+    int ay = std::max(0, cy - distance);
+    int by = std::min(Level::HEIGHT - 1, cy + distance);
+
+    bool doorFound = false;
+    bool trapFound = false;
+    bool heapFound = false;
+
+    for (int y = ay; y <= by; ++y) {
+        for (int x = ax; x <= bx; ++x) {
             int p = y * Level::WIDTH + x;
 
             if (Dungeon::visible[p]) {
@@ -469,6 +501,12 @@ bool Hero::search(Level* currentLevel, bool intentional) {
                     int oldValue = currentLevel->map[p];
                     int newValue = Terrain::discover(oldValue);
                     currentLevel->set(p, newValue);
+
+                    if (oldValue == Terrain::SECRET_DOOR) {
+                        doorFound = true;
+                    } else {
+                        trapFound = true;
+                    }
                     smthFound = true;
                 }
 
@@ -476,6 +514,7 @@ bool Hero::search(Level* currentLevel, bool intentional) {
                     Heap* heap = currentLevel->getHeap(p);
                     if (heap && heap->type == Heap::Type::HIDDEN) {
                         heap->type = Heap::Type::HEAP;
+                        heapFound = true;
                         smthFound = true;
                     }
                 }
@@ -484,15 +523,21 @@ bool Hero::search(Level* currentLevel, bool intentional) {
     }
 
     if (intentional) {
-        FX::ripple(pos);
-        spend(smthFound ? (Random::Float() < searchSkill ? TICK : 2.0f * TICK) : TICK);
+        float timeSpent = smthFound ? (Random::Float() < searchSkill ? 2.0f * TICK : 4.0f * TICK) : 2.0f * TICK;
+        spend(timeSpent);
         next();
         Dungeon::observe();
         waitingForInput = false;
     }
 
     if (smthFound) {
-        GLog::w("You noticed something!");
+        if (doorFound && !trapFound && !heapFound) {
+            GLog::w("You found a secret door!");
+        } else if (trapFound && !doorFound && !heapFound) {
+            GLog::w("You found a secret trap!");
+        } else {
+            GLog::w("You noticed something!");
+        }
         noosa::Audio::play(noosa::Audio::getSample(Assets::SND_SECRET).get());
         interrupt();
     }

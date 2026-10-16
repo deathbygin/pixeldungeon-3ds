@@ -33,6 +33,7 @@ public:
     MissileWeapon* rangedWeapon = nullptr;
     bool waitingForInput = true;
     bool restoreHealth = false;
+    bool halted = false;
 
     Hero();
     explicit Hero(HeroClass cl);

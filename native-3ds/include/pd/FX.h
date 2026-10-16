@@ -20,7 +20,7 @@ class FX {
 public:
     static constexpr size_t MAX_PARTICLES = 128;
     static constexpr size_t MAX_RIPPLES   = 16;
-    static constexpr size_t MAX_CHECKED   = 24;
+    static constexpr size_t MAX_CHECKED   = 64;
     static constexpr size_t MAX_WOUNDS    = 16;
     static constexpr size_t MAX_TEXTS     = 16;
 

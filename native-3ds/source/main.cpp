@@ -799,6 +799,11 @@ int main(int argc, char* argv[]) {
                     int prevTargetHp = targetEnemy ? targetEnemy->HP : 0;
 
                     if (hero->stepTo(targetCell, level)) {
+                        if (hero->halted) {
+                            hero->halted = false;
+                            moveDelay = 0.40f;
+                        }
+
                         if (targetEnemy) {
                             sndHit.play(0.6f, 0.0f);
                             int dealt = prevTargetHp - targetEnemy->HP;
@@ -918,8 +923,8 @@ int main(int argc, char* argv[]) {
                         tileImg.z = 0.2f;
 
                         int t = level->get(cellIdx);
-                        if (t == Terrain::WALL || t == Terrain::WALL_DECO) tileImg.setFrame(fWall);
-                        else if (t == Terrain::DOOR || t == Terrain::SECRET_DOOR) tileImg.setFrame(fDoor);
+                        if (t == Terrain::WALL || t == Terrain::WALL_DECO || t == Terrain::SECRET_DOOR) tileImg.setFrame(fWall);
+                        else if (t == Terrain::DOOR) tileImg.setFrame(fDoor);
                         else if (t == Terrain::EXIT) tileImg.setFrame(fStairs);
                         else if (t == Terrain::WATER) tileImg.setFrame(fWater);
                         else tileImg.setFrame(fFloor);
