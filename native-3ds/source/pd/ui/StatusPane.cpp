@@ -48,6 +48,13 @@ int StatusPane::update(const TouchController& touch, u32 kDown) {
         return 3; // Stairs / Depth info
     }
 
+    // Gold coins icon touch area: (234, 0, 54, HEIGHT) - Secret Developer / Debug Menu
+    noosa::RectF goldRect(234.0f, 0.0f, 54.0f, HEIGHT);
+    if (touch.clicked(goldRect)) {
+        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        return 4; // Open Developer / Debug Menu
+    }
+
     // Menu button touch area: (290, 0, 30, HEIGHT)
     noosa::RectF menuRect(290.0f, 0.0f, 30.0f, HEIGHT);
     m_menuPressed = touch.hitTest(menuRect);

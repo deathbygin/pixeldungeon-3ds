@@ -11,6 +11,8 @@
 #include "pd/windows/WndHero.h"
 #include "pd/windows/WndGame.h"
 #include "pd/windows/WndSettings.h"
+#include "pd/windows/WndDebugMenu.h"
+#include "pd/windows/WndItemSpawner.h"
 #include "pd/ui/WndOptions.h"
 #include "pd/ui/WndMessage.h"
 
@@ -62,10 +64,17 @@ public:
     void openPauseMenu();
     void closePauseMenu();
 
+    bool isDebugMenuOpen() const { return m_wndDebugMenu.isOpen() || m_wndItemSpawner.isOpen(); }
+    void openDebugMenu();
+    void closeDebugMenu();
+    void openItemSpawner();
+    void closeItemSpawner();
+
     bool isModalOpen() const {
         return m_wndOptions.isOpen() || m_wndMessage.isOpen() ||
                m_wndBag.isOpen || m_wndHero.isOpen() ||
-               m_wndGame.isOpen() || m_wndSettings.isOpen();
+               m_wndGame.isOpen() || m_wndSettings.isOpen() ||
+               m_wndDebugMenu.isOpen() || m_wndItemSpawner.isOpen();
     }
 
     pd::windows::GameAction getPendingGameAction() const { return m_pendingGameAction; }
@@ -106,6 +115,8 @@ private:
     pd::windows::WndHero m_wndHero;
     pd::windows::WndGame m_wndGame;
     pd::windows::WndSettings m_wndSettings;
+    pd::windows::WndDebugMenu m_wndDebugMenu;
+    pd::windows::WndItemSpawner m_wndItemSpawner;
     WndOptions m_wndOptions;
     WndMessage m_wndMessage;
     pd::windows::GameAction m_pendingGameAction = pd::windows::GameAction::NONE;

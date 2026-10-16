@@ -13,6 +13,7 @@
 #include "pd/Badges.h"
 #include "pd/Sign.h"
 #include "pd/Sample.h"
+#include "pd/Debug.h"
 #include "noosa/Audio.h"
 #include <algorithm>
 
@@ -640,6 +641,10 @@ void Hero::earnExp(int amount) {
 }
 
 void Hero::die(Actor* src) {
+    if (Debug::godMode) {
+        HP = HT;
+        return;
+    }
     Sample::play(Assets::SND_DEATH);
     GLog::n("You died...");
     if (src) {
@@ -657,6 +662,9 @@ void Hero::die(Actor* src) {
 }
 
 void Hero::damage(int dmg, Actor* src) {
+    if (Debug::godMode) {
+        return;
+    }
     restoreHealth = false;
     Char::damage(dmg, src);
     if (HP <= 0) {

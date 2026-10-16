@@ -368,6 +368,24 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
         return false;
     }
 
+    // Modal Developer / Debug Menu (WndDebugMenu)
+    if (m_wndDebugMenu.isOpen()) {
+        pd::windows::DebugMenuAction act = m_wndDebugMenu.update(m_touch, kDown);
+        if (act == pd::windows::DebugMenuAction::OPEN_ITEM_SPAWNER) {
+            m_wndItemSpawner.show();
+        }
+        return false;
+    }
+
+    // Modal Item Spawner (WndItemSpawner)
+    if (m_wndItemSpawner.isOpen()) {
+        m_wndItemSpawner.update(m_touch, kDown);
+        if (!m_wndItemSpawner.isOpen()) {
+            m_wndDebugMenu.show(); // Return to Debug Menu
+        }
+        return false;
+    }
+
     // 1. If WndSettings modal is open, route input exclusively to it
     if (m_wndSettings.isOpen()) {
         m_wndSettings.update(m_touch, kDown);
@@ -648,6 +666,9 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
                 log("Depth " + std::to_string(Dungeon::depth) + ". Find the stairs down to progress.", C2D_Color32(0xff, 0xcc, 0x66, 0xFF));
             }
         }
+        return false;
+    } else if (statusAction == 4) {
+        openDebugMenu();
         return false;
     }
 
@@ -1182,6 +1203,39 @@ void BottomScreenUI::draw(const pd::Hero* hero, int depth, C2D_TextBuf textBuf) 
     if (m_wndMessage.isOpen()) {
         m_wndMessage.draw(textBuf, 0.86f);
     }
+
+    // 12. Modal Developer / Debug Menu (WndDebugMenu)
+    if (m_wndDebugMenu.isOpen()) {
+        m_wndDebugMenu.draw(textBuf, 0.86f);
+    }
+
+    // 13. Modal Item Spawner (WndItemSpawner)
+    if (m_wndItemSpawner.isOpen()) {
+        m_wndItemSpawner.draw(textBuf, 0.88f);
+    }
+}
+
+void BottomScreenUI::openDebugMenu() {
+    if (m_wndBag.isOpen) m_wndBag.close();
+    if (m_wndHero.isOpen()) m_wndHero.hide();
+    if (m_wndGame.isOpen()) m_wndGame.hide();
+    if (m_wndSettings.isOpen()) m_wndSettings.hide();
+    if (m_wndItemSpawner.isOpen()) m_wndItemSpawner.hide();
+    m_wndDebugMenu.show();
+}
+
+void BottomScreenUI::closeDebugMenu() {
+    m_wndDebugMenu.hide();
+    m_wndItemSpawner.hide();
+}
+
+void BottomScreenUI::openItemSpawner() {
+    m_wndDebugMenu.hide();
+    m_wndItemSpawner.show();
+}
+
+void BottomScreenUI::closeItemSpawner() {
+    m_wndItemSpawner.hide();
 }
 
 void BottomScreenUI::showMessage(std::string text, std::function<void()> onDismiss) {

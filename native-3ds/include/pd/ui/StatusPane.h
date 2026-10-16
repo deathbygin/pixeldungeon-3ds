@@ -24,6 +24,8 @@ public:
     // Updates touch interactions. Returns:
     // 1: Avatar clicked (toggle hero info / WndHero)
     // 2: Menu button clicked (toggle pause / WndGame / options)
+    // 3: Depth / stairs clicked
+    // 4: Gold coins icon clicked (open Developer / Debug Menu)
     // 0: No action
     int update(const TouchController& touch, u32 kDown);
 

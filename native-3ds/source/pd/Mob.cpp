@@ -13,6 +13,7 @@
 #include "pd/Item.h"
 #include "pd/CharSprite.h"
 #include "pd/Sample.h"
+#include "pd/Debug.h"
 #include "noosa/Audio.h"
 #include <cmath>
 #include <algorithm>
@@ -35,6 +36,9 @@ CharSprite* Mob::getSprite() {
 }
 
 void Mob::damage(int dmg, Actor* src) {
+    if (src == Dungeon::hero.get() && Debug::oneHitKill) {
+        dmg = std::max(dmg, HP);
+    }
     if (state == State::SLEEPING) {
         state = State::WANDERING;
     }

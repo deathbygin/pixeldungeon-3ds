@@ -10,6 +10,7 @@
 #include "pd/Mob.h"
 #include "pd/Assets.h"
 #include "pd/Sample.h"
+#include "pd/Debug.h"
 #include <algorithm>
 
 namespace pd {
@@ -177,6 +178,10 @@ bool Char::attack(Char* enemy) {
 
         effective = attackProc(enemy, effective);
         effective = enemy->defenseProc(this, effective);
+
+        if (heroAttacker && Debug::oneHitKill) {
+            effective = std::max(effective, enemy->HP);
+        }
 
         enemy->damage(effective, this);
 
