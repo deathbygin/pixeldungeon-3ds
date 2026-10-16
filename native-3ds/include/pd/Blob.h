@@ -14,7 +14,10 @@ public:
         CONFUSION_GAS,
         CORROSIVE_GAS,
         REGROWTH,
-        FOLIAGE
+        FOLIAGE,
+        WATER_OF_HEALTH,
+        WATER_OF_AWARENESS,
+        WATER_OF_TRANSMUTATION
     };
 
     BlobType type = BlobType::TOXIC_GAS;

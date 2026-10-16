@@ -2,6 +2,8 @@
 #include "pd/Assets.h"
 #include "pd/Terrain.h"
 #include <algorithm>
+#include <cmath>
+#include <citro2d.h>
 
 namespace pd {
 
@@ -41,6 +43,9 @@ void DungeonTilemap::update(float dt) {
     m_waterOffsetY -= 5.0f * dt;
     while (m_waterOffsetY < 0.0f) m_waterOffsetY += 32.0f;
     while (m_waterOffsetY >= 32.0f) m_waterOffsetY -= 32.0f;
+
+    m_shimmerTime += dt;
+    if (m_shimmerTime > 1000.0f) m_shimmerTime -= 1000.0f;
 }
 
 int DungeonTilemap::getVisualTileIndex(int terrainType) {
@@ -95,7 +100,41 @@ void DungeonTilemap::draw(const Level* level, const noosa::Camera* camera, uint3
                 m_waterImage.draw(camera);
             }
 
-            // 2. Tilemap overlay:
+            // 2. Magic well colored liquid surface:
+            // Rendered under the stone lip at z = 0.19f so it shines through the transparent basin hole of tile 34
+            if (rawTile == Terrain::WELL) {
+                auto it = level->wells.find(cellIdx);
+                Level::WellType wt = Level::WellType::Awareness;
+                if (it != level->wells.end()) {
+                    wt = it->second;
+                }
+
+                uint8_t r = 0x33, g = 0x88, b = 0xee; // Awareness celestial indigo/blue
+                if (wt == Level::WellType::Health) {
+                    r = 0x20; g = 0xcc; b = 0x66; // Health crystalline spring emerald
+                } else if (wt == Level::WellType::Transmutation) {
+                    r = 0xee; g = 0xbb; b = 0x22; // Transmutation shimmering golden amber
+                }
+
+                // Subtle magical liquid shimmer
+                float shimmer = 0.88f + 0.12f * std::sin(m_shimmerTime * 3.0f + x * 0.7f + y * 0.7f);
+                r = static_cast<uint8_t>(std::clamp(r * shimmer, 0.0f, 255.0f));
+                g = static_cast<uint8_t>(std::clamp(g * shimmer, 0.0f, 255.0f));
+                b = static_cast<uint8_t>(std::clamp(b * shimmer, 0.0f, 255.0f));
+
+                float wx = x * static_cast<float>(SIZE) + 3.0f;
+                float wy = y * static_cast<float>(SIZE) + 6.0f;
+                float ww = 10.0f;
+                float wh = 5.0f;
+
+                float sx, sy;
+                camera->worldToScreen(wx, wy, sx, sy);
+                float zoom = camera->getZoom();
+                u32 waterColor = C2D_Color32(r, g, b, 255);
+                C2D_DrawRectSolid(sx, sy, 0.19f, ww * zoom, wh * zoom, waterColor);
+            }
+
+            // 3. Tilemap overlay:
             // If it's pure open water (rawTile == Terrain::WATER), the animated water texture is shown directly.
             // If it's a shore/edge tile (Terrain::WATER_TILES to WATER_TILES+15), the semi-transparent stitched tile
             // from tilesX.png is rendered over the water texture with full alpha blending!

@@ -124,7 +124,7 @@ void Item::onThrow(int cell) {
             GLog::i("The " + displayName() + " strikes " + ch->name + " for " + std::to_string(dmg) + " damage!");
         }
 
-        bool water = Dungeon::level->water[cell];
+        bool water = Dungeon::level->water[cell] || Dungeon::level->map[cell] == Terrain::WELL;
         Sample::playAt(water ? Assets::SND_WATER : Assets::SND_STEP, cell, 0.8f, 1.2f);
 
         std::unique_ptr<Item> self(this);
@@ -1153,6 +1153,10 @@ std::string Potion::info() const {
 }
 
 void Potion::onThrow(int cell) {
+    if (Dungeon::level && (Dungeon::level->map[cell] == Terrain::WELL || Dungeon::level->pit[cell])) {
+        Item::onThrow(cell);
+        return;
+    }
     shatter(cell);
     delete this;
 }

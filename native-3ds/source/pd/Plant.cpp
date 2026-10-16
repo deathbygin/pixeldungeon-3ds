@@ -430,7 +430,13 @@ void OnSeedImpact(PlantSeed::PlantType type, int cell) {
         return;
     }
 
-    // 3. Direct Hit on Entity (Hero or Mob)
+    // 3. Magic Well: drop seed into well to allow transmutation/bounce
+    if (Dungeon::level->map[cell] == Terrain::WELL) {
+        Dungeon::level->drop(std::make_unique<PlantSeed>(type), cell);
+        return;
+    }
+
+    // 4. Direct Hit on Entity (Hero or Mob)
     Char* target = Actor::findChar(cell);
     if (target != nullptr) {
         const SeedEffect& effect = SeedRegistry::get(type);

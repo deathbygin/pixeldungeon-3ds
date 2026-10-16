@@ -35,6 +35,7 @@ public:
 private:
     int m_currentDepth = 0;
     float m_waterOffsetY = 0.0f;
+    float m_shimmerTime = 0.0f;
     std::shared_ptr<noosa::Texture> m_texture;
     std::shared_ptr<noosa::TextureFilm> m_film;
     std::shared_ptr<noosa::Texture> m_waterTexture;

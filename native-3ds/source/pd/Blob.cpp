@@ -57,6 +57,13 @@ bool Blob::act() {
 void Blob::evolve(const Level* level) {
     if (volume <= 0 || !level) return;
 
+    if (type == BlobType::WATER_OF_HEALTH ||
+        type == BlobType::WATER_OF_AWARENESS ||
+        type == BlobType::WATER_OF_TRANSMUTATION) {
+        // Well water stays localized in the well basin and does not dissipate or harm on tick
+        return;
+    }
+
     if (type == BlobType::FIRE) {
         // =====================================================================
         // 1:1 Pixel Dungeon Fire Spread
@@ -333,6 +340,12 @@ uint32_t Blob::getParticleColor() const {
         return 0x44aa33FF; // Leaf green
     case BlobType::FOLIAGE:
         return 0x88cc44FF; // Foliage bright green
+    case BlobType::WATER_OF_HEALTH:
+        return 0x20cc66FF; // Vibrant crystalline spring emerald green
+    case BlobType::WATER_OF_AWARENESS:
+        return 0x3388eeFF; // Luminous celestial indigo/cyan
+    case BlobType::WATER_OF_TRANSMUTATION:
+        return 0xeebb22FF; // Shimmering iridescent gold
     default:
         return 0xFFFFFFFF;
     }
@@ -340,14 +353,17 @@ uint32_t Blob::getParticleColor() const {
 
 const char* Blob::tileDesc() const {
     switch (type) {
-    case BlobType::FIRE:          return "A fire is raging here.";
-    case BlobType::TOXIC_GAS:     return "A greenish cloud of toxic gas is swirling here.";
-    case BlobType::PARALYTIC_GAS: return "A cloud of paralytic gas is swirling here.";
-    case BlobType::CONFUSION_GAS: return "A cloud of confusion gas is swirling here.";
-    case BlobType::CORROSIVE_GAS: return "A cloud of corrosive acidic vapor is hissing here.";
-    case BlobType::REGROWTH:      return "Magical roots and vegetation are overgrown here.";
-    case BlobType::FOLIAGE:       return "Shafts of light pierce the gloom of the underground garden.";
-    default:                      return nullptr;
+    case BlobType::FIRE:                   return "A fire is raging here.";
+    case BlobType::TOXIC_GAS:              return "A greenish cloud of toxic gas is swirling here.";
+    case BlobType::PARALYTIC_GAS:          return "A cloud of paralytic gas is swirling here.";
+    case BlobType::CONFUSION_GAS:          return "A cloud of confusion gas is swirling here.";
+    case BlobType::CORROSIVE_GAS:          return "A cloud of corrosive acidic vapor is hissing here.";
+    case BlobType::REGROWTH:               return "Magical roots and vegetation are overgrown here.";
+    case BlobType::FOLIAGE:                return "Shafts of light pierce the gloom of the underground garden.";
+    case BlobType::WATER_OF_HEALTH:        return "Power of health radiates from the water of this well. Take a sip from it to heal your wounds and satisfy hunger.";
+    case BlobType::WATER_OF_AWARENESS:     return "Power of knowledge radiates from the water of this well. Take a sip from it to reveal all secrets of equipped items.";
+    case BlobType::WATER_OF_TRANSMUTATION: return "Power of change radiates from the water of this well. Throw an item into the well to turn it into something else.";
+    default:                               return nullptr;
     }
 }
 

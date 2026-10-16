@@ -66,6 +66,8 @@ int Terrain::flags(int tile) {
 
         case EMPTY_WELL:
         case ALCHEMY:
+            return PASSABLE;
+
         case LOCKED_EXIT:
             return SOLID;
 

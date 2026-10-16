@@ -224,6 +224,16 @@ void Level::bounceItemFrom(int cell) {
             break;
         }
     }
+    if (newPlace == -1) {
+        // Fallback to any valid neighbor in grid bounds
+        for (int i = 0; i < 8; ++i) {
+            int n = cell + NEIGHBOURS8[i];
+            if (n >= 0 && n < LENGTH && (passable[n] || !Terrain::isSolid(map[n]))) {
+                newPlace = n;
+                break;
+            }
+        }
+    }
     if (newPlace != -1) {
         std::unique_ptr<Item> popped = heap->pickUp();
         if (popped) {
@@ -231,6 +241,9 @@ void Level::bounceItemFrom(int cell) {
             Sample::playAt(Assets::SND_STEP, newPlace);
             GLog::i("The well regurgitates the item!");
         }
+    }
+    if (heap->isEmpty()) {
+        removeHeap(heap);
     }
 }
 
@@ -254,11 +267,20 @@ void Level::affectWell(int cell, Char* ch) {
             if (hunger) {
                 hunger->satisfy(Hunger::STARVING);
             }
+            hero->removeBuff(BuffType::Poison);
+            hero->removeBuff(BuffType::Cripple);
+            hero->removeBuff(BuffType::Weakness);
+            hero->removeBuff(BuffType::Bleeding);
+            hero->removeBuff(BuffType::Ooze);
+            hero->removeBuff(BuffType::Slow);
+            hero->removeBuff(BuffType::Blindness);
             hero->interrupt();
             GLog::p("As you take a sip, you feel your wounds heal completely.");
-            FX::burst(cell, 0x00ff88FFu, 10);
+            FX::burst(cell, 0x20CC66FFu, 12);
             set(cell, Terrain::EMPTY_WELL);
             wells.erase(cell);
+            Blob* b = FX::getBlob(Blob::BlobType::WATER_OF_HEALTH);
+            if (b) b->clear(cell);
             return;
         } else if (type == WellType::Awareness) {
             Sample::play(Assets::SND_DRINK);
@@ -275,12 +297,15 @@ void Level::affectWell(int cell, Char* ch) {
             GLog::p("As you take a sip, you feel the knowledge pours into your mind. "
                    "Now you know everything about your equipped items. Also you sense "
                    "all items on the level and know all its secrets.");
-            FX::burst(cell, 0x88ccffFFu, 10);
+            FX::burst(cell, 0x3388EEFFu, 12);
             set(cell, Terrain::EMPTY_WELL);
             wells.erase(cell);
+            Blob* b = FX::getBlob(Blob::BlobType::WATER_OF_AWARENESS);
+            if (b) b->clear(cell);
             return;
         } else if (type == WellType::Transmutation) {
             // Stepping into transmutation well does nothing to hero
+            GLog::i("The water in this well feels strange, but nothing happens when you step into it.");
             return;
         }
     } else if (ch == nullptr) {
@@ -296,9 +321,11 @@ void Level::affectWell(int cell, Char* ch) {
                 vial->fill();
                 Sample::play(Assets::SND_DRINK);
                 GLog::p("The dew vial is filled to the brim!");
-                FX::burst(cell, 0x00ff88FFu, 10);
+                FX::burst(cell, 0x20CC66FFu, 12);
                 set(cell, Terrain::EMPTY_WELL);
                 wells.erase(cell);
+                Blob* b = FX::getBlob(Blob::BlobType::WATER_OF_HEALTH);
+                if (b) b->clear(cell);
                 return;
             } else {
                 bounceItemFrom(cell);
@@ -307,11 +334,15 @@ void Level::affectWell(int cell, Char* ch) {
         } else if (type == WellType::Awareness) {
             if (!item->isIdentified()) {
                 item->identify();
+                item->cursedKnown = true;
+                item->levelKnown = true;
                 Sample::play(Assets::SND_DRINK);
                 GLog::p("The well reveals the secrets of the " + item->displayName() + ".");
-                FX::burst(cell, 0x88ccffFFu, 10);
+                FX::burst(cell, 0x3388EEFFu, 12);
                 set(cell, Terrain::EMPTY_WELL);
                 wells.erase(cell);
+                Blob* b = FX::getBlob(Blob::BlobType::WATER_OF_AWARENESS);
+                if (b) b->clear(cell);
                 return;
             } else {
                 bounceItemFrom(cell);
@@ -403,9 +434,11 @@ void Level::affectWell(int cell, Char* ch) {
                 }
                 Sample::play(Assets::SND_DRINK);
                 GLog::p("The water flashes and changes the item!");
-                FX::burst(cell, 0xff00ffFFu, 10);
+                FX::burst(cell, 0xEEBB22FFu, 12);
                 set(cell, Terrain::EMPTY_WELL);
                 wells.erase(cell);
+                Blob* b = FX::getBlob(Blob::BlobType::WATER_OF_TRANSMUTATION);
+                if (b) b->clear(cell);
                 return;
             } else {
                 bounceItemFrom(cell);
@@ -802,6 +835,7 @@ const char* Level::tileDesc(int tile) {
         case Terrain::STATUE:
         case Terrain::STATUE_SP: return "Someone wanted to adorn this place, but failed, obviously.";
         case Terrain::ALCHEMY: return "Drop some seeds here to cook a potion.";
+        case Terrain::WELL: return "A magic well. Its mystical waters hold great power.";
         case Terrain::EMPTY_WELL: return "The well has run dry.";
         default:
             if (tile >= Terrain::WATER_TILES) return "In case of burning step into the water to extinguish the fire.";

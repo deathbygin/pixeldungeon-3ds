@@ -21,6 +21,9 @@ Blob FX::s_confusionGas(Blob::BlobType::CONFUSION_GAS);
 Blob FX::s_corrosiveGas(Blob::BlobType::CORROSIVE_GAS);
 Blob FX::s_regrowth(Blob::BlobType::REGROWTH);
 Blob FX::s_foliage(Blob::BlobType::FOLIAGE);
+Blob FX::s_waterOfHealth(Blob::BlobType::WATER_OF_HEALTH);
+Blob FX::s_waterOfAwareness(Blob::BlobType::WATER_OF_AWARENESS);
+Blob FX::s_waterOfTransmutation(Blob::BlobType::WATER_OF_TRANSMUTATION);
 
 float FX::s_blobEmitTimer = 0.0f;
 
@@ -43,6 +46,9 @@ void FX::clear() {
     s_corrosiveGas.clear();
     s_regrowth.clear();
     s_foliage.clear();
+    s_waterOfHealth.clear();
+    s_waterOfAwareness.clear();
+    s_waterOfTransmutation.clear();
     s_blobEmitTimer = 0.0f;
 }
 
@@ -118,10 +124,15 @@ void FX::update(float dt) {
             if (blob.volume <= 0) return;
             for (int i = 0; i < Level::LENGTH; ++i) {
                 if (blob.cur[i] > 0 && Dungeon::visible[i]) {
-                    float prob = (blob.cur[i] >= 100) ? 0.35f : std::clamp(static_cast<float>(blob.cur[i]) / 100.0f, 0.08f, 0.35f);
+                    bool isWellWater = (blob.type == Blob::BlobType::WATER_OF_HEALTH ||
+                                        blob.type == Blob::BlobType::WATER_OF_AWARENESS ||
+                                        blob.type == Blob::BlobType::WATER_OF_TRANSMUTATION);
+                    float prob = isWellWater ? 0.16f : ((blob.cur[i] >= 100) ? 0.35f : std::clamp(static_cast<float>(blob.cur[i]) / 100.0f, 0.08f, 0.35f));
                     if (Random::Float() < prob) {
-                        float wx = (i % Level::WIDTH) * 16.0f + Random::Float(1.0f, 15.0f);
-                        float wy = (i / Level::WIDTH) * 16.0f + Random::Float(1.0f, 15.0f);
+                        float wx = isWellWater ? ((i % Level::WIDTH) * 16.0f + Random::Float(4.0f, 12.0f))
+                                               : ((i % Level::WIDTH) * 16.0f + Random::Float(1.0f, 15.0f));
+                        float wy = isWellWater ? ((i / Level::WIDTH) * 16.0f + Random::Float(7.0f, 11.0f))
+                                               : ((i / Level::WIDTH) * 16.0f + Random::Float(1.0f, 15.0f));
 
                         uint32_t col = 0xFFFFFFFF;
                         float sz = 4.0f;
@@ -181,6 +192,42 @@ void FX::update(float dt) {
                             shrink = true;
                             break;
                         }
+                        case Blob::BlobType::WATER_OF_HEALTH: {
+                            // Sparkles matching Speck.HEALING (emerald / spring green rising bubbles)
+                            static const uint32_t healthCols[] = { 0x20CC66FF, 0x50FF88FF, 0xA0FFD0FF, 0xFFFFFFFF };
+                            col = healthCols[Random::Int(4)];
+                            sz = Random::Float(2.0f, 3.5f);
+                            life = Random::Float(0.6f, 1.0f);
+                            vx = Random::Float(-3.0f, 3.0f);
+                            vy = Random::Float(-16.0f, -8.0f);
+                            ay = -4.0f;
+                            shrink = true;
+                            break;
+                        }
+                        case Blob::BlobType::WATER_OF_AWARENESS: {
+                            // Sparkles matching Speck.QUESTION (celestial indigo / cyan rising light)
+                            static const uint32_t awareCols[] = { 0x3388EEFF, 0x66AAFFFF, 0xAA66FFFF, 0xDDBBFFFF };
+                            col = awareCols[Random::Int(4)];
+                            sz = Random::Float(2.0f, 3.5f);
+                            life = Random::Float(0.7f, 1.1f);
+                            vx = Random::Float(-4.0f, 4.0f);
+                            vy = Random::Float(-14.0f, -6.0f);
+                            ay = -2.0f;
+                            shrink = true;
+                            break;
+                        }
+                        case Blob::BlobType::WATER_OF_TRANSMUTATION: {
+                            // Sparkles matching Speck.CHANGE (iridescent golden / purple spiral motes)
+                            static const uint32_t transCols[] = { 0xEEBB22FF, 0xFFDD44FF, 0xAA33FFFF, 0xFF66CCFF };
+                            col = transCols[Random::Int(4)];
+                            sz = Random::Float(2.0f, 3.5f);
+                            life = Random::Float(0.8f, 1.2f);
+                            vx = Random::Float(-5.0f, 5.0f);
+                            vy = Random::Float(-12.0f, -5.0f);
+                            ay = -2.0f;
+                            shrink = true;
+                            break;
+                        }
                         default:
                             break;
                         }
@@ -196,6 +243,9 @@ void FX::update(float dt) {
         emitGasBlob(s_confusionGas);
         emitGasBlob(s_corrosiveGas);
         emitGasBlob(s_regrowth);
+        emitGasBlob(s_waterOfHealth);
+        emitGasBlob(s_waterOfAwareness);
+        emitGasBlob(s_waterOfTransmutation);
 
         // 3. Status Effect Particles on Characters (Burning flame particles & Frost snow motes)
         auto emitCharBuffFX = [&](Char* ch) {
@@ -362,18 +412,24 @@ void FX::evolveBlobs(const Level* level) {
     s_corrosiveGas.evolve(level);
     s_regrowth.evolve(level);
     s_foliage.evolve(level);
+    s_waterOfHealth.evolve(level);
+    s_waterOfAwareness.evolve(level);
+    s_waterOfTransmutation.evolve(level);
 }
 
 Blob* FX::getBlob(Blob::BlobType type) {
     switch (type) {
-    case Blob::BlobType::TOXIC_GAS:     return &s_toxicGas;
-    case Blob::BlobType::PARALYTIC_GAS: return &s_paralyticGas;
-    case Blob::BlobType::FIRE:          return &s_fire;
-    case Blob::BlobType::CONFUSION_GAS: return &s_confusionGas;
-    case Blob::BlobType::CORROSIVE_GAS: return &s_corrosiveGas;
-    case Blob::BlobType::REGROWTH:      return &s_regrowth;
-    case Blob::BlobType::FOLIAGE:       return &s_foliage;
-    default:                            return nullptr;
+    case Blob::BlobType::TOXIC_GAS:              return &s_toxicGas;
+    case Blob::BlobType::PARALYTIC_GAS:          return &s_paralyticGas;
+    case Blob::BlobType::FIRE:                   return &s_fire;
+    case Blob::BlobType::CONFUSION_GAS:          return &s_confusionGas;
+    case Blob::BlobType::CORROSIVE_GAS:          return &s_corrosiveGas;
+    case Blob::BlobType::REGROWTH:               return &s_regrowth;
+    case Blob::BlobType::FOLIAGE:                return &s_foliage;
+    case Blob::BlobType::WATER_OF_HEALTH:        return &s_waterOfHealth;
+    case Blob::BlobType::WATER_OF_AWARENESS:     return &s_waterOfAwareness;
+    case Blob::BlobType::WATER_OF_TRANSMUTATION: return &s_waterOfTransmutation;
+    default:                                     return nullptr;
     }
 }
 

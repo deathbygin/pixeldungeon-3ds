@@ -234,6 +234,19 @@ void Dungeon::switchLevel(int newDepth) {
     }
 
     fog = std::make_unique<FogOfWar>(Level::WIDTH, Level::HEIGHT);
+
+    FX::clear();
+    for (const auto& pair : level->wells) {
+        int cell = pair.first;
+        Level::WellType wt = pair.second;
+        if (level->map[cell] == Terrain::WELL) {
+            Blob::BlobType bt = (wt == Level::WellType::Health) ? Blob::BlobType::WATER_OF_HEALTH :
+                                ((wt == Level::WellType::Awareness) ? Blob::BlobType::WATER_OF_AWARENESS :
+                                                                      Blob::BlobType::WATER_OF_TRANSMUTATION);
+            FX::seedBlob(cell, bt, 1);
+        }
+    }
+
     Actor::add(FX::getBlob(Blob::BlobType::FIRE), Actor::TICK);
     Actor::add(FX::getBlob(Blob::BlobType::TOXIC_GAS), Actor::TICK);
     Actor::add(FX::getBlob(Blob::BlobType::PARALYTIC_GAS), Actor::TICK);
@@ -241,6 +254,9 @@ void Dungeon::switchLevel(int newDepth) {
     Actor::add(FX::getBlob(Blob::BlobType::CORROSIVE_GAS), Actor::TICK);
     Actor::add(FX::getBlob(Blob::BlobType::REGROWTH), Actor::TICK);
     Actor::add(FX::getBlob(Blob::BlobType::FOLIAGE), Actor::TICK);
+    Actor::add(FX::getBlob(Blob::BlobType::WATER_OF_HEALTH), Actor::TICK);
+    Actor::add(FX::getBlob(Blob::BlobType::WATER_OF_AWARENESS), Actor::TICK);
+    Actor::add(FX::getBlob(Blob::BlobType::WATER_OF_TRANSMUTATION), Actor::TICK);
     placeChasmItems();
     observe();
     announceLevelEntrance();

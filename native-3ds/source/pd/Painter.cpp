@@ -7,6 +7,8 @@
 #include "pd/Mob.h"
 #include "pd/Heap.h"
 #include "pd/Actor.h"
+#include "pd/FX.h"
+#include "pd/Blob.h"
 #include <algorithm>
 #include <cstdlib>
 
@@ -795,6 +797,11 @@ void Painter::paintMagicWell(Level* level, Room* room) {
     int roll = Random::Int(3);
     Level::WellType type = (roll == 0) ? Level::WellType::Awareness : ((roll == 1) ? Level::WellType::Health : Level::WellType::Transmutation);
     level->wells[cell] = type;
+
+    Blob::BlobType btype = (type == Level::WellType::Health) ? Blob::BlobType::WATER_OF_HEALTH :
+                           ((type == Level::WellType::Awareness) ? Blob::BlobType::WATER_OF_AWARENESS :
+                                                                  Blob::BlobType::WATER_OF_TRANSMUTATION);
+    FX::seedBlob(cell, btype, 1);
 
     auto entrance = room->entrance();
     if (entrance) {

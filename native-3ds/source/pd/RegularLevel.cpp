@@ -42,6 +42,7 @@ bool RegularLevel::build() {
     std::fill_n(fieldOfView, LENGTH, false);
     heaps.clear();
     plants.clear();
+    wells.clear();
     secretDoors = 0;
 
     if (!initRooms()) {

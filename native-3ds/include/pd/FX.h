@@ -71,6 +71,9 @@ private:
     static Blob s_corrosiveGas;
     static Blob s_regrowth;
     static Blob s_foliage;
+    static Blob s_waterOfHealth;
+    static Blob s_waterOfAwareness;
+    static Blob s_waterOfTransmutation;
 
     static float s_blobEmitTimer;
 };
