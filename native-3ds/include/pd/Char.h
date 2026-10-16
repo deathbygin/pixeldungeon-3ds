@@ -87,6 +87,18 @@ public:
         addBuff(b);
         return b;
     }
+
+    template<typename T, typename... Args>
+    T* prolong(float duration, Args&&... args) {
+        T* existing = getBuff<T>();
+        if (existing) {
+            existing->postpone(duration);
+            return existing;
+        }
+        T* b = new T(std::forward<Args>(args)...);
+        addBuff(b);
+        return b;
+    }
 };
 
 } // namespace pd

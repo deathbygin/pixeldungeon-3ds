@@ -11,6 +11,7 @@
 #include "pd/Buff.h"
 #include "pd/GLog.h"
 #include "pd/Assets.h"
+#include "pd/Badges.h"
 #include "pd/Ballistica.h"
 #include "pd/Plant.h"
 #include "pd/Sample.h"
@@ -1936,25 +1937,40 @@ static const std::string s_potionTrueNames[Potion::POTION_COUNT] = {
     "Potion of Paralytic Gas",
     "Potion of Levitation",
     "Potion of Mind Vision",
-    "Potion of Purity",
+    "Potion of Purification",
     "Potion of Invisibility",
     "Potion of Might",
     "Potion of Frost"
 };
 
 static const std::string s_potionTrueDescs[Potion::POTION_COUNT] = {
-    "An elixir that will instantly return you to full health and cure harmful ailments.",
-    "A glowing draught that permanently increases your experience level.",
-    "Uncorking or shattering this pressurized glass causes a deadly cloud of toxic green gas to explode outward.",
-    "A volatile liquid that bursts into roaring flames upon contact with air.",
-    "A potent draught that permanently increases your strength by 1 point.",
-    "A dense vapor that instantly paralyzes anyone caught within its reach.",
-    "A buoyant elixir that allows you to float harmlessly above traps and chasms.",
-    "A mystical brew that allows your mind to pierce darkness and sense all creatures on this depth.",
-    "A clarifying liquid that purges gases, poisons, and debuffs from the body and immediate area.",
-    "A shimmering potion that renders you completely invisible to all enemies for a duration.",
-    "An extraordinary brew that grants +1 strength and permanently raises maximum health by 5 points.",
-    "A freezing draught that releases a blast of subzero frost, freezing enemies and liquids solid."
+    "An elixir that will instantly return you to full health and cure poison.",
+    "The storied experiences of multitudes of battles reduced to liquid form, this draught will instantly raise your experience level.",
+    "Uncorking or shattering this pressurized glass will cause its contents to explode into a deadly cloud of toxic green gas. You might choose to fling this potion at distant enemies instead of uncorking it by hand.",
+    "This flask contains an unstable compound which will burst violently into flame upon exposure to open air.",
+    "This powerful liquid will course through your muscles, permanently increasing your strength by one point.",
+    "Upon exposure to open air, the liquid in this flask will vaporize into a numbing yellow haze. Anyone who inhales the cloud will be paralyzed instantly, unable to move for some time after the cloud dissipates. This item can be thrown at distant enemies to catch them within the effect of the gas.",
+    "Drinking this curious liquid will cause you to hover in the air, able to drift effortlessly over traps. Flames and gases fill the air, however, and cannot be bypassed while airborne.",
+    "After drinking this, your mind will become attuned to the psychic signature of distant creatures, enabling you to sense biological presences through walls. Also this potion will permit you to see through nearby walls and doors.",
+    "This reagent will quickly neutralize all harmful gases in the area of effect. Drinking it will give you a temporary immunity to such gases.",
+    "Drinking this potion will render you temporarily invisible. While invisible, enemies will be unable to see you. Attacking an enemy, as well as using a wand or a scroll before enemy's eyes, will dispel the effect.",
+    "This powerful liquid will course through your muscles, permanently increasing your strength by one point and health by five points.",
+    "Upon exposure to open air, this chemical will evaporate into a freezing cloud, causing any creature that contacts it to be frozen in place, unable to act and move."
+};
+
+static const uint32_t s_potionSplashColors[Potion::POTION_COUNT] = {
+    0x30e7d7FF, // turquoise
+    0xdc143cFF, // crimson
+    0x007fffFF, // azure
+    0x00a86bFF, // jade
+    0xffd700FF, // golden
+    0xff00ffFF, // magenta
+    0x404040FF, // charcoal
+    0xfffff0FF, // ivory
+    0xffbf00FF, // amber
+    0x856d4dFF, // bistre
+    0x4b0082FF, // indigo
+    0xc0c0c0FF  // silver
 };
 
 static std::vector<int> s_potionColorMap = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 };
@@ -1972,6 +1988,13 @@ void Potion::initColors() {
 bool Potion::isKnown(PotionType tp) {
     size_t idx = static_cast<size_t>(tp);
     return idx < POTION_COUNT ? s_potionKnown[idx] : false;
+}
+
+bool Potion::allKnown() {
+    for (size_t i = 0; i < POTION_COUNT; ++i) {
+        if (!s_potionKnown[i]) return false;
+    }
+    return true;
 }
 
 void Potion::setKnown(PotionType tp) {
@@ -2071,6 +2094,27 @@ Item* Potion::identify() {
     return this;
 }
 
+int Potion::price() const {
+    if (!isKnown(type)) {
+        return 20 * quantity;
+    }
+    switch (type) {
+        case PotionType::HEALING:       return 30 * quantity;
+        case PotionType::EXPERIENCE:    return 80 * quantity;
+        case PotionType::TOXIC_GAS:     return 40 * quantity;
+        case PotionType::LIQUID_FLAME:  return 40 * quantity;
+        case PotionType::STRENGTH:      return 100 * quantity;
+        case PotionType::PARALYTIC_GAS: return 40 * quantity;
+        case PotionType::LEVITATION:    return 35 * quantity;
+        case PotionType::MIND_VISION:   return 35 * quantity;
+        case PotionType::PURITY:        return 50 * quantity;
+        case PotionType::INVISIBILITY:  return 40 * quantity;
+        case PotionType::MIGHT:         return 200 * quantity;
+        case PotionType::FROST:         return 50 * quantity;
+        default:                        return 20 * quantity;
+    }
+}
+
 std::string Potion::displayName() const {
     std::string s = isKnown(type) ? trueName(type) : (colorName(type) + " potion");
     if (quantity > 1) s += " x" + std::to_string(quantity);
@@ -2099,6 +2143,96 @@ void Potion::heal(Hero* hero) {
     FX::burst(hero->pos, 0x38b764FF, 12);
 }
 
+void Potion::apply(Hero* hero) {
+    if (!hero) return;
+
+    switch (type) {
+        case PotionType::HEALING: {
+            setKnown(type);
+            updatePerception();
+            heal(hero);
+            GLog::p("Your wounds heal completely.");
+            break;
+        }
+        case PotionType::EXPERIENCE: {
+            setKnown(type);
+            updatePerception();
+            hero->earnExp(hero->maxExp - hero->exp);
+            FX::burst(hero->pos, 0xffd700FF, 10);
+            GLog::p("You feel more experienced!");
+            break;
+        }
+        case PotionType::STRENGTH: {
+            setKnown(type);
+            updatePerception();
+            hero->STR += 1;
+            FX::floatingText(hero->pos, "+1 STR", 0xe4a672FF);
+            FX::burst(hero->pos, 0xe4a672FF, 8);
+            GLog::p("Newfound strength surges through your body.");
+            Badges::validateStrengthAttained();
+            break;
+        }
+        case PotionType::MIGHT: {
+            setKnown(type);
+            updatePerception();
+            hero->STR += 1;
+            hero->HT += 5;
+            hero->HP = std::min(hero->HT, hero->HP + 5);
+            FX::floatingText(hero->pos, "+1 str, +5 ht", 0xffd700FF);
+            FX::burst(hero->pos, 0xffd700FF, 12);
+            GLog::p("Newfound strength surges through your body.");
+            Badges::validateStrengthAttained();
+            break;
+        }
+        case PotionType::INVISIBILITY: {
+            setKnown(type);
+            updatePerception();
+            hero->affect<Invisibility>();
+            FX::floatingText(hero->pos, "INVISIBLE", 0xa5cde4FF);
+            FX::burst(hero->pos, 0xa5cde4FF, 10);
+            GLog::i("You see your hands turn invisible!");
+            Sample::play(Assets::SND_MELD);
+            break;
+        }
+        case PotionType::LEVITATION: {
+            setKnown(type);
+            updatePerception();
+            hero->affect<Levitation>();
+            FX::burst(hero->pos, 0xdda0ddFF, 8);
+            GLog::i("You float into the air!");
+            break;
+        }
+        case PotionType::MIND_VISION: {
+            setKnown(type);
+            updatePerception();
+            hero->affect<MindVision>();
+            Dungeon::observe();
+            FX::burst(hero->pos, 0x9955ffFF, 12);
+            if (!Dungeon::mobs.empty()) {
+                GLog::i("You can somehow feel the presence of other creatures' minds!");
+            } else {
+                GLog::i("You can somehow tell that you are alone on this level at the moment.");
+            }
+            break;
+        }
+        case PotionType::PURITY: {
+            setKnown(type);
+            updatePerception();
+            GLog::w("You've stopped sensing any smells!");
+            hero->prolong<GasesImmunity>(GasesImmunity::DURATION);
+            FX::burst(hero->pos, 0xffffffFF, 12);
+            break;
+        }
+        case PotionType::LIQUID_FLAME:
+        case PotionType::TOXIC_GAS:
+        case PotionType::PARALYTIC_GAS:
+        case PotionType::FROST: {
+            shatter(hero->pos);
+            break;
+        }
+    }
+}
+
 bool Potion::execute(Hero* hero, const std::string& action) {
     if (!hero) return false;
 
@@ -2106,75 +2240,8 @@ bool Potion::execute(Hero* hero, const std::string& action) {
         HeroSprite* hspr = hero->getSprite() ? hero->getSprite()->asHeroSprite() : nullptr;
         if (hspr) hspr->operate(hero->pos);
 
-        setKnown(type);
-        updatePerception();
-
-        if (type == PotionType::INVISIBILITY) {
-            Sample::play(Assets::SND_MELD);
-        } else if (type != PotionType::TOXIC_GAS && type != PotionType::LIQUID_FLAME &&
-                   type != PotionType::PARALYTIC_GAS && type != PotionType::FROST) {
-            Sample::play(Assets::SND_DRINK);
-        }
-
-        switch (type) {
-            case PotionType::HEALING: {
-                heal(hero);
-                GLog::p("Your wounds heal completely.");
-                break;
-            }
-            case PotionType::STRENGTH:
-                hero->STR += 1;
-                FX::floatingText(hero->pos, "+1 STR", 0xe4a672FF);
-                FX::burst(hero->pos, 0xe4a672FF, 8);
-                GLog::p("Newfound strength surges through your body.");
-                break;
-            case PotionType::INVISIBILITY:
-                hero->affect<Invisibility>();
-                FX::floatingText(hero->pos, "INVISIBLE", 0xa5cde4FF);
-                FX::burst(hero->pos, 0xa5cde4FF, 10);
-                GLog::i("You see your hands turn invisible!");
-                break;
-            case PotionType::EXPERIENCE:
-                hero->earnExp(hero->maxExp - hero->exp);
-                FX::burst(hero->pos, 0xffd700FF, 10);
-                GLog::p("You feel more experienced!");
-                break;
-            case PotionType::TOXIC_GAS:
-                shatter(hero->pos);
-                break;
-            case PotionType::LIQUID_FLAME:
-                shatter(hero->pos);
-                break;
-            case PotionType::PARALYTIC_GAS:
-                shatter(hero->pos);
-                break;
-            case PotionType::FROST:
-                shatter(hero->pos);
-                break;
-            case PotionType::LEVITATION:
-                hero->affect<Levitation>();
-                FX::burst(hero->pos, 0xdda0ddFF, 8);
-                GLog::p("You float into the air!");
-                break;
-            case PotionType::MIND_VISION:
-                hero->affect<MindVision>();
-                Dungeon::observe();
-                FX::burst(hero->pos, 0x9955ffFF, 12);
-                GLog::p("You can sense the minds of creatures on this floor!");
-                break;
-            case PotionType::PURITY:
-                hero->affect<GasesImmunity>();
-                FX::burst(hero->pos, 0xffffffFF, 12);
-                GLog::w("You've stopped sensing any smells!");
-                break;
-            case PotionType::MIGHT:
-                hero->STR += 1;
-                hero->HT += 5;
-                hero->HP = std::min(hero->HT, hero->HP + 5);
-                FX::burst(hero->pos, 0xffd700FF, 12);
-                GLog::p("Newfound strength surges through your body.");
-                break;
-        }
+        Sample::play(Assets::SND_DRINK);
+        apply(hero);
 
         quantity--;
         hero->spendAndNext(Actor::TICK);
@@ -2197,6 +2264,11 @@ std::string Potion::info() const {
 }
 
 void Potion::onThrow(int cell) {
+    if (Dungeon::hero && Dungeon::hero->pos == cell) {
+        apply(Dungeon::hero.get());
+        delete this;
+        return;
+    }
     if (Dungeon::level && (Dungeon::level->map[cell] == Terrain::WELL || Dungeon::level->pit[cell])) {
         Item::onThrow(cell);
         return;
@@ -2208,133 +2280,190 @@ void Potion::onThrow(int cell) {
 void Potion::shatter(int cell) {
     if (cell < 0 || cell >= Level::LENGTH) return;
 
-    Sample::playAt(Assets::SND_SHATTER, cell);
-    if (Dungeon::visible[cell]) {
-        FX::splash(cell, 0x88ccffFF, 8);
-    }
-
-    Char* targetChar = Actor::findChar(cell);
+    bool isObserved = Dungeon::visible[cell];
+    uint32_t flaskColor = s_potionSplashColors[s_potionColorMap[static_cast<size_t>(type)]];
 
     switch (type) {
         case PotionType::TOXIC_GAS: {
-            if (Dungeon::visible[cell]) setKnown(type);
-            FX::burst(cell, 0x00ff00FF, 16);
-            FX::seedBlob(cell, Blob::BlobType::TOXIC_GAS, 1000);
-            if (Dungeon::visible[cell]) {
+            if (isObserved) {
+                setKnown(type);
+                FX::splash(cell, flaskColor, 5);
+                FX::burst(cell, 0x00ff00FF, 16);
+                Sample::playAt(Assets::SND_SHATTER, cell);
                 GLog::i("The flask shatters and a cloud of toxic gas billows out!");
             }
+            FX::seedBlob(cell, Blob::BlobType::TOXIC_GAS, 1000);
             break;
         }
         case PotionType::LIQUID_FLAME: {
-            if (Dungeon::visible[cell]) setKnown(type);
-            FX::burst(cell, 0xff4500FF, 16);
-            FX::seedBlob(cell, Blob::BlobType::FIRE, 4);
+            if (isObserved) {
+                setKnown(type);
+                FX::splash(cell, flaskColor, 5);
+                FX::burst(cell, 0xff4500FF, 16);
+                Sample::playAt(Assets::SND_SHATTER, cell);
+                GLog::i("The flask shatters and liquid flame bursts into a roaring inferno!");
+            }
+            FX::seedBlob(cell, Blob::BlobType::FIRE, 2);
+            Char* targetChar = Actor::findChar(cell);
             if (targetChar) {
                 targetChar->affect<Burning>();
-            }
-            if (Dungeon::visible[cell]) {
-                GLog::i("The flask shatters and liquid flame bursts into a roaring inferno!");
             }
             break;
         }
         case PotionType::PARALYTIC_GAS: {
-            if (Dungeon::visible[cell]) setKnown(type);
-            FX::burst(cell, 0xffff00FF, 16);
-            FX::seedBlob(cell, Blob::BlobType::PARALYTIC_GAS, 1000);
-            if (Dungeon::visible[cell]) {
+            if (isObserved) {
+                setKnown(type);
+                FX::splash(cell, flaskColor, 5);
+                FX::burst(cell, 0xffff00FF, 16);
+                Sample::playAt(Assets::SND_SHATTER, cell);
                 GLog::i("The flask shatters into a cloud of paralyzing vapor!");
             }
+            FX::seedBlob(cell, Blob::BlobType::PARALYTIC_GAS, 1000);
             break;
         }
         case PotionType::FROST: {
-            if (Dungeon::visible[cell]) setKnown(type);
+            bool notLosBlocking[Level::LENGTH];
+            for (int i = 0; i < Level::LENGTH; ++i) {
+                notLosBlocking[i] = Dungeon::level ? !Dungeon::level->losBlocking[i] : true;
+            }
+            PathFinder::buildDistanceMap(cell, notLosBlocking, 2);
+
             Blob* fire = FX::getBlob(Blob::BlobType::FIRE);
-            int cx = cell % Level::WIDTH;
-            int cy = cell / Level::WIDTH;
-            for (int dy = -2; dy <= 2; ++dy) {
-                for (int dx = -2; dx <= 2; ++dx) {
-                    if (std::abs(dx) + std::abs(dy) > 3) continue;
-                    int nx = cx + dx;
-                    int ny = cy + dy;
-                    if (nx >= 0 && nx < Level::WIDTH && ny >= 0 && ny < Level::HEIGHT) {
-                        int c = ny * Level::WIDTH + nx;
-                        if (Dungeon::level && !Dungeon::level->isLosBlocking(c)) {
-                            Freezing::affect(c, fire);
-                        }
-                    }
+            bool visibleAny = false;
+            for (int i = 0; i < Level::LENGTH; ++i) {
+                if (PathFinder::distance[i] < INT_MAX) {
+                    visibleAny = Freezing::affect(i, fire) || visibleAny;
                 }
             }
-            if (Dungeon::visible[cell]) {
+
+            if (visibleAny) {
+                FX::splash(cell, flaskColor, 5);
+                Sample::playAt(Assets::SND_SHATTER, cell);
+                setKnown(type);
                 GLog::i("The flask shatters and freezing frost encases the area!");
             }
             break;
         }
         case PotionType::PURITY: {
+            bool notLosBlocking[Level::LENGTH];
+            for (int i = 0; i < Level::LENGTH; ++i) {
+                notLosBlocking[i] = Dungeon::level ? !Dungeon::level->losBlocking[i] : true;
+            }
+            PathFinder::buildDistanceMap(cell, notLosBlocking, 2);
+
+            bool procd = false;
             Blob* toxic = FX::getBlob(Blob::BlobType::TOXIC_GAS);
             Blob* para = FX::getBlob(Blob::BlobType::PARALYTIC_GAS);
-            Blob* conf = FX::getBlob(Blob::BlobType::CONFUSION_GAS);
-            Blob* corr = FX::getBlob(Blob::BlobType::CORROSIVE_GAS);
-            int cx = cell % Level::WIDTH;
-            int cy = cell / Level::WIDTH;
-            bool procd = false;
-            for (int dy = -2; dy <= 2; ++dy) {
-                for (int dx = -2; dx <= 2; ++dx) {
-                    if (std::abs(dx) + std::abs(dy) > 3) continue;
-                    int nx = cx + dx;
-                    int ny = cy + dy;
-                    if (nx >= 0 && nx < Level::WIDTH && ny >= 0 && ny < Level::HEIGHT) {
-                        int c = ny * Level::WIDTH + nx;
-                        if (toxic && toxic->cur[c] > 0) {
-                            toxic->clear(c);
-                            procd = true;
+
+            for (int i = 0; i < Level::LENGTH; ++i) {
+                if (PathFinder::distance[i] < INT_MAX) {
+                    if (toxic && toxic->cur[i] > 0) {
+                        toxic->clear(i);
+                        procd = true;
+                        if (Dungeon::visible[i]) {
+                            FX::burst(i, 0xffffffFF, 2);
                         }
-                        if (para && para->cur[c] > 0) {
-                            para->clear(c);
-                            procd = true;
-                        }
-                        if (conf && conf->cur[c] > 0) {
-                            conf->clear(c);
-                            procd = true;
-                        }
-                        if (corr && corr->cur[c] > 0) {
-                            corr->clear(c);
-                            procd = true;
-                        }
-                        if (Dungeon::visible[c]) {
-                            FX::burst(c, 0xffffffFF, 2);
+                    }
+                    if (para && para->cur[i] > 0) {
+                        para->clear(i);
+                        procd = true;
+                        if (Dungeon::visible[i]) {
+                            FX::burst(i, 0xffffffFF, 2);
                         }
                     }
                 }
             }
-            if (Dungeon::visible[cell] || procd) {
+
+            bool heroAffected = (Dungeon::hero != nullptr) && (PathFinder::distance[Dungeon::hero->pos] < INT_MAX);
+
+            if (procd) {
+                if (isObserved) {
+                    FX::splash(cell, flaskColor, 5);
+                    Sample::playAt(Assets::SND_SHATTER, cell);
+                }
                 setKnown(type);
-            }
-            int hx = Dungeon::hero->pos % Level::WIDTH;
-            int hy = Dungeon::hero->pos / Level::WIDTH;
-            if (std::abs(hx - cx) <= 2 && std::abs(hy - cy) <= 2) {
-                GLog::p("You feel uncommon freshness in the air.");
-                setKnown(type);
+                if (heroAffected) {
+                    GLog::p("You feel uncommon freshness in the air.");
+                }
+            } else {
+                if (isObserved) {
+                    GLog::i("The flask shatters and " + colorName(type) + " liquid splashes harmlessly.");
+                    Sample::playAt(Assets::SND_SHATTER, cell);
+                    FX::splash(cell, flaskColor, 5);
+                }
+                if (heroAffected) {
+                    GLog::i("You feel uncommon freshness in the air.");
+                    setKnown(type);
+                }
             }
             break;
         }
         case PotionType::HEALING: {
-            if (targetChar) {
-                targetChar->HP = targetChar->HT;
-                targetChar->removeBuff(BuffType::Poison);
-                targetChar->removeBuff(BuffType::Cripple);
-                targetChar->removeBuff(BuffType::Weakness);
-                targetChar->removeBuff(BuffType::Bleeding);
-                FX::burst(cell, 0x38b764FF, 12);
-                FX::floatingText(cell, "HEALED", 0x38b764FF);
-                if (Dungeon::visible[cell]) setKnown(type);
-            } else if (Dungeon::visible[cell]) {
+            if (isObserved) {
+                setKnown(type);
                 GLog::i("The flask shatters and " + colorName(type) + " liquid splashes harmlessly.");
+                Sample::playAt(Assets::SND_SHATTER, cell);
+                FX::splash(cell, 0x38b764FF, 8);
+            }
+            break;
+        }
+        case PotionType::EXPERIENCE: {
+            if (isObserved) {
+                GLog::i("The flask shatters and " + colorName(type) + " liquid splashes harmlessly.");
+                Sample::playAt(Assets::SND_SHATTER, cell);
+                FX::splash(cell, 0xbf55ecFF, 8);
+                FX::burst(cell, 0xffd700FF, 6);
+            }
+            break;
+        }
+        case PotionType::STRENGTH: {
+            if (isObserved) {
+                GLog::i("The flask shatters and " + colorName(type) + " liquid splashes harmlessly.");
+                Sample::playAt(Assets::SND_SHATTER, cell);
+                FX::splash(cell, 0xcc2222FF, 8);
+            }
+            break;
+        }
+        case PotionType::MIGHT: {
+            if (isObserved) {
+                GLog::i("The flask shatters and " + colorName(type) + " liquid splashes harmlessly.");
+                Sample::playAt(Assets::SND_SHATTER, cell);
+                FX::splash(cell, 0xffd700FF, 8);
+            }
+            break;
+        }
+        case PotionType::INVISIBILITY: {
+            if (isObserved) {
+                GLog::i("The flask shatters and " + colorName(type) + " liquid splashes harmlessly.");
+                Sample::playAt(Assets::SND_SHATTER, cell);
+                FX::splash(cell, 0xa5cde4FF, 8);
+                FX::burst(cell, 0xffffff88, 6);
+            }
+            break;
+        }
+        case PotionType::LEVITATION: {
+            if (isObserved) {
+                GLog::i("The flask shatters and " + colorName(type) + " liquid splashes harmlessly.");
+                Sample::playAt(Assets::SND_SHATTER, cell);
+                FX::splash(cell, 0xdda0ddFF, 8);
+                FX::burst(cell, 0xdda0dd88, 10);
+            }
+            break;
+        }
+        case PotionType::MIND_VISION: {
+            if (isObserved) {
+                GLog::i("The flask shatters and " + colorName(type) + " liquid splashes harmlessly.");
+                Sample::playAt(Assets::SND_SHATTER, cell);
+                FX::splash(cell, 0x9955ffFF, 8);
+                FX::burst(cell, 0x9955ffFF, 6);
             }
             break;
         }
         default: {
-            if (Dungeon::visible[cell]) {
+            if (isObserved) {
                 GLog::i("The flask shatters and " + colorName(type) + " liquid splashes harmlessly.");
+                Sample::playAt(Assets::SND_SHATTER, cell);
+                FX::splash(cell, flaskColor, 5);
             }
             break;
         }

@@ -399,7 +399,7 @@ void OnSeedImpact(PlantSeed::PlantType type, int cell) {
 
                 Potion::PotionType brewedType;
                 if (Random::Int(seedCount) == 0) {
-                    brewedType = static_cast<Potion::PotionType>(Random::Int(11));
+                    brewedType = static_cast<Potion::PotionType>(Random::Int(static_cast<int>(Potion::POTION_COUNT)));
                 } else {
                     PlantSeed::PlantType chosenSeed = seedTypes[Random::Int(static_cast<int>(seedTypes.size()))];
                     switch (chosenSeed) {

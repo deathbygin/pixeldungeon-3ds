@@ -461,7 +461,7 @@ public:
 class GasesImmunity : public FlavourBuff {
 public:
     static constexpr BuffType STATIC_TYPE = BuffType::GasesImmunity;
-    static constexpr float DURATION = 20.0f;
+    static constexpr float DURATION = 5.0f;
 
     BuffType type() const override { return STATIC_TYPE; }
     std::string name() const override { return "Gas Immunity"; }

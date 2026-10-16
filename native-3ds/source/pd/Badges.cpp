@@ -137,5 +137,11 @@ void Badges::validateDeathFromHunger() {
     unlock(Badge::DEATH_FROM_HUNGER, "Death from hunger");
 }
 
+void Badges::validateStrengthAttained() {
+}
+
+void Badges::validateAllPotionsIdentified() {
+}
+
 } // namespace pd
 

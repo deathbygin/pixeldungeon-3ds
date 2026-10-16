@@ -46,6 +46,8 @@ public:
     static void validateGoldCollected(int totalGold);
     static void validateLevelReached(int heroLevel);
     static void validateBossSlain(int bossIndex);
+    static void validateStrengthAttained();
+    static void validateAllPotionsIdentified();
     static void validateDeathFromFalling();
     static void validateDeathFromFire();
     static void validateDeathFromPoison();

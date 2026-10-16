@@ -77,6 +77,7 @@ public:
 
     virtual std::string info() const;
     virtual std::string displayName() const;
+    virtual int price() const { return 0; }
 
     virtual Weapon* asWeapon() { return nullptr; }
     virtual Armor* asArmor() { return nullptr; }
@@ -423,6 +424,8 @@ public:
 
     void onThrow(int cell) override;
     virtual void shatter(int cell);
+    virtual void apply(Hero* hero);
+    int price() const override;
     int maxDistance(const Hero* hero = nullptr) const override { (void)hero; return 6; }
 
     void updatePerception();
@@ -432,6 +435,7 @@ public:
     static void initColors();
     static bool isKnown(PotionType tp);
     static void setKnown(PotionType tp);
+    static bool allKnown();
     static const std::string& colorName(PotionType tp);
     static int imageForType(PotionType tp);
     static const std::string& trueName(PotionType tp);
