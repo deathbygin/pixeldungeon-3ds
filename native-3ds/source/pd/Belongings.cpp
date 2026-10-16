@@ -5,7 +5,32 @@
 
 namespace pd {
 
-bool Belongings::collect(std::unique_ptr<Item> item) {
+bool Belongings::canCollect(const Item* item) const {
+    if (!item) return false;
+
+    // Check stackable items
+    if (item->isStackable()) {
+        for (const auto& slot : backpack) {
+            if (slot && slot->category() == item->category()) {
+                if (item->category() == ItemCategory::Potion) {
+                    if (static_cast<const Potion*>(slot.get())->type == static_cast<const Potion*>(item)->type) {
+                        return true;
+                    }
+                } else if (item->category() == ItemCategory::Scroll) {
+                    if (static_cast<const Scroll*>(slot.get())->type == static_cast<const Scroll*>(item)->type) {
+                        return true;
+                    }
+                } else if (slot->name == item->name) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    return !isFull();
+}
+
+bool Belongings::collect(std::unique_ptr<Item>& item) {
     if (!item) return false;
 
     Hero* hero = Dungeon::hero ? Dungeon::hero.get() : nullptr;
@@ -18,17 +43,20 @@ bool Belongings::collect(std::unique_ptr<Item> item) {
                     if (static_cast<Potion*>(slot.get())->type == static_cast<Potion*>(item.get())->type) {
                         slot->quantity += item->quantity;
                         item->onCollect(hero);
+                        item.reset();
                         return true;
                     }
                 } else if (item->category() == ItemCategory::Scroll) {
                     if (static_cast<Scroll*>(slot.get())->type == static_cast<Scroll*>(item.get())->type) {
                         slot->quantity += item->quantity;
                         item->onCollect(hero);
+                        item.reset();
                         return true;
                     }
                 } else if (slot->name == item->name) {
                     slot->quantity += item->quantity;
                     item->onCollect(hero);
+                    item.reset();
                     return true;
                 }
             }

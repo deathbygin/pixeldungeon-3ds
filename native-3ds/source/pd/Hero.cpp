@@ -388,15 +388,8 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
         Heap* heap = currentLevel->getHeap(nextCell);
         if (heap && !heap->isEmpty() && heap->type == Heap::Type::HEAP) {
             Item* item = heap->peek();
-            bool canAutoPick = true;
-            if (item && item->name == "Dewdrop" && HP >= HT) {
-                canAutoPick = false; // Don't waste dew if already at full health
-            }
-
-            if (canAutoPick) {
-                if (pickUp(currentLevel, false)) {
-                    m_lastStepPickedUp = true;
-                }
+            if (pickUp(currentLevel, false)) {
+                m_lastStepPickedUp = true;
             } else if (item) {
                 GLog::i("You see " + item->displayName() + " lying here.");
             }
@@ -445,6 +438,17 @@ bool Hero::pickUp(Level* currentLevel, bool spendTurn) {
         return true;
     }
 
+    Item* peeked = heap->peek();
+    if (!peeked) return false;
+
+    // Check if backpack can accept the item before taking it from the ground!
+    if (peeked->name != "Dewdrop" && peeked->name != "Gold") {
+        if (!belongings.canCollect(peeked)) {
+            GLog::w("Your pack is too full for " + peeked->displayName());
+            return false;
+        }
+    }
+
     std::unique_ptr<Item> item = heap->pickUp();
     if (!item) return false;
 
@@ -460,23 +464,22 @@ bool Hero::pickUp(Level* currentLevel, bool spendTurn) {
         if (vial && !vial->isFull()) {
             vial->collectDew(item->quantity);
             Sample::play(Assets::SND_DEWDROP);
-            return true;
-        }
-
-        int value = 1 + (Dungeon::depth - 1) / 5;
-        if (heroClass == HeroClass::Huntress) {
-            value++;
-        }
-        int effect = std::min(HT - HP, value * item->quantity);
-        if (effect > 0) {
-            HP += effect;
-            FX::floatingText(pos, "+" + std::to_string(effect), 0x38b764FF);
-            FX::burst(pos, 0x38b764FF, 4);
-            GLog::p("You drank a dewdrop (+" + std::to_string(effect) + " HP)");
         } else {
-            GLog::i("You drank a fresh dewdrop.");
+            int value = 1 + (Dungeon::depth - 1) / 5;
+            if (heroClass == HeroClass::Huntress) {
+                value++;
+            }
+            int effect = std::min(HT - HP, value * item->quantity);
+            if (effect > 0) {
+                HP += effect;
+                FX::floatingText(pos, "+" + std::to_string(effect), 0x38b764FF);
+                FX::burst(pos, 0x38b764FF, 4);
+                GLog::p("You drank a dewdrop (+" + std::to_string(effect) + " HP)");
+            } else {
+                GLog::i("You drank a fresh dewdrop.");
+            }
+            Sample::play(Assets::SND_DEWDROP);
         }
-        Sample::play(Assets::SND_DEWDROP);
     } else if (item->name == "Gold") {
         int g = item->quantity;
         gold += g;
@@ -485,12 +488,12 @@ bool Hero::pickUp(Level* currentLevel, bool spendTurn) {
         FX::floatingText(pos, "+" + std::to_string(g), 0xffd700FF);
         GLog::p("You collected " + std::to_string(g) + " gold.");
         Sample::play(Assets::SND_GOLD, 1.0f, 1.0f, Random::Float(0.9f, 1.1f));
-    } else if (belongings.collect(std::move(item))) {
+    } else if (belongings.collect(item)) {
         GLog::p("You picked up " + itemName);
         Sample::play(Assets::SND_ITEM);
     } else {
         GLog::w("Your pack is too full for " + itemName);
-        heap->drop(std::move(item));
+        currentLevel->drop(std::move(item), pos);
         return false;
     }
 

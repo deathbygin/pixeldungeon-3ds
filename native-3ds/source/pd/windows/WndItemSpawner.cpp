@@ -211,21 +211,9 @@ void WndItemSpawner::spawnItem(const SpawnItemEntry& entry) {
     item->identify();
     std::string itemName = item->displayName();
 
-    if (!hero->belongings.isFull()) {
-        hero->belongings.collect(std::move(item));
+    if (hero->belongings.collect(item)) {
         Sample::play(Assets::SND_ITEM);
     } else {
-        if (item->isStackable()) {
-            if (hero->belongings.collect(std::move(item))) {
-                Sample::play(Assets::SND_ITEM);
-                std::string msg = "[DEBUG] Spawned " + itemName;
-                GLog::p(msg);
-                FX::floatingText(hero->pos, "+SPAWN", 0x55ff55FF);
-                return;
-            }
-            item = entry.create();
-            item->identify();
-        }
         if (Dungeon::level) {
             Dungeon::level->drop(std::move(item), hero->pos);
             Sample::play(Assets::SND_STEP);

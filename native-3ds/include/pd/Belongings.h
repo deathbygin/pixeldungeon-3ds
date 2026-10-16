@@ -21,7 +21,9 @@ public:
     Belongings() = default;
     ~Belongings() = default;
 
-    bool collect(std::unique_ptr<Item> item);
+    bool canCollect(const Item* item) const;
+    bool collect(std::unique_ptr<Item>& item);
+    bool collect(std::unique_ptr<Item>&& item) { return collect(item); }
     bool equip(Item* item);
     bool unequip(Item* item);
     std::unique_ptr<Item> drop(Item* item);

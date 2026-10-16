@@ -1654,7 +1654,7 @@ void WandOfReach::onZap(int cell) {
                         FX::floatingText(Dungeon::hero->pos, "+" + std::to_string(g), 0xffd700FF);
                         GLog::p("You have magically transported " + std::to_string(g) + " gold into your backpack");
                         Sample::play(Assets::SND_GOLD);
-                    } else if (Dungeon::hero->belongings.collect(std::move(it))) {
+                    } else if (Dungeon::hero->belongings.collect(it)) {
                         GLog::p("You have magically transported " + itName + " into your backpack");
                         Sample::play(Assets::SND_ITEM);
                     } else {
@@ -3727,9 +3727,10 @@ void Boomerang::circleBack(int fromCell, Hero* owner) {
     // Launch return missile sprite arc backwards to hero
     FX::missile(fromCell, heroCell, image, [this, owner, heroCell]() {
         std::unique_ptr<Item> self(this);
-        if (!owner->belongings.collect(std::move(self))) {
+        if (!owner->belongings.collect(self)) {
+            GLog::w("Your backpack is too full for " + displayName());
             if (Dungeon::level) {
-                Dungeon::level->drop(std::unique_ptr<Item>(this), heroCell);
+                Dungeon::level->drop(std::move(self), heroCell);
             }
         }
     });
