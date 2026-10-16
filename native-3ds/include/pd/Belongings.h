@@ -10,9 +10,14 @@ class Hero;
 
 class Belongings {
 public:
-    static constexpr size_t BACKPACK_SIZE = 19;
+    static constexpr size_t BACKPACK_SIZE = 15;
 
     std::vector<std::unique_ptr<Item>> backpack;
+    std::unique_ptr<Weapon> weaponSlot;
+    std::unique_ptr<Armor> armorSlot;
+    std::unique_ptr<Item> ring1Slot;
+    std::unique_ptr<Item> ring2Slot;
+
     Weapon* equippedWeapon = nullptr;
     Armor* equippedArmor = nullptr;
     Item* equippedRing1 = nullptr;
@@ -25,6 +30,7 @@ public:
     bool collect(std::unique_ptr<Item>& item);
     bool collect(std::unique_ptr<Item>&& item) { return collect(item); }
     bool equip(Item* item);
+    bool equip(std::unique_ptr<Item> item);
     bool unequip(Item* item);
     std::unique_ptr<Item> drop(Item* item);
     Item* getKey(const std::string& keyName, int depth);

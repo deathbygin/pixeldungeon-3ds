@@ -55,6 +55,10 @@ void Hero::initClass(HeroClass cl) {
     heroClass = cl;
     subClass = HeroSubClass::None;
     belongings.backpack.clear();
+    belongings.weaponSlot.reset();
+    belongings.armorSlot.reset();
+    belongings.ring1Slot.reset();
+    belongings.ring2Slot.reset();
     belongings.equippedWeapon = nullptr;
     belongings.equippedArmor = nullptr;
     belongings.equippedRing1 = nullptr;
@@ -63,8 +67,7 @@ void Hero::initClass(HeroClass cl) {
     // Common starter gear
     auto clothArmor = std::make_unique<Armor>("Cloth Armor", 1, 10);
     clothArmor->identify();
-    belongings.equip(clothArmor.get());
-    belongings.collect(std::move(clothArmor));
+    belongings.equip(std::move(clothArmor));
 
     auto ration = std::make_unique<Food>();
     ration->identify();
@@ -78,8 +81,7 @@ void Hero::initClass(HeroClass cl) {
 
             auto sword = std::make_unique<ShortSword>();
             sword->identify();
-            belongings.equip(sword.get());
-            belongings.collect(std::move(sword));
+            belongings.equip(std::move(sword));
 
             auto darts = std::make_unique<Dart>(8);
             darts->identify();
@@ -96,8 +98,7 @@ void Hero::initClass(HeroClass cl) {
 
             auto knuckles = std::make_unique<Weapon>("Knuckles", 1, 6, 10);
             knuckles->identify();
-            belongings.equip(knuckles.get());
-            belongings.collect(std::move(knuckles));
+            belongings.equip(std::move(knuckles));
 
             // Wand of Magic Missile
             auto wand = std::make_unique<WandOfMagicMissile>();
@@ -115,8 +116,7 @@ void Hero::initClass(HeroClass cl) {
 
             auto dagger = std::make_unique<Weapon>("Dagger", 2, 5, 10);
             dagger->identify();
-            belongings.equip(dagger.get());
-            belongings.collect(std::move(dagger));
+            belongings.equip(std::move(dagger));
 
             auto darts = std::make_unique<Dart>(8);
             darts->identify();
@@ -136,8 +136,7 @@ void Hero::initClass(HeroClass cl) {
 
             auto dagger = std::make_unique<Weapon>("Dagger", 2, 5, 10);
             dagger->identify();
-            belongings.equip(dagger.get());
-            belongings.collect(std::move(dagger));
+            belongings.equip(std::move(dagger));
 
             auto boomerang = std::make_unique<Boomerang>();
             boomerang->identify();

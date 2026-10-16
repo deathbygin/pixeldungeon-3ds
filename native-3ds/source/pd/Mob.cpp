@@ -696,13 +696,9 @@ int Monk::attackProc(Char* enemyChar, int damage) {
         if (hero->belongings.equippedWeapon && Dungeon::level) {
             std::string wName = hero->belongings.equippedWeapon->name;
             // Disarm: drop equipped weapon to ground
-            for (auto it = hero->belongings.backpack.begin(); it != hero->belongings.backpack.end(); ++it) {
-                if (it->get() == hero->belongings.equippedWeapon) {
-                    Dungeon::level->drop(std::move(*it), hero->pos);
-                    hero->belongings.backpack.erase(it);
-                    hero->belongings.equippedWeapon = nullptr;
-                    break;
-                }
+            std::unique_ptr<Item> dropped = hero->belongings.drop(hero->belongings.equippedWeapon);
+            if (dropped) {
+                Dungeon::level->drop(std::move(dropped), hero->pos);
             }
             GLog::w("Dwarf Monk has knocked the " + wName + " from your hands!");
         }

@@ -70,32 +70,77 @@ bool Belongings::collect(std::unique_ptr<Item>& item) {
     return true;
 }
 
-bool Belongings::equip(Item* item) {
+bool Belongings::equip(std::unique_ptr<Item> item) {
     if (!item) return false;
 
     if (item->category() == ItemCategory::Weapon) {
-        equippedWeapon = static_cast<Weapon*>(item);
+        std::unique_ptr<Weapon> newWeapon(static_cast<Weapon*>(item.release()));
+        if (weaponSlot) {
+            backpack.push_back(std::move(weaponSlot));
+        }
+        weaponSlot = std::move(newWeapon);
+        equippedWeapon = weaponSlot.get();
         return true;
     } else if (item->category() == ItemCategory::Armor) {
-        equippedArmor = static_cast<Armor*>(item);
+        std::unique_ptr<Armor> newArmor(static_cast<Armor*>(item.release()));
+        if (armorSlot) {
+            backpack.push_back(std::move(armorSlot));
+        }
+        armorSlot = std::move(newArmor);
+        equippedArmor = armorSlot.get();
         return true;
+    } else if (item->category() == ItemCategory::Ring) {
+        if (!ring1Slot) {
+            ring1Slot = std::move(item);
+            equippedRing1 = ring1Slot.get();
+            return true;
+        } else if (!ring2Slot) {
+            ring2Slot = std::move(item);
+            equippedRing2 = ring2Slot.get();
+            return true;
+        } else {
+            backpack.push_back(std::move(ring1Slot));
+            ring1Slot = std::move(item);
+            equippedRing1 = ring1Slot.get();
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Belongings::equip(Item* item) {
+    if (!item) return false;
+    if (item == equippedWeapon || item == equippedArmor || item == equippedRing1 || item == equippedRing2) {
+        return true;
+    }
+
+    auto it = std::find_if(backpack.begin(), backpack.end(), [item](const auto& p) { return p.get() == item; });
+    if (it != backpack.end()) {
+        std::unique_ptr<Item> itemPtr = std::move(*it);
+        backpack.erase(it);
+        return equip(std::move(itemPtr));
     }
     return false;
 }
 
 bool Belongings::unequip(Item* item) {
     if (!item) return false;
+    if (isFull()) return false;
 
-    if (equippedWeapon == item) {
+    if (weaponSlot && weaponSlot.get() == item) {
+        backpack.push_back(std::move(weaponSlot));
         equippedWeapon = nullptr;
         return true;
-    } else if (equippedArmor == item) {
+    } else if (armorSlot && armorSlot.get() == item) {
+        backpack.push_back(std::move(armorSlot));
         equippedArmor = nullptr;
         return true;
-    } else if (equippedRing1 == item) {
+    } else if (ring1Slot && ring1Slot.get() == item) {
+        backpack.push_back(std::move(ring1Slot));
         equippedRing1 = nullptr;
         return true;
-    } else if (equippedRing2 == item) {
+    } else if (ring2Slot && ring2Slot.get() == item) {
+        backpack.push_back(std::move(ring2Slot));
         equippedRing2 = nullptr;
         return true;
     }
@@ -105,7 +150,23 @@ bool Belongings::unequip(Item* item) {
 std::unique_ptr<Item> Belongings::drop(Item* item) {
     if (!item) return nullptr;
 
-    unequip(item);
+    if (weaponSlot && weaponSlot.get() == item) {
+        std::unique_ptr<Item> dropped = std::move(weaponSlot);
+        equippedWeapon = nullptr;
+        return dropped;
+    } else if (armorSlot && armorSlot.get() == item) {
+        std::unique_ptr<Item> dropped = std::move(armorSlot);
+        equippedArmor = nullptr;
+        return dropped;
+    } else if (ring1Slot && ring1Slot.get() == item) {
+        std::unique_ptr<Item> dropped = std::move(ring1Slot);
+        equippedRing1 = nullptr;
+        return dropped;
+    } else if (ring2Slot && ring2Slot.get() == item) {
+        std::unique_ptr<Item> dropped = std::move(ring2Slot);
+        equippedRing2 = nullptr;
+        return dropped;
+    }
 
     for (auto it = backpack.begin(); it != backpack.end(); ++it) {
         if (it->get() == item) {

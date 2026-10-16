@@ -294,10 +294,19 @@ bool SaveManager::saveGame(const std::string& customPath) {
     std::fwrite(&rooted, sizeof(uint8_t), 1, fp);
 
     // 4. Inventory & Belongings
-    uint32_t itemCount = static_cast<uint32_t>(hero->belongings.backpack.size());
+    std::vector<const Item*> allItems;
+    if (hero->belongings.weaponSlot) allItems.push_back(hero->belongings.weaponSlot.get());
+    if (hero->belongings.armorSlot) allItems.push_back(hero->belongings.armorSlot.get());
+    if (hero->belongings.ring1Slot) allItems.push_back(hero->belongings.ring1Slot.get());
+    if (hero->belongings.ring2Slot) allItems.push_back(hero->belongings.ring2Slot.get());
+    for (const auto& it : hero->belongings.backpack) {
+        if (it) allItems.push_back(it.get());
+    }
+
+    uint32_t itemCount = static_cast<uint32_t>(allItems.size());
     std::fwrite(&itemCount, sizeof(uint32_t), 1, fp);
 
-    for (const auto& it : hero->belongings.backpack) {
+    for (const auto* it : allItems) {
         uint32_t category = static_cast<uint32_t>(it->category());
         std::fwrite(&category, sizeof(uint32_t), 1, fp);
 
@@ -311,8 +320,10 @@ bool SaveManager::saveGame(const std::string& customPath) {
         int32_t iQty = it->quantity;
         uint8_t identified = it->identified ? 1 : 0;
         uint8_t cursed = it->cursed ? 1 : 0;
-        uint8_t isEquippedWeapon = (it.get() == hero->belongings.equippedWeapon) ? 1 : 0;
-        uint8_t isEquippedArmor = (it.get() == hero->belongings.equippedArmor) ? 1 : 0;
+        uint8_t isEquippedWeapon = (it == hero->belongings.equippedWeapon) ? 1 :
+                                   (it == hero->belongings.equippedRing1) ? 2 :
+                                   (it == hero->belongings.equippedRing2) ? 3 : 0;
+        uint8_t isEquippedArmor = (it == hero->belongings.equippedArmor) ? 1 : 0;
         uint8_t levelKnown = it->levelKnown ? 1 : 0;
         uint8_t cursedKnown = it->cursedKnown ? 1 : 0;
 
@@ -327,7 +338,7 @@ bool SaveManager::saveGame(const std::string& customPath) {
 
         // Subcategory payloads
         if (it->category() == ItemCategory::Weapon) {
-            Weapon* w = static_cast<Weapon*>(it.get());
+            const Weapon* w = static_cast<const Weapon*>(it);
             int32_t minD = w->minDamage;
             int32_t maxD = w->maxDamage;
             int32_t sReq = w->STR;
@@ -337,7 +348,7 @@ bool SaveManager::saveGame(const std::string& customPath) {
             std::fwrite(&sReq, sizeof(int32_t), 1, fp);
             std::fwrite(&htk, sizeof(int32_t), 1, fp);
         } else if (it->category() == ItemCategory::Armor) {
-            Armor* a = static_cast<Armor*>(it.get());
+            const Armor* a = static_cast<const Armor*>(it);
             int32_t tier = a->tier;
             int32_t sReq = a->STR;
             int32_t htk = a->hitsToKnow;
@@ -345,11 +356,11 @@ bool SaveManager::saveGame(const std::string& customPath) {
             std::fwrite(&sReq, sizeof(int32_t), 1, fp);
             std::fwrite(&htk, sizeof(int32_t), 1, fp);
         } else if (it->category() == ItemCategory::Potion) {
-            Potion* p = static_cast<Potion*>(it.get());
+            const Potion* p = static_cast<const Potion*>(it);
             int32_t pType = static_cast<int32_t>(p->type);
             std::fwrite(&pType, sizeof(int32_t), 1, fp);
         } else if (it->category() == ItemCategory::Scroll) {
-            Scroll* s = static_cast<Scroll*>(it.get());
+            const Scroll* s = static_cast<const Scroll*>(it);
             int32_t sType = static_cast<int32_t>(s->type);
             std::fwrite(&sType, sizeof(int32_t), 1, fp);
         }
@@ -615,8 +626,14 @@ bool SaveManager::loadGame(const std::string& customPath) {
 
     // 4. Inventory & Belongings
     hero->belongings.backpack.clear();
-    Weapon* equippedW = nullptr;
-    Armor* equippedA = nullptr;
+    hero->belongings.weaponSlot.reset();
+    hero->belongings.armorSlot.reset();
+    hero->belongings.ring1Slot.reset();
+    hero->belongings.ring2Slot.reset();
+    hero->belongings.equippedWeapon = nullptr;
+    hero->belongings.equippedArmor = nullptr;
+    hero->belongings.equippedRing1 = nullptr;
+    hero->belongings.equippedRing2 = nullptr;
 
     uint32_t itemCount = 0;
     std::fread(&itemCount, sizeof(uint32_t), 1, fp);
@@ -668,12 +685,10 @@ bool SaveManager::loadGame(const std::string& customPath) {
             auto wand = Wand::createByName(iName);
             if (wand) {
                 wand->hitsToKnow = htk;
-                if (isEquippedWeapon) equippedW = wand.get();
                 item = std::move(wand);
             } else {
                 auto weapon = std::make_unique<Weapon>(iName, minD, maxD, sReq);
                 weapon->hitsToKnow = htk;
-                if (isEquippedWeapon) equippedW = weapon.get();
                 item = std::move(weapon);
             }
         } else if (cat == ItemCategory::Armor) {
@@ -685,7 +700,6 @@ bool SaveManager::loadGame(const std::string& customPath) {
             }
             auto armor = std::make_unique<Armor>(iName, tier, sReq);
             armor->hitsToKnow = htk;
-            if (isEquippedArmor) equippedA = armor.get();
             item = std::move(armor);
         } else if (cat == ItemCategory::Potion) {
             int32_t pType = 0;
@@ -744,12 +758,23 @@ bool SaveManager::loadGame(const std::string& customPath) {
             } else if (item->asWand()) {
                 item->asWand()->updatePerception();
             }
-            hero->belongings.backpack.push_back(std::move(item));
+            if (isEquippedWeapon == 1 && item->category() == ItemCategory::Weapon) {
+                hero->belongings.weaponSlot = std::unique_ptr<Weapon>(static_cast<Weapon*>(item.release()));
+                hero->belongings.equippedWeapon = hero->belongings.weaponSlot.get();
+            } else if (isEquippedArmor == 1 && item->category() == ItemCategory::Armor) {
+                hero->belongings.armorSlot = std::unique_ptr<Armor>(static_cast<Armor*>(item.release()));
+                hero->belongings.equippedArmor = hero->belongings.armorSlot.get();
+            } else if (isEquippedWeapon == 2) {
+                hero->belongings.ring1Slot = std::move(item);
+                hero->belongings.equippedRing1 = hero->belongings.ring1Slot.get();
+            } else if (isEquippedWeapon == 3) {
+                hero->belongings.ring2Slot = std::move(item);
+                hero->belongings.equippedRing2 = hero->belongings.ring2Slot.get();
+            } else {
+                hero->belongings.backpack.push_back(std::move(item));
+            }
         }
     }
-
-    hero->belongings.equippedWeapon = equippedW;
-    hero->belongings.equippedArmor = equippedA;
 
     // 5. Level State
     Dungeon::level = Level::create(Dungeon::depth);

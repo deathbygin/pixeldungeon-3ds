@@ -296,6 +296,10 @@ bool Weapon::execute(Hero* hero, const std::string& action) {
             GLog::w("You can't remove cursed " + displayName() + "!");
             return false;
         }
+        if (hero->belongings.isFull()) {
+            GLog::w("Your backpack is too full to unequip that!");
+            return false;
+        }
         hero->belongings.unequip(this);
         hero->spendAndNext(Actor::TICK);
         return true;
@@ -305,7 +309,6 @@ bool Weapon::execute(Hero* hero, const std::string& action) {
                 GLog::w("You can't remove cursed " + displayName() + "!");
                 return false;
             }
-            hero->belongings.unequip(this);
         }
         return doDropItem(hero, this);
     } else if (action == "THROW") {
@@ -314,7 +317,6 @@ bool Weapon::execute(Hero* hero, const std::string& action) {
                 GLog::w("You can't remove cursed " + displayName() + "!");
                 return false;
             }
-            hero->belongings.unequip(this);
         }
         return doThrowItem(hero, this);
     }
@@ -1916,6 +1918,10 @@ bool Armor::execute(Hero* hero, const std::string& action) {
             GLog::w("You can't remove cursed " + displayName() + "!");
             return false;
         }
+        if (hero->belongings.isFull()) {
+            GLog::w("Your backpack is too full to unequip that!");
+            return false;
+        }
         hero->belongings.unequip(this);
         hero->spendAndNext(Actor::TICK);
         return true;
@@ -1925,7 +1931,6 @@ bool Armor::execute(Hero* hero, const std::string& action) {
                 GLog::w("You can't remove cursed " + displayName() + "!");
                 return false;
             }
-            hero->belongings.unequip(this);
         }
         return doDropItem(hero, this);
     } else if (action == "THROW") {
@@ -1934,7 +1939,6 @@ bool Armor::execute(Hero* hero, const std::string& action) {
                 GLog::w("You can't remove cursed " + displayName() + "!");
                 return false;
             }
-            hero->belongings.unequip(this);
         }
         return doThrowItem(hero, this);
     }
@@ -4062,7 +4066,9 @@ Item* Ring::random() {
 }
 
 std::vector<std::string> Ring::actions(Hero* hero) {
-    (void)hero;
+    if (hero && (hero->belongings.equippedRing1 == this || hero->belongings.equippedRing2 == this)) {
+        return { "UNEQUIP", "DROP", "THROW" };
+    }
     return { "EQUIP", "DROP", "THROW" };
 }
 
@@ -4070,14 +4076,45 @@ bool Ring::execute(Hero* hero, const std::string& action) {
     if (!hero) return false;
     if (action == "EQUIP") {
         if (hero->belongings.equip(this)) {
-            GLog::i("You put on the " + displayName() + ".");
+            cursedKnown = true;
+            if (cursed) {
+                FX::burst(hero->pos, 0x550055FFu, 8);
+                Sample::play(Assets::SND_CURSED);
+                GLog::n("The " + displayName() + " is cursed! You cannot take it off!");
+            } else {
+                GLog::i("You put on the " + displayName() + ".");
+            }
             hero->spendAndNext(Actor::TICK);
             return true;
         }
         return false;
+    } else if (action == "UNEQUIP") {
+        if (cursed && (hero->belongings.equippedRing1 == this || hero->belongings.equippedRing2 == this)) {
+            GLog::w("You can't remove cursed " + displayName() + "!");
+            return false;
+        }
+        if (hero->belongings.isFull()) {
+            GLog::w("Your backpack is too full to unequip that!");
+            return false;
+        }
+        hero->belongings.unequip(this);
+        hero->spendAndNext(Actor::TICK);
+        return true;
     } else if (action == "DROP") {
+        if (hero->belongings.equippedRing1 == this || hero->belongings.equippedRing2 == this) {
+            if (cursed) {
+                GLog::w("You can't remove cursed " + displayName() + "!");
+                return false;
+            }
+        }
         return doDropItem(hero, this);
     } else if (action == "THROW") {
+        if (hero->belongings.equippedRing1 == this || hero->belongings.equippedRing2 == this) {
+            if (cursed) {
+                GLog::w("You can't remove cursed " + displayName() + "!");
+                return false;
+            }
+        }
         return doThrowItem(hero, this);
     }
     return false;
