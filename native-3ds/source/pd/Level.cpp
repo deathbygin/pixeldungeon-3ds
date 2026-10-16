@@ -11,6 +11,7 @@
 #include "pd/Chasm.h"
 #include "pd/Assets.h"
 #include "pd/Patch.h"
+#include "pd/Item.h"
 #include "noosa/Audio.h"
 #include <cmath>
 #include <cstring>
@@ -273,47 +274,89 @@ void Level::removeHeap(Heap* heap) {
 }
 
 std::unique_ptr<Level> Level::create(int depth) {
+    std::unique_ptr<Level> level = nullptr;
     switch (depth) {
     case 1:
     case 2:
     case 3:
     case 4:
-        return std::make_unique<SewerLevel>();
+        level = std::make_unique<SewerLevel>();
+        break;
     case 5:
-        return std::make_unique<SewerBossLevel>();
+        level = std::make_unique<SewerBossLevel>();
+        break;
     case 6:
     case 7:
     case 8:
     case 9:
-        return std::make_unique<PrisonLevel>();
+        level = std::make_unique<PrisonLevel>();
+        break;
     case 10:
-        return std::make_unique<PrisonBossLevel>();
+        level = std::make_unique<PrisonBossLevel>();
+        break;
     case 11:
     case 12:
     case 13:
     case 14:
-        return std::make_unique<CavesLevel>();
+        level = std::make_unique<CavesLevel>();
+        break;
     case 15:
-        return std::make_unique<CavesBossLevel>();
+        level = std::make_unique<CavesBossLevel>();
+        break;
     case 16:
     case 17:
     case 18:
     case 19:
     case 21:
-        return std::make_unique<CityLevel>();
+        level = std::make_unique<CityLevel>();
+        break;
     case 20:
-        return std::make_unique<CityBossLevel>();
+        level = std::make_unique<CityBossLevel>();
+        break;
     case 22:
     case 23:
     case 24:
-        return std::make_unique<HallsLevel>();
+        level = std::make_unique<HallsLevel>();
+        break;
     case 25:
-        return std::make_unique<HallsBossLevel>();
+        level = std::make_unique<HallsBossLevel>();
+        break;
     case 26:
-        return std::make_unique<LastLevel>();
+        level = std::make_unique<LastLevel>();
+        break;
     default:
-        return std::make_unique<RegularLevel>();
+        level = std::make_unique<RegularLevel>();
+        break;
     }
+
+    if (level && !Dungeon::bossLevel(depth) && depth > 1 && depth != 26) {
+        switch (Random::Int(10)) {
+        case 0:
+            if (!Dungeon::bossLevel(depth + 1)) {
+                level->feeling = Level::Feeling::CHASM;
+            }
+            break;
+        case 1:
+            level->feeling = Level::Feeling::WATER;
+            break;
+        case 2:
+            level->feeling = Level::Feeling::GRASS;
+            break;
+        case 3:
+            level->feeling = Level::Feeling::DARK;
+            break;
+        default:
+            level->feeling = Level::Feeling::NONE;
+            break;
+        }
+
+        if (level->feeling == Level::Feeling::DARK) {
+            level->viewDistance = 3;
+            level->addItemToSpawn(std::make_unique<Torch>());
+        }
+    }
+
+    return level;
 }
 
 void Level::cleanWalls() {

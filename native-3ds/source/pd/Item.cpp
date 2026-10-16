@@ -1613,6 +1613,55 @@ std::unique_ptr<Item> Gold::clone(int qty) const {
 }
 
 // -----------------------------------------------------------------------------
+// Torch
+// -----------------------------------------------------------------------------
+Torch::Torch() {
+    name = "Torch";
+    image = ItemSpriteSheet::TORCH;
+    quantity = 1;
+    identified = true;
+    levelKnown = true;
+    cursedKnown = true;
+}
+
+std::vector<std::string> Torch::actions(Hero* hero) {
+    (void)hero;
+    return { "LIGHT", "DROP", "THROW" };
+}
+
+bool Torch::execute(Hero* hero, const std::string& action) {
+    if (!hero) return false;
+    if (action == "LIGHT" || action == "USE") {
+        hero->spendAndNext(Actor::TICK);
+        hero->affect<Light>();
+        GLog::p("You light a torch. The warm glow pushes back the darkness!");
+        quantity--;
+        if (quantity <= 0) {
+            hero->belongings.backpack.erase(
+                std::remove_if(hero->belongings.backpack.begin(), hero->belongings.backpack.end(),
+                               [this](const std::unique_ptr<Item>& it) { return it.get() == this; }),
+                hero->belongings.backpack.end());
+        }
+        return true;
+    } else if (action == "DROP") {
+        return doDropItem(hero, this);
+    } else if (action == "THROW") {
+        return doThrowItem(hero, this);
+    }
+    return false;
+}
+
+std::string Torch::info() const {
+    return "It's an indispensable item in dark dungeons and The Demon Halls, which are notorious for their poor ambient lighting.";
+}
+
+std::unique_ptr<Item> Torch::clone(int qty) const {
+    auto t = std::make_unique<Torch>();
+    t->quantity = qty;
+    return t;
+}
+
+// -----------------------------------------------------------------------------
 // Keys
 // -----------------------------------------------------------------------------
 Key::Key() : Key(Dungeon::depth) {}

@@ -33,7 +33,8 @@ public:
         NONE,
         CHASM,
         WATER,
-        GRASS
+        GRASS,
+        DARK
     };
 
     Feeling feeling = Feeling::NONE;

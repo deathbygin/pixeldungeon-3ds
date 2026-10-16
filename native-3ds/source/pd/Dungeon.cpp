@@ -2,8 +2,10 @@
 #include "pd/FogOfWar.h"
 #include "pd/Random.h"
 #include "pd/Badges.h"
+#include "pd/GLog.h"
 #include <algorithm>
 #include <unordered_map>
+#include <ctime>
 
 namespace pd {
 
@@ -18,7 +20,14 @@ std::unique_ptr<FogOfWar> Dungeon::fog = nullptr;
 bool Dungeon::visible[Level::LENGTH] = { false };
 int Dungeon::depth = 1;
 int Dungeon::gold = 0;
+int Dungeon::deepestFloor = 1;
+bool Dungeon::nightMode = false;
 std::unordered_map<int, std::vector<std::unique_ptr<Item>>> Dungeon::droppedItems;
+
+bool Dungeon::bossLevel(int d) {
+    if (d == -1) d = depth;
+    return d == 5 || d == 10 || d == 15 || d == 20 || d == 25;
+}
 
 void Dungeon::dropToChasm(std::unique_ptr<Item> item) {
     if (!item) return;
@@ -40,10 +49,54 @@ void Dungeon::placeChasmItems() {
 }
 
 void Dungeon::init() {
+    std::time_t t = std::time(nullptr);
+    struct tm* lt = std::localtime(&t);
+    int hour = lt ? lt->tm_hour : 12;
+    nightMode = (hour < 7 || hour >= 22);
+    deepestFloor = 1;
+
     Actor::init();
     Badges::init();
     Potion::initColors();
     Scroll::initLabels();
+}
+
+void Dungeon::announceLevelEntrance() {
+    if (!level) return;
+
+    if (depth < deepestFloor) {
+        GLog::h("Welcome back to level " + std::to_string(depth) + " of Pixel Dungeon!");
+    } else {
+        GLog::h("Welcome to level " + std::to_string(depth) + " of Pixel Dungeon!");
+        deepestFloor = std::max(deepestFloor, depth);
+    }
+
+    switch (level->feeling) {
+    case Level::Feeling::CHASM:
+        GLog::w("You can hear the wind howling outside.");
+        GLog::w("Your steps echo across the dungeon.");
+        break;
+    case Level::Feeling::WATER:
+        GLog::w("You hear the sound of roaring water.");
+        GLog::w("You hear the water splashing around you.");
+        break;
+    case Level::Feeling::GRASS:
+        GLog::w("The smell of vegetation is thick in the air.");
+        break;
+    case Level::Feeling::DARK:
+        GLog::w("The darkness here is oppressive and suffocating...");
+        break;
+    default:
+        break;
+    }
+
+    if (level->secretDoors >= 3) {
+        GLog::w("The atmosphere hints that this floor hides many secrets.");
+    }
+
+    if (nightMode && !bossLevel()) {
+        GLog::w("Be cautious, since the dungeon is even more dangerous at night!");
+    }
 }
 
 void Dungeon::newGame() {
@@ -51,6 +104,7 @@ void Dungeon::newGame() {
     s_cachedMobs.clear();
     depth = 1;
     gold = 0;
+    deepestFloor = 1;
     Potion::initColors();
     Scroll::initLabels();
     hero = std::make_unique<Hero>();
@@ -93,6 +147,7 @@ void Dungeon::resetLevel() {
 
     spawnMobs(4);
     observe();
+    announceLevelEntrance();
     Actor::process();
 }
 
@@ -172,6 +227,7 @@ void Dungeon::switchLevel(int newDepth) {
     fog = std::make_unique<FogOfWar>(Level::WIDTH, Level::HEIGHT);
     placeChasmItems();
     observe();
+    announceLevelEntrance();
     Actor::process();
 }
 
@@ -265,7 +321,12 @@ void Dungeon::spawnMobs(int count) {
         return;
     }
 
-    for (int i = 0; i < count; ++i) {
+    int mobCount = count;
+    if (level && (level->feeling == Level::Feeling::DARK || (nightMode && !bossLevel()))) {
+        mobCount = count + 2;
+    }
+
+    for (int i = 0; i < mobCount; ++i) {
         int cell = -1;
         for (int attempts = 0; attempts < 100; ++attempts) {
             int candidate = Random::Int(Level::LENGTH);

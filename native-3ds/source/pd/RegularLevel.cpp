@@ -505,9 +505,12 @@ void RegularLevel::createItems() {
         if (h) h->type = type;
     }
 
-    // Spawn puzzle / special room required items (Keys, Invisibility, Liquid Flame, Levitation)
+    // Spawn puzzle / special room required items (Keys, Invisibility, Liquid Flame, Levitation, Torch)
     for (auto& itm : itemsToSpawn) {
         int cell = randomDropCell();
+        if (itm && itm->name == "Torch") {
+            cell = entrance;
+        }
         drop(std::move(itm), cell);
     }
     itemsToSpawn.clear();

@@ -24,7 +24,8 @@ enum class BuffType {
     Ooze,
     Combo,
     Fury,
-    SnipersMark
+    SnipersMark,
+    Light
 };
 
 class Combo;
@@ -228,6 +229,19 @@ public:
 
     BuffType type() const override { return STATIC_TYPE; }
     std::string name() const override { return "Levitating"; }
+
+    void attachTo(Char* ch) override;
+    void detach() override;
+};
+
+class Light : public FlavourBuff {
+public:
+    static constexpr BuffType STATIC_TYPE = BuffType::Light;
+    static constexpr float DURATION = 250.0f;
+    static constexpr int DISTANCE = 6;
+
+    BuffType type() const override { return STATIC_TYPE; }
+    std::string name() const override { return "Illuminated"; }
 
     void attachTo(Char* ch) override;
     void detach() override;

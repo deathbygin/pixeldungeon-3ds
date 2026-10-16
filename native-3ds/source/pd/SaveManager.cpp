@@ -349,10 +349,12 @@ bool SaveManager::saveGame(const std::string& customPath) {
     int32_t height = Level::HEIGHT;
     int32_t entrance = level->entrance;
     int32_t exit = level->exit;
+    int32_t feeling = static_cast<int32_t>(level->feeling);
     std::fwrite(&width, sizeof(int32_t), 1, fp);
     std::fwrite(&height, sizeof(int32_t), 1, fp);
     std::fwrite(&entrance, sizeof(int32_t), 1, fp);
     std::fwrite(&exit, sizeof(int32_t), 1, fp);
+    std::fwrite(&feeling, sizeof(int32_t), 1, fp);
 
     // Map tiles
     std::fwrite(level->map, sizeof(int), Level::LENGTH, fp);
@@ -665,6 +667,8 @@ bool SaveManager::loadGame(const std::string& customPath) {
                 item = std::make_unique<Dewdrop>();
             } else if (iName == "Gold") {
                 item = std::make_unique<Gold>(iQty);
+            } else if (iName == "Torch") {
+                item = std::make_unique<Torch>();
             } else if (iName == "Golden Key") {
                 item = std::make_unique<GoldenKey>();
             } else if (iName == "Iron Key") {
@@ -700,7 +704,7 @@ bool SaveManager::loadGame(const std::string& customPath) {
     hero->belongings.equippedArmor = equippedA;
 
     // 5. Level State
-    Dungeon::level = std::make_unique<Level>();
+    Dungeon::level = Level::create(Dungeon::depth);
     Level* level = Dungeon::level.get();
 
     int32_t width = 0;
@@ -711,6 +715,11 @@ bool SaveManager::loadGame(const std::string& customPath) {
     std::fread(&height, sizeof(int32_t), 1, fp);
     std::fread(&entrance, sizeof(int32_t), 1, fp);
     std::fread(&exit, sizeof(int32_t), 1, fp);
+    if (version >= 4) {
+        int32_t feeling = 0;
+        std::fread(&feeling, sizeof(int32_t), 1, fp);
+        level->feeling = static_cast<Level::Feeling>(feeling);
+    }
 
     level->entrance = entrance;
     level->exit = exit;
@@ -820,6 +829,8 @@ bool SaveManager::loadGame(const std::string& customPath) {
                         item = std::make_unique<Dewdrop>();
                     } else if (iName == "Gold") {
                         item = std::make_unique<Gold>(iQty);
+                    } else if (iName == "Torch") {
+                        item = std::make_unique<Torch>();
                     } else if (iName == "Golden Key") {
                         item = std::make_unique<GoldenKey>();
                     } else if (iName == "Iron Key") {

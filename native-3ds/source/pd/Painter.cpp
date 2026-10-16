@@ -227,7 +227,17 @@ void Painter::paintStandard(Level* level, Room* room) {
     }
 
     bool bossLevel = (Dungeon::depth % 5 == 0);
-    if (!bossLevel && Random::Int(5) == 0) {
+    int chance = (level->feeling != Level::Feeling::NONE) ? 3 : 5;
+    if (!bossLevel && Random::Int(chance) == 0) {
+        if (level->feeling == Level::Feeling::CHASM && Random::Int(2) == 0) {
+            if (room->connected.size() == 2 && room->width() >= 4 && room->height() >= 4) {
+                paintBridge(level, room);
+                return;
+            } else if (!bossLevel && ((Dungeon::depth + 1) % 5 != 0) && std::min(room->width(), room->height()) >= 5) {
+                paintFissure(level, room);
+                return;
+            }
+        }
         switch (Random::Int(6)) {
         case 0:
             if (level->feeling != Level::Feeling::GRASS) {
@@ -343,9 +353,10 @@ void Painter::paintStudy(Level* level, Room* room) {
 
 void Painter::paintBridge(Level* level, Room* room) {
     bool bossLevel = (Dungeon::depth % 5 == 0);
+    bool useChasm = (!bossLevel && ((Dungeon::depth + 1) % 5 != 0) &&
+                     (level->feeling == Level::Feeling::CHASM || Random::Int(3) == 0));
     fill(level, room->left + 1, room->top + 1, room->width() - 1, room->height() - 1,
-         (!bossLevel && ((Dungeon::depth + 1) % 5 != 0) && Random::Int(3) == 0) ?
-         Terrain::CHASM : Terrain::WATER);
+         useChasm ? Terrain::CHASM : Terrain::WATER);
 
     Point door1(-1, -1);
     Point door2(-1, -1);

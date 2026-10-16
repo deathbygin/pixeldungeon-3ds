@@ -342,6 +342,26 @@ void Levitation::detach() {
 }
 
 // -----------------------------------------------------------------------------
+// Light (Torch)
+// -----------------------------------------------------------------------------
+void Light::attachTo(Char* ch) {
+    target = ch;
+    Actor::add(this, DURATION);
+    if (ch) {
+        ch->viewDistance = std::max(ch->viewDistance, DISTANCE);
+        Dungeon::observe();
+    }
+}
+
+void Light::detach() {
+    if (target && Dungeon::level) {
+        target->viewDistance = Dungeon::level->viewDistance;
+        Dungeon::observe();
+    }
+    Buff::detach();
+}
+
+// -----------------------------------------------------------------------------
 // Shadows
 // -----------------------------------------------------------------------------
 bool Shadows::act() {

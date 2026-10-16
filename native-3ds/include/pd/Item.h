@@ -301,6 +301,19 @@ public:
     std::unique_ptr<Item> clone(int qty = 1) const override;
 };
 
+class Torch : public Item {
+public:
+    Torch();
+    ItemCategory category() const override { return ItemCategory::Generic; }
+    bool isStackable() const override { return true; }
+    bool isUpgradable() const override { return false; }
+    bool isIdentified() const override { return true; }
+    std::vector<std::string> actions(Hero* hero) override;
+    bool execute(Hero* hero, const std::string& action) override;
+    std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
 class Key : public Item {
 public:
     int depth = 1;

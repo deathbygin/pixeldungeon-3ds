@@ -22,6 +22,10 @@ public:
 
     static int depth;
     static int gold;
+    static int deepestFloor;
+    static bool nightMode;
+
+    static bool bossLevel(int d = -1);
 
     static void init();
     static void newGame();
@@ -29,6 +33,7 @@ public:
     static void nextLevel();
     static void prevLevel();
     static void switchLevel(int newDepth);
+    static void announceLevelEntrance();
 
     static void spawnMobs(int count = 4);
     static std::unique_ptr<Mob> createMobForDepth(int depth);
