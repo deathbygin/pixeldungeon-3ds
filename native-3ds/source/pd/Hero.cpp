@@ -432,6 +432,19 @@ bool Hero::pickUp(Level* currentLevel, bool spendTurn) {
 
     std::string itemName = item->displayName();
     if (item->name == "Dewdrop") {
+        DewVial* vial = nullptr;
+        for (auto& bIt : belongings.backpack) {
+            if (bIt && bIt->asDewVial()) {
+                vial = bIt->asDewVial();
+                break;
+            }
+        }
+        if (vial && !vial->isFull()) {
+            vial->collectDew(item->quantity);
+            Sample::play(Assets::SND_DEWDROP);
+            return true;
+        }
+
         int value = 1 + (Dungeon::depth - 1) / 5;
         if (heroClass == HeroClass::Huntress) {
             value++;
@@ -646,6 +659,9 @@ void Hero::die(Actor* src) {
 void Hero::damage(int dmg, Actor* src) {
     restoreHealth = false;
     Char::damage(dmg, src);
+    if (HP <= 0) {
+        DewVial::autoDrink(this);
+    }
     if (subClass == HeroSubClass::Berserker && HP > 0 && HP <= HT * 0.40f) {
         if (!getBuff<Fury>()) {
             affect<Fury>();

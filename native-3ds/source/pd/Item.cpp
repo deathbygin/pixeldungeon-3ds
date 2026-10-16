@@ -247,6 +247,18 @@ Item* Weapon::random() {
 
 std::string Weapon::displayName() const {
     std::string s = name;
+    if (isEnchanted()) {
+        switch (enchantment) {
+            case Enchantment::BLAZING: s = "Blazing " + s; break;
+            case Enchantment::CHILLING: s = "Chilling " + s; break;
+            case Enchantment::VENOMOUS: s = "Venomous " + s; break;
+            case Enchantment::PARALYTIC: s = "Paralytic " + s; break;
+            case Enchantment::LEECH: s = "Vampiric " + s; break;
+            case Enchantment::SHOCKING: s = "Shocking " + s; break;
+            case Enchantment::UNSTABLE: s = "Unstable " + s; break;
+            default: break;
+        }
+    }
     if (levelKnown) {
         if (cursed && cursedKnown) s = "cursed " + s;
         if (level > 0) s += " +" + std::to_string(level);
@@ -343,14 +355,80 @@ int Weapon::damageRoll(Hero* hero) const {
     return dmg;
 }
 
+void Weapon::enchant(Enchantment ench) {
+    if (ench == Enchantment::NONE) {
+        int r = Random::Int(7);
+        switch (r) {
+            case 0: enchantment = Enchantment::BLAZING; break;
+            case 1: enchantment = Enchantment::CHILLING; break;
+            case 2: enchantment = Enchantment::VENOMOUS; break;
+            case 3: enchantment = Enchantment::PARALYTIC; break;
+            case 4: enchantment = Enchantment::LEECH; break;
+            case 5: enchantment = Enchantment::SHOCKING; break;
+            case 6: enchantment = Enchantment::UNSTABLE; break;
+        }
+    } else {
+        enchantment = ench;
+    }
+}
+
 void Weapon::proc(Char* attacker, Char* defender, int damage) {
-    (void)attacker;
-    (void)defender;
-    (void)damage;
     if (!levelKnown) {
         if (--hitsToKnow <= 0) {
             identify();
             GLog::i("You are now familiar enough with your " + name + " to identify it. It is " + displayName() + ".");
+        }
+    }
+
+    if (defender && defender->isAlive() && isEnchanted()) {
+        Enchantment eff = enchantment;
+        if (eff == Enchantment::UNSTABLE) {
+            eff = static_cast<Enchantment>(1 + Random::Int(6));
+        }
+
+        switch (eff) {
+            case Enchantment::BLAZING:
+                defender->affect<Burning>();
+                FX::burst(defender->pos, 0xff6600FFu, 6);
+                Sample::playAt(Assets::SND_BURNING, defender->pos);
+                break;
+            case Enchantment::CHILLING:
+                defender->affect<Frost>();
+                FX::burst(defender->pos, 0x66ccffFFu, 6);
+                Sample::playAt(Assets::SND_HIT, defender->pos);
+                break;
+            case Enchantment::VENOMOUS:
+                defender->affect<Poison>();
+                FX::burst(defender->pos, 0x00cc44FFu, 6);
+                break;
+            case Enchantment::PARALYTIC:
+                if (Random::Int(4) == 0) {
+                    defender->affect<Paralysis>();
+                    FX::burst(defender->pos, 0xcccc00FFu, 6);
+                }
+                break;
+            case Enchantment::LEECH:
+                if (attacker && damage > 0) {
+                    int heal = std::max(1, damage / 5);
+                    attacker->HP = std::min(attacker->HT, attacker->HP + heal);
+                    FX::floatingText(attacker->pos, "+" + std::to_string(heal), 0x38b764FF);
+                }
+                break;
+            case Enchantment::SHOCKING:
+                if (Dungeon::level) {
+                    for (int n : Level::NEIGHBOURS8) {
+                        int c = defender->pos + n;
+                        Char* nearby = Actor::findChar(c);
+                        if (nearby && nearby != attacker) {
+                            nearby->damage(std::max(1, damage / 3), attacker);
+                            FX::burst(c, 0xffff66FFu, 6);
+                        }
+                    }
+                    Sample::playAt(Assets::SND_ZAP, defender->pos);
+                }
+                break;
+            default:
+                break;
         }
     }
 }
@@ -966,6 +1044,17 @@ std::vector<std::string> Potion::actions(Hero* hero) {
     return { "DRINK", "THROW", "DROP" };
 }
 
+void Potion::heal(Hero* hero) {
+    if (!hero) return;
+    hero->HP = hero->HT;
+    hero->removeBuff(BuffType::Poison);
+    hero->removeBuff(BuffType::Cripple);
+    hero->removeBuff(BuffType::Weakness);
+    hero->removeBuff(BuffType::Bleeding);
+    FX::floatingText(hero->pos, "HEALED", 0x38b764FF);
+    FX::burst(hero->pos, 0x38b764FF, 12);
+}
+
 bool Potion::execute(Hero* hero, const std::string& action) {
     if (!hero) return false;
 
@@ -985,13 +1074,7 @@ bool Potion::execute(Hero* hero, const std::string& action) {
 
         switch (type) {
             case PotionType::HEALING: {
-                hero->HP = hero->HT;
-                hero->removeBuff(BuffType::Poison);
-                hero->removeBuff(BuffType::Cripple);
-                hero->removeBuff(BuffType::Weakness);
-                hero->removeBuff(BuffType::Bleeding);
-                FX::floatingText(hero->pos, "HEALED", 0x38b764FF);
-                FX::burst(hero->pos, 0x38b764FF, 12);
+                heal(hero);
                 GLog::p("Your wounds heal completely.");
                 break;
             }
@@ -2355,6 +2438,418 @@ std::unique_ptr<Item> TomeOfMastery::clone(int qty) const {
     auto t = std::make_unique<TomeOfMastery>();
     t->quantity = qty;
     return t;
+}
+
+// =============================================================================
+// Ring Implementation
+// =============================================================================
+Ring::Ring(Gem g, std::string eff)
+    : gem(g), effect(std::move(eff)) {
+    name = "Ring of " + effect;
+    switch (gem) {
+        case Gem::DIAMOND: image = ItemSpriteSheet::RING_DIAMOND; break;
+        case Gem::OPAL: image = ItemSpriteSheet::RING_OPAL; break;
+        case Gem::GARNET: image = ItemSpriteSheet::RING_GARNET; break;
+        case Gem::RUBY: image = ItemSpriteSheet::RING_RUBY; break;
+        case Gem::AMETHYST: image = ItemSpriteSheet::RING_AMETHYST; break;
+        case Gem::TOPAZ: image = ItemSpriteSheet::RING_TOPAZ; break;
+        case Gem::ONYX: image = ItemSpriteSheet::RING_ONYX; break;
+        case Gem::TOURMALINE: image = ItemSpriteSheet::RING_TOURMALINE; break;
+        case Gem::EMERALD: image = ItemSpriteSheet::RING_EMERALD; break;
+        case Gem::SAPPHIRE: image = ItemSpriteSheet::RING_SAPPHIRE; break;
+        case Gem::QUARTZ: image = ItemSpriteSheet::RING_QUARTZ; break;
+        case Gem::AGATE: image = ItemSpriteSheet::RING_AGATE; break;
+        default: image = ItemSpriteSheet::RING; break;
+    }
+}
+
+Item* Ring::identify() {
+    identified = true;
+    levelKnown = true;
+    cursedKnown = true;
+    return this;
+}
+
+Item* Ring::random() {
+    static const char* s_effects[] = {
+        "Mending", "Shadows", "Detection", "Accuracy",
+        "Evasion", "Elements", "Haggler", "Haste",
+        "Herbalism", "Power", "Satiety", "Thorns"
+    };
+    int r = Random::Int(12);
+    gem = static_cast<Gem>(r);
+    effect = s_effects[r];
+    name = "Ring of " + effect;
+    switch (gem) {
+        case Gem::DIAMOND: image = ItemSpriteSheet::RING_DIAMOND; break;
+        case Gem::OPAL: image = ItemSpriteSheet::RING_OPAL; break;
+        case Gem::GARNET: image = ItemSpriteSheet::RING_GARNET; break;
+        case Gem::RUBY: image = ItemSpriteSheet::RING_RUBY; break;
+        case Gem::AMETHYST: image = ItemSpriteSheet::RING_AMETHYST; break;
+        case Gem::TOPAZ: image = ItemSpriteSheet::RING_TOPAZ; break;
+        case Gem::ONYX: image = ItemSpriteSheet::RING_ONYX; break;
+        case Gem::TOURMALINE: image = ItemSpriteSheet::RING_TOURMALINE; break;
+        case Gem::EMERALD: image = ItemSpriteSheet::RING_EMERALD; break;
+        case Gem::SAPPHIRE: image = ItemSpriteSheet::RING_SAPPHIRE; break;
+        case Gem::QUARTZ: image = ItemSpriteSheet::RING_QUARTZ; break;
+        case Gem::AGATE: image = ItemSpriteSheet::RING_AGATE; break;
+        default: image = ItemSpriteSheet::RING; break;
+    }
+
+    identified = false;
+    levelKnown = false;
+    cursedKnown = false;
+    if (Random::Float() < 0.30f) {
+        level = (Random::Int(2) == 0) ? 1 : -1;
+        cursed = (level < 0);
+    } else {
+        level = 0;
+        cursed = false;
+    }
+    return this;
+}
+
+std::vector<std::string> Ring::actions(Hero* hero) {
+    (void)hero;
+    return { "EQUIP", "DROP", "THROW" };
+}
+
+bool Ring::execute(Hero* hero, const std::string& action) {
+    if (!hero) return false;
+    if (action == "EQUIP") {
+        if (hero->belongings.equip(this)) {
+            GLog::i("You put on the " + displayName() + ".");
+            hero->spendAndNext(Actor::TICK);
+            return true;
+        }
+        return false;
+    } else if (action == "DROP") {
+        return doDropItem(hero, this);
+    } else if (action == "THROW") {
+        return doThrowItem(hero, this);
+    }
+    return false;
+}
+
+std::string Ring::displayName() const {
+    std::string s = identified ? name : "Ring";
+    if (levelKnown) {
+        if (cursed && cursedKnown) s = "cursed " + s;
+        if (level > 0) s += " +" + std::to_string(level);
+        else if (level < 0) s += " " + std::to_string(level);
+    } else if (cursed && cursedKnown) {
+        s = "cursed " + s;
+    }
+    return s;
+}
+
+std::string Ring::info() const {
+    return "A precious ring imbued with ancient enchantments of " + effect + ".";
+}
+
+std::unique_ptr<Item> Ring::clone(int qty) const {
+    (void)qty;
+    auto r = std::make_unique<Ring>(gem, effect);
+    r->level = level;
+    r->cursed = cursed;
+    r->identified = identified;
+    r->levelKnown = levelKnown;
+    r->cursedKnown = cursedKnown;
+    return r;
+}
+
+// =============================================================================
+// DewVial Implementation
+// =============================================================================
+DewVial::DewVial() {
+    name = "Dew Vial";
+    image = ItemSpriteSheet::VIAL;
+    volume = 0;
+    identified = true;
+    levelKnown = true;
+    cursedKnown = true;
+}
+
+void DewVial::collectDew(int count) {
+    volume = std::min(MAX_VOLUME, volume + count);
+    GLog::i("You collected a dewdrop into your dew vial.");
+    if (volume >= MAX_VOLUME) {
+        GLog::p("Your dew vial is full!");
+    }
+}
+
+std::vector<std::string> DewVial::actions(Hero* hero) {
+    (void)hero;
+    std::vector<std::string> acts;
+    if (volume > 0) acts.push_back("DRINK");
+    acts.push_back("DROP");
+    acts.push_back("THROW");
+    return acts;
+}
+
+bool DewVial::execute(Hero* hero, const std::string& action) {
+    if (!hero) return false;
+    if (action == "DRINK") {
+        if (volume > 0) {
+            Sample::play(Assets::SND_DRINK);
+            int healAmount = (hero->HT * volume) / MAX_VOLUME;
+            hero->HP = std::min(hero->HT, hero->HP + healAmount);
+            FX::burst(hero->pos, 0x00ff88FFu, 8);
+            FX::floatingText(hero->pos, "+" + std::to_string(healAmount), 0x38b764FF);
+            GLog::i("You drink the pure dew from the vial, soothing your wounds.");
+            volume = 0;
+            hero->spendAndNext(Actor::TICK);
+            return true;
+        } else {
+            GLog::w("Your dew vial is empty!");
+            return false;
+        }
+    } else if (action == "DROP") {
+        return doDropItem(hero, this);
+    } else if (action == "THROW") {
+        return doThrowItem(hero, this);
+    }
+    return false;
+}
+
+void DewVial::autoDrink(Hero* hero) {
+    if (!hero) return;
+    DewVial* vial = nullptr;
+    for (auto& it : hero->belongings.backpack) {
+        if (it && it->asDewVial()) {
+            vial = it->asDewVial();
+            break;
+        }
+    }
+    if (vial && vial->isFull()) {
+        vial->volume = 0;
+        hero->HP = hero->HT;
+        Sample::play(Assets::SND_DRINK);
+        FX::burst(hero->pos, 0x00ff88FFu, 16);
+        GLog::w("The dew vial was emptied to heal your fatal wounds!");
+    }
+}
+
+std::string DewVial::displayName() const {
+    return "Dew Vial (" + std::to_string(volume) + "/" + std::to_string(MAX_VOLUME) + ")";
+}
+
+std::string DewVial::info() const {
+    return "You can store excess dew in this tiny vessel for drinking it later. If the vial is full, in a moment of deadly peril the dew will be consumed automatically.";
+}
+
+std::unique_ptr<Item> DewVial::clone(int qty) const {
+    (void)qty;
+    auto dv = std::make_unique<DewVial>();
+    dv->volume = volume;
+    return dv;
+}
+
+// =============================================================================
+// Bomb Implementation
+// =============================================================================
+Bomb::Bomb() {
+    name = "Bomb";
+    image = ItemSpriteSheet::BOMB;
+    quantity = 1;
+    identified = true;
+    levelKnown = true;
+    cursedKnown = true;
+}
+
+Item* Bomb::random() {
+    quantity = Random::IntRange(1, 2);
+    return this;
+}
+
+std::vector<std::string> Bomb::actions(Hero* hero) {
+    (void)hero;
+    return { "THROW", "DROP" };
+}
+
+bool Bomb::execute(Hero* hero, const std::string& action) {
+    if (!hero) return false;
+    if (action == "THROW") {
+        return doThrowItem(hero, this);
+    } else if (action == "DROP") {
+        return doDropItem(hero, this);
+    }
+    return false;
+}
+
+void Bomb::onThrow(int cell) {
+    if (Dungeon::level && Dungeon::level->pit[cell]) {
+        Item::onThrow(cell);
+        return;
+    }
+    explode(cell);
+}
+
+void Bomb::explode(int cell) {
+    if (!Dungeon::level) return;
+    Sample::playAt(Assets::SND_BLAST, cell, 1.0f, 1.0f);
+    FX::burst(cell, 0xff8800FFu, 24);
+
+    for (int n : Level::NEIGHBOURS9) {
+        int c = cell + n;
+        if (c < 0 || c >= Level::LENGTH) continue;
+
+        if (Dungeon::level->isFlamable(c)) {
+            Dungeon::level->destroy(c);
+        }
+
+        Char* ch = Actor::findChar(c);
+        if (ch) {
+            int dmg = Random::IntRange(1 + Dungeon::depth, 10 + Dungeon::depth * 2);
+            ch->damage(dmg, nullptr);
+            FX::floatingText(c, std::to_string(dmg), 0xff4444FF);
+            if (ch->isAlive()) {
+                ch->affect<Paralysis>();
+            }
+        }
+    }
+    Dungeon::observe();
+}
+
+std::string Bomb::info() const {
+    return "A potent explosive device with a short fuse. Throw it to blast a 3x3 area, destroying terrain and damaging enemies.";
+}
+
+std::unique_ptr<Item> Bomb::clone(int qty) const {
+    auto b = std::make_unique<Bomb>();
+    b->quantity = qty;
+    return b;
+}
+
+// =============================================================================
+// Honeypot Implementation
+// =============================================================================
+Honeypot::Honeypot() {
+    name = "Honeypot";
+    image = ItemSpriteSheet::HONEYPOT;
+    quantity = 1;
+    identified = true;
+    levelKnown = true;
+    cursedKnown = true;
+}
+
+std::vector<std::string> Honeypot::actions(Hero* hero) {
+    (void)hero;
+    return { "SHATTER", "THROW", "DROP" };
+}
+
+bool Honeypot::execute(Hero* hero, const std::string& action) {
+    if (!hero) return false;
+    if (action == "SHATTER") {
+        shatter(hero->pos);
+        quantity--;
+        hero->spendAndNext(Actor::TICK);
+        return true;
+    } else if (action == "THROW") {
+        return doThrowItem(hero, this);
+    } else if (action == "DROP") {
+        return doDropItem(hero, this);
+    }
+    return false;
+}
+
+void Honeypot::onThrow(int cell) {
+    if (Dungeon::level && Dungeon::level->pit[cell]) {
+        Item::onThrow(cell);
+        return;
+    }
+    shatter(cell);
+}
+
+void Honeypot::shatter(int cell) {
+    Sample::playAt(Assets::SND_SHATTER, cell);
+    FX::burst(cell, 0xffd500FFu, 16);
+    GLog::p("The honeypot shatters, releasing sweet golden honey!");
+    if (Dungeon::level) {
+        for (int n : Level::NEIGHBOURS4) {
+            int c = cell + n;
+            if (c >= 0 && c < Level::LENGTH && Dungeon::level->isPassable(c) && !Actor::findChar(c)) {
+                auto bat = std::make_unique<Bat>();
+                bat->name = "Golden Bee";
+                bat->place(c);
+                Actor::occupyCell(bat.get());
+                Actor::add(bat.get());
+                Dungeon::mobs.push_back(std::move(bat));
+                break;
+            }
+        }
+    }
+}
+
+std::string Honeypot::info() const {
+    return "A sealed pot filled with thick aromatic honey. When thrown or shattered, it breaks and summons a loyal golden bee.";
+}
+
+std::unique_ptr<Item> Honeypot::clone(int qty) const {
+    auto hp = std::make_unique<Honeypot>();
+    hp->quantity = qty;
+    return hp;
+}
+
+// =============================================================================
+// MysteryMeat Implementation
+// =============================================================================
+MysteryMeat::MysteryMeat() {
+    name = "Mystery Meat";
+    image = ItemSpriteSheet::MEAT;
+    identified = true;
+    levelKnown = true;
+    cursedKnown = true;
+}
+
+bool MysteryMeat::execute(Hero* hero, const std::string& action) {
+    if (!hero) return false;
+    if (action == "EAT") {
+        Sample::play(Assets::SND_EAT);
+        Hunger* hunger = hero->getBuff<Hunger>();
+        if (hunger) {
+            hunger->satisfy(Hunger::STARVING - Hunger::HUNGRY);
+        }
+        GLog::i("That food tasted... strange.");
+        switch (Random::Int(5)) {
+            case 0:
+                GLog::w("Oh it's hot!");
+                hero->affect<Burning>();
+                break;
+            case 1:
+                GLog::w("You can't feel your legs!");
+                hero->affect<Paralysis>();
+                break;
+            case 2:
+                GLog::w("You are not feeling well.");
+                hero->affect<Poison>();
+                break;
+            case 3:
+                GLog::w("You feel sluggish.");
+                hero->affect<Cripple>();
+                break;
+            default:
+                break;
+        }
+        quantity--;
+        hero->spendAndNext(3.0f * Actor::TICK);
+        return true;
+    } else if (action == "DROP") {
+        return doDropItem(hero, this);
+    } else if (action == "THROW") {
+        return doThrowItem(hero, this);
+    }
+    return false;
+}
+
+std::string MysteryMeat::info() const {
+    return "Eat at your own risk!";
+}
+
+std::unique_ptr<Item> MysteryMeat::clone(int qty) const {
+    auto m = std::make_unique<MysteryMeat>();
+    m->quantity = qty;
+    return m;
 }
 
 } // namespace pd

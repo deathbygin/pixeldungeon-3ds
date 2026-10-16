@@ -39,6 +39,7 @@ public:
     std::unique_ptr<Item> pickUp();
     Item* peek() const;
     void drop(std::unique_ptr<Item> item);
+    void replace(Item* oldItem, std::unique_ptr<Item> newItem);
 
     void burn();
     void freeze();

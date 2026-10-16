@@ -13,6 +13,8 @@
 #include "pd/Patch.h"
 #include "pd/Item.h"
 #include "pd/Sample.h"
+#include "pd/GLog.h"
+#include "pd/Buff.h"
 #include "noosa/Audio.h"
 #include <cmath>
 #include <cstring>
@@ -201,11 +203,215 @@ void Level::press(int cell, Char* ch) {
     } else if (tile == Terrain::DOOR) {
         set(cell, Terrain::OPEN_DOOR);
         Sample::playAt(Assets::SND_OPEN, cell);
+    } else if (tile == Terrain::WELL) {
+        affectWell(cell, ch);
     }
 
     Plant* plant = getPlant(cell);
     if (plant) {
         plant->activate(ch);
+    }
+}
+
+void Level::bounceItemFrom(int cell) {
+    Heap* heap = getHeap(cell);
+    if (!heap || heap->isEmpty()) return;
+    int newPlace = -1;
+    for (int attempts = 0; attempts < 30; ++attempts) {
+        int n = cell + NEIGHBOURS8[Random::Int(8)];
+        if (n >= 0 && n < LENGTH && isPassable(n) && !avoid[n]) {
+            newPlace = n;
+            break;
+        }
+    }
+    if (newPlace != -1) {
+        std::unique_ptr<Item> popped = heap->pickUp();
+        if (popped) {
+            drop(std::move(popped), newPlace);
+            Sample::playAt(Assets::SND_STEP, newPlace);
+            GLog::i("The well regurgitates the item!");
+        }
+    }
+}
+
+void Level::affectWell(int cell, Char* ch) {
+    auto it = wells.find(cell);
+    WellType type;
+    if (it == wells.end()) {
+        type = static_cast<WellType>(Random::Int(3));
+        wells[cell] = type;
+    } else {
+        type = it->second;
+    }
+
+    if (ch == Dungeon::hero.get()) {
+        Hero* hero = Dungeon::hero.get();
+        if (type == WellType::Health) {
+            Sample::play(Assets::SND_DRINK);
+            Potion::heal(hero);
+            hero->belongings.uncurseEquipped();
+            Hunger* hunger = hero->getBuff<Hunger>();
+            if (hunger) {
+                hunger->satisfy(Hunger::STARVING);
+            }
+            hero->interrupt();
+            GLog::p("As you take a sip, you feel your wounds heal completely.");
+            FX::burst(cell, 0x00ff88FFu, 10);
+            set(cell, Terrain::EMPTY_WELL);
+            wells.erase(cell);
+            return;
+        } else if (type == WellType::Awareness) {
+            Sample::play(Assets::SND_DRINK);
+            hero->belongings.observe();
+            for (int i = 0; i < LENGTH; ++i) {
+                int terr = map[i];
+                if (Terrain::isSecret(terr)) {
+                    set(i, Terrain::discover(terr));
+                }
+            }
+            hero->affect<Awareness>();
+            Dungeon::observe();
+            hero->interrupt();
+            GLog::p("As you take a sip, you feel the knowledge pours into your mind. "
+                   "Now you know everything about your equipped items. Also you sense "
+                   "all items on the level and know all its secrets.");
+            FX::burst(cell, 0x88ccffFFu, 10);
+            set(cell, Terrain::EMPTY_WELL);
+            wells.erase(cell);
+            return;
+        } else if (type == WellType::Transmutation) {
+            // Stepping into transmutation well does nothing to hero
+            return;
+        }
+    } else if (ch == nullptr) {
+        // Thrown or dropped item in well
+        Heap* heap = getHeap(cell);
+        if (!heap || heap->isEmpty()) return;
+        Item* item = heap->peek();
+        if (!item) return;
+
+        if (type == WellType::Health) {
+            DewVial* vial = item->asDewVial();
+            if (vial && !vial->isFull()) {
+                vial->fill();
+                Sample::play(Assets::SND_DRINK);
+                GLog::p("The dew vial is filled to the brim!");
+                FX::burst(cell, 0x00ff88FFu, 10);
+                set(cell, Terrain::EMPTY_WELL);
+                wells.erase(cell);
+                return;
+            } else {
+                bounceItemFrom(cell);
+                return;
+            }
+        } else if (type == WellType::Awareness) {
+            if (!item->isIdentified()) {
+                item->identify();
+                Sample::play(Assets::SND_DRINK);
+                GLog::p("The well reveals the secrets of the " + item->displayName() + ".");
+                FX::burst(cell, 0x88ccffFFu, 10);
+                set(cell, Terrain::EMPTY_WELL);
+                wells.erase(cell);
+                return;
+            } else {
+                bounceItemFrom(cell);
+                return;
+            }
+        } else if (type == WellType::Transmutation) {
+            std::unique_ptr<Item> newItem = nullptr;
+            if (Weapon* w = item->asWeapon()) {
+                if (w->category() == Item::ItemCategory::Weapon) {
+                    std::string newName;
+                    int newMin = w->minDamage;
+                    int newMax = w->maxDamage;
+                    int newStr = w->STR;
+                    if (w->name == "Knuckles" || w->name == "Knuckleduster") { newName = "Dagger"; newMin = 2; newMax = 5; newStr = 10; }
+                    else if (w->name == "Dagger") { newName = "Knuckles"; newMin = 1; newMax = 6; newStr = 10; }
+                    else if (w->name == "Spear") { newName = "Quarterstaff"; newMin = 2; newMax = 8; newStr = 12; }
+                    else if (w->name == "Quarterstaff" || w->name == "Shortsword") { newName = "Spear"; newMin = 2; newMax = 9; newStr = 12; }
+                    else if (w->name == "Sword") { newName = "Mace"; newMin = 4; newMax = 10; newStr = 14; }
+                    else if (w->name == "Mace") { newName = "Sword"; newMin = 3; newMax = 11; newStr = 14; }
+                    else if (w->name == "Longsword") { newName = "Battle Axe"; newMin = 5; newMax = 14; newStr = 16; }
+                    else if (w->name == "Battle Axe") { newName = "Longsword"; newMin = 4; newMax = 15; newStr = 16; }
+                    else if (w->name == "Glaive") { newName = "War Hammer"; newMin = 7; newMax = 17; newStr = 18; }
+                    else if (w->name == "War Hammer") { newName = "Glaive"; newMin = 6; newMax = 18; newStr = 18; }
+                    else { newName = "Sword"; newMin = 3; newMax = 11; newStr = 14; }
+
+                    auto nw = std::make_unique<Weapon>(newName, newMin, newMax, newStr);
+                    nw->level = w->level;
+                    nw->cursed = w->cursed;
+                    nw->enchantment = w->enchantment;
+                    nw->identified = w->identified;
+                    nw->levelKnown = w->levelKnown;
+                    nw->cursedKnown = w->cursedKnown;
+                    newItem = std::move(nw);
+                }
+            } else if (Scroll* s = item->asScroll()) {
+                if (s->type == Scroll::ScrollType::UPGRADE) {
+                    newItem = std::make_unique<Scroll>(Scroll::ScrollType::ENCHANTMENT);
+                } else if (s->type == Scroll::ScrollType::ENCHANTMENT) {
+                    newItem = std::make_unique<Scroll>(Scroll::ScrollType::UPGRADE);
+                } else {
+                    Scroll::ScrollType newType;
+                    do {
+                        newType = static_cast<Scroll::ScrollType>(Random::Int(static_cast<int>(Scroll::SCROLL_COUNT)));
+                    } while (newType == s->type);
+                    newItem = std::make_unique<Scroll>(newType);
+                }
+            } else if (Potion* p = item->asPotion()) {
+                if (p->type == Potion::PotionType::STRENGTH) {
+                    newItem = std::make_unique<Potion>(Potion::PotionType::MIGHT);
+                } else if (p->type == Potion::PotionType::MIGHT) {
+                    newItem = std::make_unique<Potion>(Potion::PotionType::STRENGTH);
+                } else {
+                    Potion::PotionType newType;
+                    do {
+                        newType = static_cast<Potion::PotionType>(Random::Int(static_cast<int>(Potion::POTION_COUNT)));
+                    } while (newType == p->type);
+                    newItem = std::make_unique<Potion>(newType);
+                }
+            } else if (PlantSeed* ps = item->asPlantSeed()) {
+                PlantSeed::PlantType newPt;
+                do {
+                    newPt = static_cast<PlantSeed::PlantType>(Random::Int(8));
+                } while (newPt == ps->plantType);
+                newItem = std::make_unique<PlantSeed>(newPt);
+            } else if (Ring* r = item->asRing()) {
+                Ring::Gem newGem;
+                do {
+                    newGem = static_cast<Ring::Gem>(Random::Int(12));
+                } while (newGem == r->gem);
+                auto nr = std::make_unique<Ring>(newGem);
+                nr->level = r->level;
+                nr->cursed = r->cursed;
+                nr->identified = r->identified;
+                newItem = std::move(nr);
+            } else if (item->asWand()) {
+                auto nw = std::make_unique<WandOfMagicMissile>();
+                nw->level = item->level;
+                nw->cursed = item->cursed;
+                nw->identified = item->identified;
+                newItem = std::move(nw);
+            }
+
+            if (newItem) {
+                if (item->quantity > 1) {
+                    item->quantity--;
+                    drop(std::move(newItem), cell);
+                } else {
+                    heap->replace(item, std::move(newItem));
+                }
+                Sample::play(Assets::SND_DRINK);
+                GLog::p("The water flashes and changes the item!");
+                FX::burst(cell, 0xff00ffFFu, 10);
+                set(cell, Terrain::EMPTY_WELL);
+                wells.erase(cell);
+                return;
+            } else {
+                bounceItemFrom(cell);
+                return;
+            }
+        }
     }
 }
 

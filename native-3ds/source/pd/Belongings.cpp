@@ -125,10 +125,35 @@ void Belongings::observe() {
     if (equippedArmor) {
         equippedArmor->identify();
     }
+    if (equippedRing1) {
+        equippedRing1->identify();
+    }
+    if (equippedRing2) {
+        equippedRing2->identify();
+    }
     for (auto& item : backpack) {
         if (item) {
             item->cursedKnown = true;
         }
+    }
+}
+
+void Belongings::uncurseEquipped() {
+    if (equippedWeapon && equippedWeapon->isCursed()) {
+        equippedWeapon->cursed = false;
+        equippedWeapon->cursedKnown = true;
+    }
+    if (equippedArmor && equippedArmor->isCursed()) {
+        equippedArmor->cursed = false;
+        equippedArmor->cursedKnown = true;
+    }
+    if (equippedRing1 && equippedRing1->isCursed()) {
+        equippedRing1->cursed = false;
+        equippedRing1->cursedKnown = true;
+    }
+    if (equippedRing2 && equippedRing2->isCursed()) {
+        equippedRing2->cursed = false;
+        equippedRing2->cursedKnown = true;
     }
 }
 

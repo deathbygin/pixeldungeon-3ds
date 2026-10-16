@@ -261,6 +261,11 @@ void Mob::aiStep(Hero* hero, Level* currentLevel) {
         }
         break;
     }
+
+    case State::PASSIVE: {
+        spend(TICK);
+        break;
+    }
     }
 
     alerted = false;
@@ -897,28 +902,27 @@ bool Scorpio::getCloser(int targetCell) {
 // Giant Piranha
 Piranha::Piranha() {
     name = "Giant Piranha";
-    HP = 20;
-    HT = 20;
+    HP = HT = 10 + Dungeon::depth * 5;
     expAward = 0;
     baseSpeed = 2.0f;
 }
 
 int Piranha::damageRoll() {
-    return Random::NormalIntRange(4, 10);
+    return Random::NormalIntRange(Dungeon::depth, 4 + Dungeon::depth * 2);
 }
 
 int Piranha::attackSkill(Char* targetChar) {
     (void)targetChar;
-    return 24;
+    return 20 + Dungeon::depth * 2;
 }
 
 int Piranha::defenseSkill(Char* attackerChar) {
     (void)attackerChar;
-    return 16;
+    return 10 + Dungeon::depth * 2;
 }
 
 int Piranha::dr() {
-    return 2;
+    return Dungeon::depth;
 }
 
 bool Piranha::act() {
@@ -945,6 +949,9 @@ bool Piranha::getCloser(int targetCell) {
 }
 
 void Piranha::die(Actor* src) {
+    if (Dungeon::level) {
+        Dungeon::level->drop(std::make_unique<MysteryMeat>(), pos);
+    }
     Mob::die(src);
 }
 
@@ -976,15 +983,62 @@ void Wraith::adjustStats(int dungeonDepth) {
     level = dungeonDepth;
 }
 
+void Wraith::spawnAround(int pos) {
+    if (!Dungeon::level) return;
+    int n4[4] = { -Level::WIDTH, +1, +Level::WIDTH, -1 };
+    for (int n : n4) {
+        int cell = pos + n;
+        if (cell >= 0 && cell < Level::LENGTH && Dungeon::level->isPassable(cell) && !Actor::findChar(cell)) {
+            spawnAt(cell);
+        }
+    }
+}
+
+Wraith* Wraith::spawnAt(int pos) {
+    if (!Dungeon::level) return nullptr;
+    if (pos >= 0 && pos < Level::LENGTH && Dungeon::level->isPassable(pos) && !Actor::findChar(pos)) {
+        auto w = std::make_unique<Wraith>();
+        w->adjustStats(Dungeon::depth);
+        w->pos = pos;
+        w->state = State::HUNTING;
+        w->enemy = Dungeon::hero.get();
+        w->enemySeen = true;
+        Wraith* ptr = w.get();
+        Actor::occupyCell(ptr);
+        Actor::add(ptr);
+        FX::burst(pos, 0x8800ffFFu, 6);
+        Dungeon::mobs.push_back(std::move(w));
+        return ptr;
+    }
+    return nullptr;
+}
+
 // Animated Statue
 Statue::Statue() {
     name = "Animated Statue";
     HP = HT = 15 + Dungeon::depth * 5;
-    state = State::SLEEPING;
+    state = State::PASSIVE;
     expAward = 0;
 
-    auto w = std::make_unique<Weapon>("Sword", 3, 8 + Dungeon::depth, 10 + Dungeon::depth);
+    static const struct WeapDef { const char* name; int min; int max; int str; } s_weapons[] = {
+        { "Dagger", 2, 5, 10 },
+        { "Knuckles", 1, 6, 10 },
+        { "Spear", 2, 9, 12 },
+        { "Quarterstaff", 2, 8, 12 },
+        { "Sword", 3, 11, 14 },
+        { "Mace", 4, 10, 14 },
+        { "Longsword", 4, 15, 16 },
+        { "Battle Axe", 5, 14, 16 },
+        { "Glaive", 6, 18, 18 },
+        { "War Hammer", 7, 17, 18 }
+    };
+    int tier = std::min(5, 1 + Dungeon::depth / 5);
+    int idx = std::min(static_cast<int>(sizeof(s_weapons)/sizeof(s_weapons[0]) - 1), (tier - 1) * 2 + Random::Int(2));
+    auto w = std::make_unique<Weapon>(s_weapons[idx].name, s_weapons[idx].min, s_weapons[idx].max, s_weapons[idx].str);
     w->random();
+    if (w->level < 0) w->level = 0;
+    w->identify();
+    w->enchant();
     weapon = std::move(w);
 }
 
@@ -1007,6 +1061,22 @@ int Statue::defenseSkill(Char* attackerChar) {
 
 int Statue::dr() {
     return Dungeon::depth;
+}
+
+void Statue::damage(int dmg, Actor* src) {
+    if (state == State::PASSIVE) {
+        state = State::HUNTING;
+        enemy = Dungeon::hero.get();
+        enemySeen = true;
+    }
+    Mob::damage(dmg, src);
+}
+
+int Statue::attackProc(Char* enemyChar, int damage) {
+    if (weapon) {
+        weapon->proc(this, enemyChar, damage);
+    }
+    return Mob::attackProc(enemyChar, damage);
 }
 
 void Statue::die(Actor* src) {
@@ -1377,6 +1447,7 @@ std::string Mob::status() const {
         case State::WANDERING: return "This " + name + " is wandering.";
         case State::HUNTING:   return "This " + name + " is hunting.";
         case State::FLEEING:   return "This " + name + " is fleeing.";
+        case State::PASSIVE:   return "This " + name + " is passive.";
     }
     return "This " + name + " is passive.";
 }
@@ -1387,6 +1458,7 @@ std::string Mob::statePreview() const {
         case State::WANDERING: return "Wandering";
         case State::HUNTING:   return "Hunting";
         case State::FLEEING:   return "Fleeing";
+        case State::PASSIVE:   return "Passive";
     }
     return "Passive";
 }

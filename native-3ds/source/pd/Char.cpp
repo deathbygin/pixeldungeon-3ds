@@ -7,6 +7,7 @@
 #include "pd/Dungeon.h"
 #include "pd/Terrain.h"
 #include "pd/Hero.h"
+#include "pd/Mob.h"
 #include "pd/Assets.h"
 #include "pd/Sample.h"
 #include <algorithm>
@@ -150,14 +151,21 @@ bool Char::attack(Char* enemy) {
         espr->turnTo(enemy->pos, pos);
     }
 
-    // Attacking breaks Invisibility and Shadows
+    // Check for surprise attack BEFORE breaking invisibility/shadows
     Buff* inv = buff(BuffType::Invisibility);
-    if (inv) inv->detach();
     Buff* shd = buff(BuffType::Shadows);
+    bool surprise = (inv != nullptr) || (shd != nullptr) || (invisible > 0);
+
+    Mob* enemyMob = enemy->asMob();
+    if (enemyMob && (!enemyMob->enemySeen || enemyMob->paralysed || enemyMob->state == Mob::State::SLEEPING)) {
+        surprise = true;
+    }
+
+    if (inv) inv->detach();
     if (shd) shd->detach();
 
     float acuRoll = Random::Float(static_cast<float>(attackSkill(enemy)));
-    float defRoll = Random::Float(static_cast<float>(enemy->defenseSkill(this)));
+    float defRoll = surprise ? 0.0f : Random::Float(static_cast<float>(enemy->defenseSkill(this)));
 
     if (acuRoll >= defRoll) {
         int dmg = damageRoll();

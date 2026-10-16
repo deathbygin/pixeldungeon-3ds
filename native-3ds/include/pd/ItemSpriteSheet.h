@@ -133,6 +133,9 @@ public:
     static constexpr int STEAK              = 114;
     static constexpr int OVERPRICED         = 115;
     static constexpr int CARPACCIO          = 116;
+    static constexpr int VIAL               = 120;
+    static constexpr int BOMB               = 124;
+    static constexpr int HONEYPOT           = 125;
     static constexpr int MASTERY            = 82;
 };
 

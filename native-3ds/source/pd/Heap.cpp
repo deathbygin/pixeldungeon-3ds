@@ -6,6 +6,7 @@
 #include "pd/GLog.h"
 #include "pd/Assets.h"
 #include "pd/Sample.h"
+#include "pd/Mob.h"
 #include "noosa/Audio.h"
 #include <algorithm>
 
@@ -51,16 +52,33 @@ void Heap::open(Hero* hero) {
         FX::burst(pos, 0x9955ffFFu, 8);
         type = Type::HEAP;
         break;
-    case Type::SKELETON:
+    case Type::SKELETON: {
         GLog::i("You search the skeletal remains...");
         FX::burst(pos, 0xd0c090FFu, 8);
         Sample::playAt(Assets::SND_BONES, pos);
+        bool hasCursed = false;
+        for (auto& item : items) {
+            if (item && item->isCursed()) {
+                hasCursed = true;
+                break;
+            }
+        }
+        if (hasCursed) {
+            if (!Wraith::spawnAt(pos)) {
+                if (hero) {
+                    hero->damage(hero->HP / 2, nullptr);
+                }
+            }
+            Sample::playAt(Assets::SND_CURSED, pos);
+        }
         type = Type::HEAP;
         break;
+    }
     case Type::TOMB:
         GLog::w("You disturbed the ancient tomb!");
         FX::burst(pos, 0x505050FFu, 10);
         Sample::playAt(Assets::SND_TOMB, pos);
+        Wraith::spawnAround(hero ? hero->pos : pos);
         type = Type::HEAP;
         break;
     case Type::LOCKED_CHEST:
@@ -125,6 +143,16 @@ void Heap::drop(std::unique_ptr<Item> item) {
         items.push_back(std::move(item));
     } else {
         items.insert(items.begin(), std::move(item));
+    }
+}
+
+void Heap::replace(Item* oldItem, std::unique_ptr<Item> newItem) {
+    if (!oldItem || !newItem) return;
+    for (auto it = items.begin(); it != items.end(); ++it) {
+        if (it->get() == oldItem) {
+            *it = std::move(newItem);
+            return;
+        }
     }
 }
 

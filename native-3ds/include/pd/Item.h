@@ -16,17 +16,24 @@ class MissileWeapon;
 class Boomerang;
 class Dart;
 class ShortSword;
+class Ring;
+class DewVial;
+class Potion;
+class Scroll;
 
 enum class ItemCategory {
     Generic,
     Weapon,
     Armor,
     Potion,
-    Scroll
+    Scroll,
+    Ring,
+    Wand
 };
 
 class Item {
 public:
+    using ItemCategory = pd::ItemCategory;
     std::string name = "Item";
     int image = 0;
     int quantity = 1;
@@ -58,6 +65,7 @@ public:
     virtual Item* random();
 
     virtual bool isIdentified() const { return identified; }
+    virtual bool isCursed() const { return cursed; }
     virtual Item* identify() {
         identified = true;
         levelKnown = true;
@@ -75,6 +83,10 @@ public:
     virtual Boomerang* asBoomerang() { return nullptr; }
     virtual Dart* asDart() { return nullptr; }
     virtual ShortSword* asShortSword() { return nullptr; }
+    virtual Ring* asRing() { return nullptr; }
+    virtual DewVial* asDewVial() { return nullptr; }
+    virtual Potion* asPotion() { return nullptr; }
+    virtual Scroll* asScroll() { return nullptr; }
 };
 
 class Weapon : public Item {
@@ -99,6 +111,20 @@ public:
     std::string info() const override;
     std::string displayName() const override;
     virtual int typicalSTR() const;
+
+    enum class Enchantment {
+        NONE,
+        BLAZING,
+        CHILLING,
+        VENOMOUS,
+        PARALYTIC,
+        LEECH,
+        SHOCKING,
+        UNSTABLE
+    };
+    Enchantment enchantment = Enchantment::NONE;
+    bool isEnchanted() const { return enchantment != Enchantment::NONE; }
+    void enchant(Enchantment ench = Enchantment::NONE);
 
     virtual float acuracyFactor(Hero* hero) const;
     float speedFactor(Hero* hero) const override;
@@ -201,6 +227,7 @@ public:
     PotionType type = PotionType::HEALING;
 
     explicit Potion(PotionType tp);
+    Potion* asPotion() override { return this; }
     ItemCategory category() const override { return ItemCategory::Potion; }
     bool isStackable() const override { return true; }
     bool isIdentified() const override { return isKnown(type); }
@@ -216,6 +243,7 @@ public:
     int maxDistance(const Hero* hero = nullptr) const override { (void)hero; return 6; }
 
     void updatePerception();
+    static void heal(Hero* hero);
 
     // Static Status Handler methods
     static void initColors();
@@ -251,6 +279,7 @@ public:
     ScrollType type = ScrollType::UPGRADE;
 
     explicit Scroll(ScrollType tp);
+    Scroll* asScroll() override { return this; }
     ItemCategory category() const override { return ItemCategory::Scroll; }
     bool isStackable() const override { return true; }
     bool isIdentified() const override { return isKnown(type); }
@@ -515,6 +544,114 @@ public:
         (void)qty;
         return std::make_unique<Amulet>();
     }
+};
+
+// =============================================================================
+// Ring
+// =============================================================================
+class Ring : public Item {
+public:
+    enum class Gem {
+        DIAMOND,
+        OPAL,
+        GARNET,
+        RUBY,
+        AMETHYST,
+        TOPAZ,
+        ONYX,
+        TOURMALINE,
+        EMERALD,
+        SAPPHIRE,
+        QUARTZ,
+        AGATE
+    };
+    Gem gem = Gem::DIAMOND;
+    std::string effect = "Mending";
+
+    explicit Ring(Gem g = Gem::DIAMOND, std::string eff = "Mending");
+    Ring* asRing() override { return this; }
+    ItemCategory category() const override { return ItemCategory::Ring; }
+    bool isEquippable() const override { return true; }
+    bool isUpgradable() const override { return true; }
+    bool isIdentified() const override { return identified && levelKnown; }
+    Item* identify() override;
+    Item* random() override;
+    std::vector<std::string> actions(Hero* hero) override;
+    bool execute(Hero* hero, const std::string& action) override;
+    std::string info() const override;
+    std::string displayName() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+// =============================================================================
+// DewVial
+// =============================================================================
+class DewVial : public Item {
+public:
+    static constexpr int MAX_VOLUME = 10;
+    int volume = 0;
+
+    DewVial();
+    DewVial* asDewVial() override { return this; }
+    bool isStackable() const override { return false; }
+    bool isUpgradable() const override { return false; }
+    bool isIdentified() const override { return true; }
+    bool isFull() const { return volume >= MAX_VOLUME; }
+    void fill() { volume = MAX_VOLUME; }
+    void collectDew(int count = 1);
+    static void autoDrink(Hero* hero);
+
+    std::vector<std::string> actions(Hero* hero) override;
+    bool execute(Hero* hero, const std::string& action) override;
+    std::string info() const override;
+    std::string displayName() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+// =============================================================================
+// Bomb
+// =============================================================================
+class Bomb : public Item {
+public:
+    Bomb();
+    bool isStackable() const override { return true; }
+    bool isUpgradable() const override { return false; }
+    bool isIdentified() const override { return true; }
+    Item* random() override;
+    std::vector<std::string> actions(Hero* hero) override;
+    bool execute(Hero* hero, const std::string& action) override;
+    void onThrow(int cell) override;
+    void explode(int cell);
+    std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+// =============================================================================
+// Honeypot
+// =============================================================================
+class Honeypot : public Item {
+public:
+    Honeypot();
+    bool isStackable() const override { return true; }
+    bool isUpgradable() const override { return false; }
+    bool isIdentified() const override { return true; }
+    std::vector<std::string> actions(Hero* hero) override;
+    bool execute(Hero* hero, const std::string& action) override;
+    void onThrow(int cell) override;
+    void shatter(int cell);
+    std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+// =============================================================================
+// MysteryMeat
+// =============================================================================
+class MysteryMeat : public Food {
+public:
+    MysteryMeat();
+    bool execute(Hero* hero, const std::string& action) override;
+    std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
 };
 
 } // namespace pd

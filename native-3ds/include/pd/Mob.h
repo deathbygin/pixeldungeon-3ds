@@ -16,7 +16,8 @@ public:
         SLEEPING,
         WANDERING,
         HUNTING,
-        FLEEING
+        FLEEING,
+        PASSIVE
     };
 
     enum class MobType {
@@ -290,6 +291,9 @@ public:
     int attackSkill(Char* target) override;
     int defenseSkill(Char* attacker) override;
     void adjustStats(int dungeonDepth);
+
+    static void spawnAround(int pos);
+    static Wraith* spawnAt(int pos);
 };
 
 class Statue : public Mob {
@@ -303,6 +307,8 @@ public:
     int attackSkill(Char* target) override;
     int defenseSkill(Char* attacker) override;
     int dr() override;
+    void damage(int dmg, Actor* src) override;
+    int attackProc(Char* enemy, int damage) override;
     void die(Actor* src) override;
 };
 

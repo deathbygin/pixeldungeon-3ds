@@ -575,6 +575,53 @@ void Painter::paintPassage(Level* level, Room* room) {
 // Special Room Painters
 // =============================================================================
 
+static std::unique_ptr<Item> randomWeapon(int minTier = 1, int maxTier = 5) {
+    static const struct WeapDef { const char* name; int min; int max; int str; int tier; } s_weapons[] = {
+        { "Dagger", 2, 5, 10, 1 },
+        { "Knuckles", 1, 6, 10, 1 },
+        { "Spear", 2, 9, 12, 2 },
+        { "Quarterstaff", 2, 8, 12, 2 },
+        { "Shortsword", 3, 8, 11, 2 },
+        { "Sword", 3, 11, 14, 3 },
+        { "Mace", 4, 10, 14, 3 },
+        { "Longsword", 4, 15, 16, 4 },
+        { "Battle Axe", 5, 14, 16, 4 },
+        { "Glaive", 6, 18, 18, 5 },
+        { "War Hammer", 7, 17, 18, 5 }
+    };
+    int t = Random::IntRange(minTier, maxTier);
+    std::vector<const WeapDef*> candidates;
+    for (const auto& w : s_weapons) {
+        if (w.tier == t) candidates.push_back(&w);
+    }
+    if (candidates.empty()) candidates.push_back(&s_weapons[0]);
+    const WeapDef* chosen = candidates[Random::Int(static_cast<int>(candidates.size()))];
+    auto w = std::make_unique<Weapon>(chosen->name, chosen->min, chosen->max, chosen->str);
+    w->random();
+    return w;
+}
+
+static std::unique_ptr<Item> randomArmor(int minTier = 1, int maxTier = 5) {
+    int t = Random::IntRange(minTier, maxTier);
+    static const char* s_names[] = { "Cloth Armor", "Leather Armor", "Mail Armor", "Scale Armor", "Plate Armor" };
+    int idx = std::min(4, std::max(0, t - 1));
+    auto a = std::make_unique<Armor>(s_names[idx], t, 9 + t * 2);
+    a->random();
+    return a;
+}
+
+static std::unique_ptr<Item> randomPrize(Level* level) {
+    auto prize = level->itemToSpawnAsPrize();
+    if (prize) return prize;
+
+    switch (Random::Int(4)) {
+        case 0: return std::make_unique<Potion>(static_cast<Potion::PotionType>(Random::Int(static_cast<int>(Potion::POTION_COUNT))));
+        case 1: return std::make_unique<Scroll>(static_cast<Scroll::ScrollType>(Random::Int(static_cast<int>(Scroll::SCROLL_COUNT))));
+        case 2: return std::make_unique<Food>();
+        default: return std::make_unique<Gold>(Random::IntRange(15 * Dungeon::depth, 35 * Dungeon::depth));
+    }
+}
+
 void Painter::paintArmory(Level* level, Room* room) {
     fill(level, *room, Terrain::WALL);
     fill(level, *room, 1, Terrain::EMPTY);
@@ -607,14 +654,14 @@ void Painter::paintArmory(Level* level, Room* room) {
         } while ((level->map[pos] != Terrain::EMPTY || level->getHeap(pos) != nullptr) && ++tries < 50);
 
         std::unique_ptr<Item> prize;
-        if (Random::Int(2) == 0) {
-            auto w = std::make_unique<Weapon>("Weapon", 3, 8 + Dungeon::depth, 10 + Dungeon::depth);
-            w->random();
-            prize = std::move(w);
+        if (Random::Int(6) == 0) {
+            auto b = std::make_unique<Bomb>();
+            b->random();
+            prize = std::move(b);
+        } else if (Random::Int(2) == 0) {
+            prize = randomWeapon(1, std::min(5, 1 + Dungeon::depth / 5 + 1));
         } else {
-            auto a = std::make_unique<Armor>("Armor", 1 + Dungeon::depth / 5, 10 + Dungeon::depth);
-            a->random();
-            prize = std::move(a);
+            prize = randomArmor(1, std::min(5, 1 + Dungeon::depth / 5 + 1));
         }
         level->drop(std::move(prize), pos);
     }
@@ -654,8 +701,9 @@ void Painter::paintLaboratory(Level* level, Room* room) {
         } while ((level->map[pos] != Terrain::EMPTY_SP || level->getHeap(pos) != nullptr) && ++tries < 50);
 
         auto prize = level->itemToSpawnAsPrize();
-        if (!prize) {
-            prize = std::make_unique<Potion>(static_cast<Potion::PotionType>(Random::Int(12)));
+        if (!prize || prize->category() != Item::ItemCategory::Potion) {
+            if (prize) level->addItemToSpawn(std::move(prize));
+            prize = std::make_unique<Potion>(static_cast<Potion::PotionType>(Random::Int(static_cast<int>(Potion::POTION_COUNT))));
         }
         level->drop(std::move(prize), pos);
     }
@@ -668,8 +716,9 @@ void Painter::paintLibrary(Level* level, Room* room) {
     fill(level, *room, 1, Terrain::EMPTY);
 
     auto entrance = room->entrance();
+    Point a(-1, -1), b(-1, -1);
+
     if (entrance) {
-        Point a(-1, -1), b(-1, -1);
         if (entrance->x == room->left) {
             a = Point(room->left + 1, entrance->y - 1);
             b = Point(room->left + 1, entrance->y + 1);
@@ -687,6 +736,7 @@ void Painter::paintLibrary(Level* level, Room* room) {
             b = Point(entrance->x - 1, room->bottom - 1);
             fill(level, room->left + 1, room->top + 1, room->width() - 1, 1, Terrain::BOOKSHELF);
         }
+
         if (a.x != -1 && level->get(a.x, a.y) == Terrain::EMPTY) set(level, a, Terrain::STATUE);
         if (b.x != -1 && level->get(b.x, b.y) == Terrain::EMPTY) set(level, b, Terrain::STATUE);
 
@@ -702,8 +752,9 @@ void Painter::paintLibrary(Level* level, Room* room) {
         } while ((level->map[pos] != Terrain::EMPTY || level->getHeap(pos) != nullptr) && ++tries < 50);
 
         auto prize = level->itemToSpawnAsPrize();
-        if (!prize) {
-            prize = std::make_unique<Scroll>(static_cast<Scroll::ScrollType>(Random::Int(12)));
+        if (!prize || prize->category() != Item::ItemCategory::Scroll) {
+            if (prize) level->addItemToSpawn(std::move(prize));
+            prize = std::make_unique<Scroll>(static_cast<Scroll::ScrollType>(Random::Int(static_cast<int>(Scroll::SCROLL_COUNT))));
         }
         level->drop(std::move(prize), pos);
     }
@@ -721,11 +772,15 @@ void Painter::paintGarden(Level* level, Room* room) {
         entrance->set(Room::Door::Type::REGULAR);
     }
 
-    int bushes = (Random::Int(5) == 0 ? 2 : 1);
-    for (int i = 0; i < bushes; ++i) {
-        int pos = room->random();
-        set(level, pos, Terrain::GRASS);
-        level->drop(std::make_unique<PlantSeed>(PlantSeed::PlantType::SUNGRASS), pos);
+    if (Random::Int(2) == 0) {
+        level->drop(std::make_unique<Honeypot>(), room->random());
+    } else {
+        int bushes = (Random::Int(5) == 0 ? 2 : 1);
+        for (int i = 0; i < bushes; ++i) {
+            int pos = room->random();
+            set(level, pos, Terrain::GRASS);
+            level->plant(PlantSeed::PlantType::SUNGRASS, pos);
+        }
     }
 }
 
@@ -734,7 +789,12 @@ void Painter::paintMagicWell(Level* level, Room* room) {
     fill(level, *room, 1, Terrain::EMPTY);
 
     Point c = room->center();
-    set(level, c.x, c.y, Terrain::WELL);
+    int cell = c.x + Level::WIDTH * c.y;
+    set(level, cell, Terrain::WELL);
+
+    int roll = Random::Int(3);
+    Level::WellType type = (roll == 0) ? Level::WellType::Awareness : ((roll == 1) ? Level::WellType::Health : Level::WellType::Transmutation);
+    level->wells[cell] = type;
 
     auto entrance = room->entrance();
     if (entrance) {
@@ -770,9 +830,17 @@ void Painter::paintPool(Level* level, Room* room) {
 
         auto prize = level->itemToSpawnAsPrize();
         if (!prize) {
-            auto w = std::make_unique<Weapon>("Weapon", 4, 10 + Dungeon::depth, 12 + Dungeon::depth);
-            w->random();
-            prize = std::move(w);
+            prize = (Random::Int(2) == 0)
+                ? randomWeapon(1, std::min(5, 1 + Dungeon::depth / 5 + 1))
+                : randomArmor(1, std::min(5, 1 + Dungeon::depth / 5 + 1));
+            for (int i = 0; i < 4; ++i) {
+                auto another = (Random::Int(2) == 0)
+                    ? randomWeapon(1, std::min(5, 1 + Dungeon::depth / 5 + 1))
+                    : randomArmor(1, std::min(5, 1 + Dungeon::depth / 5 + 1));
+                if (another->level > prize->level) {
+                    prize = std::move(another);
+                }
+            }
         }
 
         Heap* h = level->drop(std::move(prize), pos);
@@ -833,16 +901,21 @@ void Painter::paintPit(Level* level, Room* room) {
     Heap* skel = level->drop(std::make_unique<IronKey>(Dungeon::depth), remains);
     if (skel) {
         skel->type = Heap::Type::SKELETON;
-        if (Random::Int(2) == 0) {
-            auto w = std::make_unique<Weapon>("Sword", 3, 8 + Dungeon::depth, 11 + Dungeon::depth);
-            w->random();
-            skel->drop(std::move(w));
+
+        if (Random::Int(5) == 0) {
+            auto r = std::make_unique<Ring>();
+            r->random();
+            skel->drop(std::move(r));
         } else {
-            auto a = std::make_unique<Armor>("Armor", 2, 12 + Dungeon::depth);
-            a->random();
-            skel->drop(std::move(a));
+            skel->drop(Random::Int(2) == 0
+                ? randomWeapon(1, std::min(5, 1 + Dungeon::depth / 5 + 1))
+                : randomArmor(1, std::min(5, 1 + Dungeon::depth / 5 + 1)));
         }
-        skel->drop(std::make_unique<Potion>(Potion::PotionType::HEALING));
+
+        int n = Random::IntRange(1, 2);
+        for (int i = 0; i < n; ++i) {
+            skel->drop(randomPrize(level));
+        }
     }
 }
 
@@ -858,20 +931,7 @@ void Painter::paintStorage(Level* level, Room* room) {
             pos = room->random();
         } while ((level->map[pos] != Terrain::EMPTY_SP || level->getHeap(pos) != nullptr) && ++tries < 50);
 
-        auto prize = level->itemToSpawnAsPrize();
-        if (!prize) {
-            float r = Random::Float();
-            if (r < 0.35f) {
-                prize = std::make_unique<Food>();
-            } else if (r < 0.65f) {
-                prize = std::make_unique<Potion>(static_cast<Potion::PotionType>(Random::Int(12)));
-            } else if (r < 0.85f) {
-                prize = std::make_unique<Scroll>(static_cast<Scroll::ScrollType>(Random::Int(12)));
-            } else {
-                prize = std::make_unique<Gold>(Random::IntRange(10, 35));
-            }
-        }
-        level->drop(std::move(prize), pos);
+        level->drop(randomPrize(level), pos);
     }
 
     auto entrance = room->entrance();
@@ -919,8 +979,12 @@ void Painter::paintStatue(Level* level, Room* room) {
 }
 
 void Painter::paintTraps(Level* level, Room* room) {
-    int trapChoices[] = { Terrain::TOXIC_TRAP, Terrain::PARALYTIC_TRAP, Terrain::CHASM };
-    int trapType = trapChoices[Random::Int(3)];
+    int trapChoices[6] = {
+        Terrain::TOXIC_TRAP, Terrain::TOXIC_TRAP, Terrain::TOXIC_TRAP,
+        Terrain::PARALYTIC_TRAP, Terrain::PARALYTIC_TRAP,
+        Terrain::CHASM
+    };
+    int trapType = trapChoices[Random::Int(6)];
 
     fill(level, *room, Terrain::WALL);
     fill(level, *room, 1, trapType);
@@ -952,16 +1016,27 @@ void Painter::paintTraps(Level* level, Room* room) {
     }
 
     int pos = x + y * Level::WIDTH;
+    auto prize = level->itemToSpawnAsPrize();
+    if (!prize) {
+        prize = (Random::Int(2) == 0)
+            ? randomWeapon(1, std::min(5, 1 + Dungeon::depth / 5 + 1))
+            : randomArmor(1, std::min(5, 1 + Dungeon::depth / 5 + 1));
+        for (int i = 0; i < 3; ++i) {
+            auto another = (Random::Int(2) == 0)
+                ? randomWeapon(1, std::min(5, 1 + Dungeon::depth / 5 + 1))
+                : randomArmor(1, std::min(5, 1 + Dungeon::depth / 5 + 1));
+            if (another->level > prize->level) {
+                prize = std::move(another);
+            }
+        }
+    }
+
     if (Random::Int(3) == 0) {
         if (lastRow == Terrain::CHASM) set(level, pos, Terrain::EMPTY);
-        auto prize = std::make_unique<Weapon>("Weapon", 4, 12, 13);
-        prize->random();
         Heap* h = level->drop(std::move(prize), pos);
         if (h) h->type = Heap::Type::CHEST;
     } else {
         set(level, pos, Terrain::PEDESTAL);
-        auto prize = std::make_unique<Armor>("Armor", 3, 14);
-        prize->random();
         level->drop(std::move(prize), pos);
     }
 
@@ -1014,34 +1089,45 @@ void Painter::paintVault(Level* level, Room* room) {
     Point c = room->center();
     int cPos = c.x + c.y * Level::WIDTH;
 
+    auto makeVaultPrize = []() -> std::unique_ptr<Item> {
+        if (Random::Int(2) == 0) {
+            auto w = std::make_unique<WandOfMagicMissile>();
+            w->level = Random::Int(2);
+            return w;
+        } else {
+            auto r = std::make_unique<Ring>();
+            r->random();
+            return r;
+        }
+    };
+
     switch (Random::Int(3)) {
     case 0: {
-        auto w = std::make_unique<Weapon>("Enchanted Weapon", 4, 12, 13);
-        w->random();
-        Heap* h = level->drop(std::move(w), cPos);
+        Heap* h = level->drop(makeVaultPrize(), cPos);
         if (h) h->type = Heap::Type::LOCKED_CHEST;
         level->addItemToSpawn(std::make_unique<GoldenKey>(Dungeon::depth));
         break;
     }
     case 1: {
-        auto w = std::make_unique<Weapon>("Crystal Weapon", 4, 14, 14);
-        w->random();
-        auto a = std::make_unique<Armor>("Crystal Armor", 3, 14);
-        a->random();
+        auto w = std::make_unique<WandOfMagicMissile>();
+        w->level = Random::Int(2);
+        auto r = std::make_unique<Ring>();
+        r->random();
+
         Heap* h1 = level->drop(std::move(w), cPos);
         if (h1) h1->type = Heap::Type::CRYSTAL_CHEST;
+
         const int n8[8] = { +1, -1, +Level::WIDTH, -Level::WIDTH, +1+Level::WIDTH, +1-Level::WIDTH, -1+Level::WIDTH, -1-Level::WIDTH };
         int cPos2 = cPos + n8[Random::Int(8)];
-        Heap* h2 = level->drop(std::move(a), cPos2);
+        Heap* h2 = level->drop(std::move(r), cPos2);
         if (h2) h2->type = Heap::Type::CRYSTAL_CHEST;
+
         level->addItemToSpawn(std::make_unique<GoldenKey>(Dungeon::depth));
         break;
     }
     case 2: {
         set(level, cPos, Terrain::PEDESTAL);
-        auto w = std::make_unique<Weapon>("Sacred Weapon", 4, 14, 14);
-        w->random();
-        level->drop(std::move(w), cPos);
+        level->drop(makeVaultPrize(), cPos);
         break;
     }
     }
@@ -1056,6 +1142,9 @@ void Painter::paintVault(Level* level, Room* room) {
 void Painter::paintWeakFloor(Level* level, Room* room) {
     fill(level, *room, Terrain::WALL);
     fill(level, *room, 1, Terrain::CHASM);
+
+    Level::weakFloorCreated = true;
+    Level::pitRoomNeeded = true;
 
     auto entrance = room->entrance();
     if (entrance) {
@@ -1138,9 +1227,16 @@ void Painter::paintCrypt(Level* level, Room* room) {
 
     level->addItemToSpawn(std::make_unique<IronKey>(Dungeon::depth));
 
-    auto a = std::make_unique<Armor>("Ancient Armor", 3, 14);
-    a->random();
-    Heap* tomb = level->drop(std::move(a), cx + cy * Level::WIDTH);
+    // 4 rolls of armor, choose highest tier/level
+    auto prize = randomArmor(1, std::min(5, 1 + Dungeon::depth / 5 + 1));
+    for (int i = 0; i < 3; ++i) {
+        auto another = randomArmor(1, std::min(5, 1 + Dungeon::depth / 5 + 1));
+        if (another->asArmor()->tier > prize->asArmor()->tier) {
+            prize = std::move(another);
+        }
+    }
+
+    Heap* tomb = level->drop(std::move(prize), cx + cy * Level::WIDTH);
     if (tomb) {
         tomb->type = Heap::Type::TOMB;
     }

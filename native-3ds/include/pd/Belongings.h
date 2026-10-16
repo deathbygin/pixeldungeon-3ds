@@ -29,6 +29,7 @@ public:
     bool consumeKey(const std::string& keyName, int depth);
     Item* getItem(const std::string& itemName);
     void observe();
+    void uncurseEquipped();
     bool isFull() const { return backpack.size() >= BACKPACK_SIZE; }
 };
 

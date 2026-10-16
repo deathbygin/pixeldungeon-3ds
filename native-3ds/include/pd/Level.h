@@ -7,6 +7,7 @@
 #include "pd/Plant.h"
 #include <vector>
 #include <memory>
+#include <unordered_map>
 
 namespace pd {
 
@@ -18,6 +19,10 @@ public:
     static constexpr int WIDTH = PathFinder::WIDTH;   // 32
     static constexpr int HEIGHT = PathFinder::HEIGHT; // 32
     static constexpr int LENGTH = PathFinder::LENGTH; // 1024
+
+    static constexpr int NEIGHBOURS4[4] = { -WIDTH, 1, WIDTH, -1 };
+    static constexpr int NEIGHBOURS8[8] = { 1, -1, WIDTH, -WIDTH, 1 + WIDTH, 1 - WIDTH, -1 + WIDTH, -1 - WIDTH };
+    static constexpr int NEIGHBOURS9[9] = { 0, 1, -1, WIDTH, -WIDTH, 1 + WIDTH, 1 - WIDTH, -1 + WIDTH, -1 - WIDTH };
 
     int map[LENGTH] = { 0 };
     bool visited[LENGTH] = { false };
@@ -50,6 +55,15 @@ public:
     std::vector<std::shared_ptr<Room>> rooms;
     std::vector<std::unique_ptr<Heap>> heaps;
     std::vector<std::unique_ptr<Item>> itemsToSpawn;
+
+    enum class WellType {
+        Awareness,
+        Health,
+        Transmutation
+    };
+    std::unordered_map<int, WellType> wells;
+    void affectWell(int cell, Char* ch);
+    void bounceItemFrom(int cell);
 
     void addItemToSpawn(std::unique_ptr<Item> item) {
         if (item) itemsToSpawn.push_back(std::move(item));
