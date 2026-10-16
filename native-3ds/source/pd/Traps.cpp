@@ -96,7 +96,7 @@ void Traps::trigger(int tile, int cell, Char* ch) {
             if (ch) {
                 auto* p = ch->affect<Poison>();
                 if (p) {
-                    p->duration = 4 + Dungeon::depth / 2;
+                    p->durationTicks = 4 + Dungeon::depth / 2;
                 }
             }
             FX::splash(cell, 0xbb66eeFFu, 8);

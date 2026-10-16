@@ -90,6 +90,12 @@ void Char::move(int step) {
             Dungeon::level->trample(step, this);
         }
     }
+
+    // Bleeding damage upon movement
+    Bleeding* b = getBuff<Bleeding>();
+    if (b && isAlive()) {
+        damage(Random::Int(b->level), b);
+    }
 }
 
 int Char::attackSkill(Char* target) {
@@ -132,6 +138,12 @@ bool Char::attack(Char* enemy) {
         espr->turnTo(enemy->pos, pos);
     }
 
+    // Attacking breaks Invisibility and Shadows
+    Buff* inv = buff(BuffType::Invisibility);
+    if (inv) inv->detach();
+    Buff* shd = buff(BuffType::Shadows);
+    if (shd) shd->detach();
+
     float acuRoll = Random::Float(static_cast<float>(attackSkill(enemy)));
     float defRoll = Random::Float(static_cast<float>(enemy->defenseSkill(this)));
 
@@ -162,9 +174,54 @@ bool Char::attack(Char* enemy) {
     }
 }
 
+void Char::spend(float time) {
+    float timeScale = 1.0f;
+    if (buff(BuffType::Slow) != nullptr) {
+        timeScale *= 0.5f;
+    }
+    if (buff(BuffType::Speed) != nullptr) {
+        timeScale *= 2.0f;
+    }
+    Actor::spend(time / timeScale);
+}
+
+void Char::unfreeze() {
+    if (!buff(BuffType::Paralysis) && !buff(BuffType::Frost)) {
+        paralysed = false;
+    }
+}
+
+bool Char::isCharmedBy(Char* ch) const {
+    if (!ch) return false;
+    Charm* c = getBuff<Charm>();
+    return c && c->charmer == ch;
+}
+
 void Char::damage(int dmg, Actor* src) {
     (void)src;
     interrupt();
+
+    // Damage reactions on active buffs:
+    // 1. Frost melts immediately upon taking any damage
+    Frost* frostBuff = getBuff<Frost>();
+    if (frostBuff && dmg > 0) {
+        frostBuff->detach();
+    }
+
+    // 2. Sleep awakens immediately upon taking any damage
+    Sleep* sleepBuff = getBuff<Sleep>();
+    if (sleepBuff && dmg > 0) {
+        sleepBuff->detach();
+    }
+
+    // 3. Paralysis has a chance to break upon taking damage
+    Paralysis* pBuff = getBuff<Paralysis>();
+    if (pBuff && dmg > 0 && HT > 0) {
+        if (Random::Int(dmg) >= Random::Int(HP)) {
+            pBuff->detach();
+        }
+    }
+
     HP = std::max(0, HP - dmg);
     if (HP <= 0) {
         die(src);

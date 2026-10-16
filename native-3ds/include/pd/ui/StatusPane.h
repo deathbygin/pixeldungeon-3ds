@@ -8,6 +8,7 @@
 
 namespace pd {
 class Hero;
+class Buff;
 }
 
 namespace pd::ui {
@@ -25,6 +26,9 @@ public:
     // 2: Menu button clicked (toggle pause / WndGame / options)
     // 0: No action
     int update(const TouchController& touch, u32 kDown);
+
+    // If a buff badge in the tray was tapped, returns a pointer to the buff (or nullptr)
+    const pd::Buff* clickedBuff(const pd::Hero* hero, const TouchController& touch) const;
 
     void draw(const pd::Hero* hero, int depth, C2D_TextBuf textBuf) const;
 

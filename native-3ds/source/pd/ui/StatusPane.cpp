@@ -59,6 +59,27 @@ int StatusPane::update(const TouchController& touch, u32 kDown) {
     return 0;
 }
 
+const pd::Buff* StatusPane::clickedBuff(const pd::Hero* hero, const TouchController& touch) const {
+    if (!hero) return nullptr;
+
+    float bx = 44.0f;
+    float by = 21.0f;
+
+    for (const pd::Buff* b : hero->buffs) {
+        if (!b) continue;
+        int iconIdx = b->icon();
+        if (iconIdx < 0) continue;
+
+        noosa::RectF hitRect(bx - 1.0f, by - 1.0f, 10.0f, 10.0f);
+        if (touch.clicked(hitRect)) {
+            return b;
+        }
+        bx += 10.0f;
+        if (bx > 180.0f) break;
+    }
+    return nullptr;
+}
+
 void StatusPane::draw(const pd::Hero* hero, int depth, C2D_TextBuf textBuf) const {
     (void)textBuf;
     if (!hero) return;
@@ -175,21 +196,13 @@ void StatusPane::draw(const pd::Hero* hero, int depth, C2D_TextBuf textBuf) cons
             bx += 10.0f;
         };
 
-        if (hero->isStarving()) drawBuffIcon(6); // STARVATION
-        else if (hero->isHungry()) drawBuffIcon(5); // HUNGER
-        if (hero->buff(BuffType::Poison)) drawBuffIcon(3);
-        if (hero->buff(BuffType::Bleeding)) drawBuffIcon(26);
-        if (hero->buff(BuffType::Burning)) drawBuffIcon(2);
-        if (hero->buff(BuffType::Paralysis)) drawBuffIcon(4);
-        if (hero->buff(BuffType::Fury)) drawBuffIcon(18);
-        if (hero->buff(BuffType::Combo)) drawBuffIcon(17);
-        if (hero->buff(BuffType::SnipersMark)) drawBuffIcon(27);
-        if (hero->buff(BuffType::Barkskin)) drawBuffIcon(24);
-        if (hero->buff(BuffType::Shadows)) drawBuffIcon(13);
-        if (hero->buff(BuffType::Invisibility)) drawBuffIcon(12);
-        if (hero->buff(BuffType::Regeneration)) drawBuffIcon(19);
-        if (hero->buff(BuffType::Roots)) drawBuffIcon(11);
-        if (hero->buff(BuffType::Cripple)) drawBuffIcon(23);
+        for (const pd::Buff* b : hero->buffs) {
+            if (!b) continue;
+            int iconIdx = b->icon();
+            if (iconIdx >= 0 && bx <= 180.0f) {
+                drawBuffIcon(iconIdx);
+            }
+        }
     }
 
     // 6. Dungeon Info Cluster (x: 190 to 290, y: 4..28)

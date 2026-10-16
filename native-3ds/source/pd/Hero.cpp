@@ -234,12 +234,52 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
         return false;
     }
 
+    if (paralysed) {
+        GLog::w("You can't move while paralyzed!");
+        waitingForInput = true;
+        return false;
+    }
+
+    // Vertigo scrambles direction into a random adjacent passable step
+    if (buff(BuffType::Vertigo) != nullptr && nextCell != pos) {
+        std::vector<int> adj;
+        int px = pos % Level::WIDTH;
+        int py = pos / Level::WIDTH;
+        for (int dy = -1; dy <= 1; ++dy) {
+            for (int dx = -1; dx <= 1; ++dx) {
+                if (dx == 0 && dy == 0) continue;
+                int nx = px + dx;
+                int ny = py + dy;
+                if (nx >= 0 && nx < Level::WIDTH && ny >= 0 && ny < Level::HEIGHT) {
+                    int c = ny * Level::WIDTH + nx;
+                    if (currentLevel->isPassable(c)) {
+                        adj.push_back(c);
+                    }
+                }
+            }
+        }
+        if (!adj.empty()) {
+            nextCell = adj[Random::Int(static_cast<int>(adj.size()))];
+        }
+    }
+
     Char* enemy = Actor::findChar(nextCell);
     if (enemy && enemy != this) {
+        if (isCharmedBy(enemy)) {
+            GLog::w("You are too charmed to attack!");
+            waitingForInput = true;
+            return false;
+        }
         attack(enemy);
         next();
         waitingForInput = false;
         return true;
+    }
+
+    if (rooted) {
+        GLog::w("You are rooted to the ground and cannot move!");
+        waitingForInput = true;
+        return false;
     }
 
     int tile = currentLevel->get(nextCell);

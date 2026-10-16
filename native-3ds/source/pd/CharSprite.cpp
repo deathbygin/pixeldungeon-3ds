@@ -142,6 +142,9 @@ void CharSprite::update(float dt) {
         int cy = m_char->pos / Level::WIDTH;
         m_worldX = (cx + 0.5f) * 16.0f - m_width * 0.5f;
         m_worldY = (cy + 1.0f) * 16.0f - m_height;
+        if (m_char->flying) {
+            m_worldY -= 3.0f; // 3-pixel hover offset for levitating characters
+        }
     }
 
     m_movieClip.x = m_worldX;

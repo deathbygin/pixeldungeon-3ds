@@ -249,8 +249,7 @@ std::string BottomScreenUI::getHoverPreviewText(int cell, const pd::Level* level
         case Terrain::ALARM_TRAP:     return "Alarm Trap";
         case Terrain::LIGHTNING_TRAP: return "Lightning Trap";
         case Terrain::GRIPPING_TRAP:  return "Gripping Trap";
-        case Terrain::SUMMONING_TRAP: return "Summoning Trap";
-        case Terrain::SECRET_DOOR:    return "Wall";
+        case Terrain::SECRET_DOOR:             return "Wall";
         case Terrain::SECRET_TOXIC_TRAP:
         case Terrain::SECRET_FIRE_TRAP:
         case Terrain::SECRET_PARALYTIC_TRAP:
@@ -258,10 +257,8 @@ std::string BottomScreenUI::getHoverPreviewText(int cell, const pd::Level* level
         case Terrain::SECRET_ALARM_TRAP:
         case Terrain::SECRET_LIGHTNING_TRAP:
         case Terrain::SECRET_GRIPPING_TRAP:
-        case Terrain::SECRET_SUMMONING_TRAP:
-        case Terrain::SECRET_TELEPORTATION_TRAP:
-            return "Floor";
-        case Terrain::WALL:           return "Wall";
+        case Terrain::SECRET_SUMMONING_TRAP:   return "Floor";
+        case Terrain::WALL:                    return "Wall";
         case Terrain::WALL_DECO:      return "Wall";
         case Terrain::EMPTY:          return "Floor";
         case Terrain::EMPTY_DECO:     return "Floor";
@@ -643,6 +640,16 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
         return false;
     }
 
+    // Check if hero buff icon was clicked in StatusPane tray
+    if (hero) {
+        const pd::Buff* b = m_statusPane.clickedBuff(hero, m_touch);
+        if (b) {
+            std::string buffInfo = b->name() + "\n\n" + b->desc();
+            showMessage(buffInfo);
+            return false;
+        }
+    }
+
     // Hardware shortcuts to enter Examine Mode:
     // 1. SELECT button
     // 2. Double-tap X button
@@ -948,6 +955,7 @@ void BottomScreenUI::drawRightGlanceCard(const pd::Hero* hero, C2D_TextBuf textB
             if (heap && (level->visited[cell] || Dungeon::visible[cell])) {
                 BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "Contains Item", cardX + 8.0f, cardY + 52.0f, zText, 0xE4A672FF, 0x000000FF);
             } else if (level) {
+                int t = level->map[cell];
                 std::string attr = level->isPassable(cell) ? "Passable" : "Impassable";
                 if (level->avoid[cell]) attr += " (Hazard)";
                 BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, attr, cardX + 8.0f, cardY + 52.0f, zText, 0xCACFC2FF, 0x000000FF);
@@ -988,11 +996,10 @@ void BottomScreenUI::drawRightGlanceCard(const pd::Hero* hero, C2D_TextBuf textB
         float thW = BitmapFont::width(BitmapFont::FontType::Font1x, mobHpBuf);
         BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, mobHpBuf, std::floor(barX + (barW - thW) * 0.5f), barY + 1.0f, zText + 0.01f, 0xFFFFFFFF, 0x000000FF);
 
-        // Mob State / Awareness
+        // Mob State / Awareness & Active Buffs
         std::string statusStr = "Status: Hunting";
         u32 statusCol = C2D_Color32(0xEE, 0x44, 0x44, 0xFF);
-        Mob* mobTarget = static_cast<Mob*>(targetChar);
-        if (mobTarget) {
+        if (Mob* mobTarget = targetChar->asMob()) {
             statusStr = "Status: " + mobTarget->statePreview();
             if (mobTarget->state == Mob::State::SLEEPING) statusCol = C2D_Color32(0x88, 0xAA, 0xEE, 0xFF);
             else if (mobTarget->state == Mob::State::WANDERING) statusCol = C2D_Color32(0xEE, 0xCC, 0x22, 0xFF);
@@ -1001,18 +1008,34 @@ void BottomScreenUI::drawRightGlanceCard(const pd::Hero* hero, C2D_TextBuf textB
         if (targetChar->buff(BuffType::Paralysis)) {
             statusStr = "Status: Paralyzed";
             statusCol = C2D_Color32(0xEE, 0xCC, 0x22, 0xFF);
+        } else if (targetChar->buff(BuffType::Frost)) {
+            statusStr = "Status: Frozen";
+            statusCol = C2D_Color32(0x64, 0xBE, 0xFF, 0xFF);
         } else if (targetChar->buff(BuffType::Roots)) {
             statusStr = "Status: Rooted";
             statusCol = C2D_Color32(0x88, 0xBB, 0x44, 0xFF);
         }
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, statusStr, cardX + 8.0f, cardY + 52.0f, zText, statusCol, 0x000000FF);
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, statusStr, cardX + 8.0f, cardY + 50.0f, zText, statusCol, 0x000000FF);
+
+        // List active buffs affecting target mob
+        std::string buffList = "Buffs: ";
+        bool first = true;
+        for (const pd::Buff* b : targetChar->buffs) {
+            if (!b) continue;
+            if (!first) buffList += ", ";
+            buffList += b->name();
+            first = false;
+        }
+        if (first) buffList += "None";
+        if (buffList.length() > 22) buffList = buffList.substr(0, 19) + "...";
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, buffList, cardX + 8.0f, cardY + 64.0f, zText, 0xE4A672FF, 0x000000FF);
 
         if (m_isExamining) {
-            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "[A] View Lore & Stats", cardX + 8.0f, cardY + 68.0f, zText, 0x56BB77FF, 0x000000FF);
-            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "[B] Exit Examine", cardX + 8.0f, cardY + 84.0f, zText, 0xA5CDE4FF, 0x000000FF);
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "[A] View Lore & Stats", cardX + 8.0f, cardY + 76.0f, zText, 0x56BB77FF, 0x000000FF);
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "[B] Exit Examine", cardX + 8.0f, cardY + 88.0f, zText, 0xA5CDE4FF, 0x000000FF);
         } else {
-            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "Melee Hostile", cardX + 8.0f, cardY + 68.0f, zText, 0xCACFC2FF, 0x000000FF);
-            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "Tap to target/shoot", cardX + 8.0f, cardY + 84.0f, zText, 0x888899FF, 0x000000FF);
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "[A] View Lore & Stats", cardX + 8.0f, cardY + 76.0f, zText, 0xCACFC2FF, 0x000000FF);
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "Tap to target/shoot", cardX + 8.0f, cardY + 88.0f, zText, 0x888899FF, 0x000000FF);
         }
     } else {
         // --- MODE B: HERO QUICK STATS (EXPLORATION) ---

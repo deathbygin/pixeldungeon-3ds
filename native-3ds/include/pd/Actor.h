@@ -24,7 +24,7 @@ public:
     virtual Char* asChar() { return nullptr; }
     virtual Buff* asBuff() { return nullptr; }
 
-    void spend(float t) { time += t; }
+    virtual void spend(float t) { time += t; }
     void spendAndNext(float t) { spend(t); next(); }
     void postpone(float t);
     float cooldown() const;

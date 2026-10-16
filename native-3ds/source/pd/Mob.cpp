@@ -111,7 +111,7 @@ void Mob::aiStep(Hero* hero, Level* currentLevel) {
         return;
     }
 
-    if (paralysed) {
+    if (paralysed || buff(BuffType::Sleep) != nullptr) {
         enemySeen = false;
         spend(TICK);
         return;
@@ -122,12 +122,47 @@ void Mob::aiStep(Hero* hero, Level* currentLevel) {
     int my = pos / Level::WIDTH;
     ShadowCaster::castShadow(mx, my, s_mobFov, viewDistance, currentLevel->losBlocking);
 
-    enemy = hero;
+    // Amok: Choose closest character (mob or hero) within FOV
+    if (buff(BuffType::Amok) != nullptr) {
+        Char* closest = nullptr;
+        int minDist = 999;
+        if (hero && hero->isAlive() && s_mobFov[hero->pos]) {
+            closest = hero;
+            minDist = PathFinder::distanceChebyshev(pos, hero->pos);
+        }
+        for (const auto& otherMob : Dungeon::mobs) {
+            if (otherMob.get() != this && otherMob && otherMob->isAlive() && s_mobFov[otherMob->pos]) {
+                int d = PathFinder::distanceChebyshev(pos, otherMob->pos);
+                if (d < minDist) {
+                    minDist = d;
+                    closest = otherMob.get();
+                }
+            }
+        }
+        if (closest) {
+            enemy = closest;
+        } else {
+            enemy = hero;
+        }
+    } else {
+        enemy = hero;
+    }
+
+    // Terror: Force FLEEING state
+    if (buff(BuffType::Terror) != nullptr) {
+        state = State::FLEEING;
+    }
+
+    // Charm: Cannot target charmer
+    if (enemy && isCharmedBy(enemy)) {
+        enemy = nullptr;
+    }
+
     bool enemyInFOV = (enemy && enemy->isAlive() &&
                        s_mobFov[enemy->pos] &&
                        enemy->invisible <= 0);
 
-    int dist = PathFinder::distanceChebyshev(pos, enemy->pos);
+    int dist = enemy ? PathFinder::distanceChebyshev(pos, enemy->pos) : 999;
 
     switch (state) {
     case State::SLEEPING: {

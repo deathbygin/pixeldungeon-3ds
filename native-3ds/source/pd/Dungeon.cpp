@@ -405,6 +405,8 @@ void Dungeon::observe() {
         fog->updateVisibility(visible, level->visited, level->mapped);
     }
 
+    bool mindVision = hero->buff(BuffType::MindVision) != nullptr;
+
     for (auto& mob : mobs) {
         if (mob) {
             bool wasVisible = mob->spriteVisible;
@@ -413,6 +415,9 @@ void Dungeon::observe() {
                 if (PathFinder::distanceChebyshev(hero->pos, mob->pos) <= 2) {
                     isVis = true;
                 }
+            }
+            if (mindVision && mob->isAlive()) {
+                isVis = true;
             }
             mob->spriteVisible = isVis;
             if (!wasVisible && mob->spriteVisible && hero->restoreHealth) {

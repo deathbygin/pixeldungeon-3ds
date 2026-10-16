@@ -58,6 +58,7 @@ public:
     ~Mob() override = default;
 
     CharSprite* getSprite() override;
+    Mob* asMob() override { return this; }
 
     virtual MobType mobType() const { return MobType::Rat; }
     virtual std::string description() const;

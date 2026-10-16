@@ -35,6 +35,7 @@ public:
 
     bool act() override;
     Char* asChar() override { return this; }
+    virtual class Mob* asMob() { return nullptr; }
 
     virtual CharSprite* getSprite();
 
@@ -50,11 +51,14 @@ public:
     virtual void die(Actor* src);
     virtual void interrupt();
 
+    void spend(float time) override;
     virtual void move(int step);
     virtual void place(int cell);
     virtual int stealth() const { return 0; }
     virtual float speed() const;
     bool isAlive() const { return HP > 0; }
+    bool isCharmedBy(Char* ch) const;
+    void unfreeze();
 
     void addBuff(Buff* b);
     void removeBuff(Buff* b);
