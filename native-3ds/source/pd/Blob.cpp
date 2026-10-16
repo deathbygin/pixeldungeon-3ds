@@ -100,10 +100,7 @@ void Blob::evolve(const Level* level) {
                     }
 
                     // Burn and activate any plants on the tile
-                    Plant* plant = level->getPlant(pos);
-                    if (plant) {
-                        plant->activate(nullptr);
-                    }
+                    const_cast<Level*>(level)->activatePlant(pos, nullptr);
 
                     fire = cur[pos] - 1;
                     if (fire <= 0 && flamable) {
@@ -129,10 +126,7 @@ void Blob::evolve(const Level* level) {
                             heap->burn();
                         }
 
-                        Plant* plant = level->getPlant(pos);
-                        if (plant) {
-                            plant->activate(nullptr);
-                        }
+                        const_cast<Level*>(level)->activatePlant(pos, nullptr);
                     } else {
                         fire = 0;
                     }

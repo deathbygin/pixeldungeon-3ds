@@ -311,7 +311,7 @@ Plant::Plant(PlantSeed::PlantType t, int p) : type(t), pos(p) {
 }
 
 void Plant::activate(Char* ch) {
-    Sample::playAt(type == PlantSeed::PlantType::ROTBERRY ? Assets::SND_CHALLENGE : Assets::SND_PLANT, pos);
+    Sample::playAt(Assets::SND_PLANT, pos);
 
     if (ch && ch == Dungeon::hero.get() && Dungeon::hero->subClass == HeroSubClass::Warden) {
         Barkskin* b = ch->affect<Barkskin>();
@@ -320,12 +320,12 @@ void Plant::activate(Char* ch) {
         }
     }
 
+    wither();
+
     const SeedEffect& effect = SeedRegistry::get(type);
     if (effect.activate) {
         effect.activate(pos, ch, false);
     }
-
-    wither();
 }
 
 void Plant::wither() {
@@ -342,10 +342,6 @@ void Plant::wither() {
         if (Random::Int(5) == 0 && Dungeon::level) {
             Dungeon::level->drop(std::make_unique<Dewdrop>(), p);
         }
-    }
-
-    if (Dungeon::level) {
-        Dungeon::level->uproot(p);
     }
 }
 

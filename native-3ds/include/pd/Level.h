@@ -137,6 +137,7 @@ public:
     Plant* getPlant(int cell) const;
     Plant* plant(PlantSeed::PlantType type, int cell);
     void uproot(int cell);
+    void activatePlant(int cell, Char* ch);
 
     static const char* tileName(int tile);
     static const char* tileDesc(int tile);

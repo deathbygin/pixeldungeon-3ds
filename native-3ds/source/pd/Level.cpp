@@ -139,10 +139,7 @@ void Level::destroy(int cell) {
         }
     }
 
-    Plant* p = getPlant(cell);
-    if (p) {
-        p->wither();
-    }
+    uproot(cell);
 }
 
 void Level::trample(int cell, Char* ch) {
@@ -207,10 +204,7 @@ void Level::press(int cell, Char* ch) {
         affectWell(cell, ch);
     }
 
-    Plant* plant = getPlant(cell);
-    if (plant) {
-        plant->activate(ch);
-    }
+    activatePlant(cell, ch);
 }
 
 void Level::bounceItemFrom(int cell) {
@@ -473,10 +467,7 @@ void Level::mobPress(Mob* mob) {
         Sample::playAt(Assets::SND_OPEN, cell);
     }
 
-    Plant* plant = getPlant(cell);
-    if (plant) {
-        plant->activate(mob);
-    }
+    activatePlant(cell, mob);
 }
 
 Heap* Level::getHeap(int cell) const {
@@ -530,10 +521,7 @@ Plant* Level::getPlant(int cell) const {
 Plant* Level::plant(PlantSeed::PlantType type, int cell) {
     if (cell < 0 || cell >= LENGTH) return nullptr;
 
-    Plant* existing = getPlant(cell);
-    if (existing) {
-        existing->wither();
-    }
+    uproot(cell);
 
     auto newPlant = std::make_unique<Plant>(type, cell);
     Plant* ptr = newPlant.get();
@@ -545,8 +533,22 @@ void Level::uproot(int cell) {
     auto it = std::find_if(plants.begin(), plants.end(),
                            [cell](const std::unique_ptr<Plant>& p) { return p && p->pos == cell; });
     if (it != plants.end()) {
+        std::unique_ptr<Plant> plant = std::move(*it);
         plants.erase(it);
+        plant->wither();
     }
+}
+
+void Level::activatePlant(int cell, Char* ch) {
+    if (cell < 0 || cell >= LENGTH) return;
+    auto it = std::find_if(plants.begin(), plants.end(),
+                           [cell](const std::unique_ptr<Plant>& p) { return p && p->pos == cell; });
+    if (it == plants.end()) return;
+
+    std::unique_ptr<Plant> plant = std::move(*it);
+    plants.erase(it);
+
+    plant->activate(ch);
 }
 
 std::unique_ptr<Level> Level::create(int depth) {

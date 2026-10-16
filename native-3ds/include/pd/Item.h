@@ -53,6 +53,7 @@ public:
 
     virtual void cast(Hero* hero, int targetCell);
     virtual void onThrow(int cell);
+    virtual void onCollect(Hero* hero) { (void)hero; }
     virtual int maxDistance(const Hero* hero = nullptr) const { (void)hero; return 6; }
     virtual float speedFactor(Hero* hero) const { (void)hero; return 1.0f; }
     virtual std::unique_ptr<Item> clone(int qty = 1) const;
@@ -502,6 +503,7 @@ public:
     std::vector<std::string> actions(Hero* hero) override;
     bool execute(Hero* hero, const std::string& action) override;
     void onThrow(int cell) override;
+    void onCollect(Hero* hero) override;
     int maxDistance(const Hero* hero = nullptr) const override { (void)hero; return 5; }
     std::string info() const override;
     std::string displayName() const override;

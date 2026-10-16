@@ -1,10 +1,14 @@
 #include "pd/Belongings.h"
+#include "pd/Dungeon.h"
+#include "pd/Hero.h"
 #include <algorithm>
 
 namespace pd {
 
 bool Belongings::collect(std::unique_ptr<Item> item) {
     if (!item) return false;
+
+    Hero* hero = Dungeon::hero ? Dungeon::hero.get() : nullptr;
 
     // Check stackable items
     if (item->isStackable()) {
@@ -13,15 +17,18 @@ bool Belongings::collect(std::unique_ptr<Item> item) {
                 if (item->category() == ItemCategory::Potion) {
                     if (static_cast<Potion*>(slot.get())->type == static_cast<Potion*>(item.get())->type) {
                         slot->quantity += item->quantity;
+                        item->onCollect(hero);
                         return true;
                     }
                 } else if (item->category() == ItemCategory::Scroll) {
                     if (static_cast<Scroll*>(slot.get())->type == static_cast<Scroll*>(item.get())->type) {
                         slot->quantity += item->quantity;
+                        item->onCollect(hero);
                         return true;
                     }
                 } else if (slot->name == item->name) {
                     slot->quantity += item->quantity;
+                    item->onCollect(hero);
                     return true;
                 }
             }
@@ -30,6 +37,7 @@ bool Belongings::collect(std::unique_ptr<Item> item) {
 
     if (isFull()) return false;
 
+    item->onCollect(hero);
     backpack.push_back(std::move(item));
     return true;
 }

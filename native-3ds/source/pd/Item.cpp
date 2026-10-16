@@ -2344,6 +2344,22 @@ void PlantSeed::onThrow(int cell) {
     OnSeedImpact(pt, cell);
 }
 
+void PlantSeed::onCollect(Hero* hero) {
+    if (plantType == PlantType::ROTBERRY) {
+        int heroPos = hero ? hero->pos : (Dungeon::hero ? Dungeon::hero->pos : -1);
+        if (Dungeon::level && heroPos != -1) {
+            for (auto& mob : Dungeon::mobs) {
+                if (mob && mob->isAlive()) {
+                    mob->beckon(heroPos);
+                }
+            }
+            GLog::w("The seed emits a roar that echoes throughout the dungeon!");
+            FX::burst(heroPos, 0x55aa33FF, 10);
+            Sample::play(Assets::SND_CHALLENGE);
+        }
+    }
+}
+
 std::string PlantSeed::info() const {
     const auto& eff = SeedRegistry::get(plantType);
     return "Throw this seed to the place where you want to grow " + eff.plantName + ".\n\n" + eff.description;
