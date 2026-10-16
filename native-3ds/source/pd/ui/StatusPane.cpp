@@ -41,6 +41,13 @@ int StatusPane::update(const TouchController& touch, u32 kDown) {
         return 1; // Toggle Hero Info
     }
 
+    // Depth / stairs icon touch area: (188, 0, 44, HEIGHT)
+    noosa::RectF depthRect(188.0f, 0.0f, 44.0f, HEIGHT);
+    if (touch.clicked(depthRect)) {
+        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        return 3; // Stairs / Depth info
+    }
+
     // Menu button touch area: (290, 0, 30, HEIGHT)
     noosa::RectF menuRect(290.0f, 0.0f, 30.0f, HEIGHT);
     m_menuPressed = touch.hitTest(menuRect);

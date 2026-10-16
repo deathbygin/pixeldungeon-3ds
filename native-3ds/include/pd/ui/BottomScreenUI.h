@@ -11,6 +11,8 @@
 #include "pd/windows/WndHero.h"
 #include "pd/windows/WndGame.h"
 #include "pd/windows/WndSettings.h"
+#include "pd/ui/WndOptions.h"
+#include "pd/ui/WndMessage.h"
 
 namespace pd {
 class Hero;
@@ -19,6 +21,13 @@ class Item;
 }
 
 namespace pd::ui {
+
+enum class LevelTransition {
+    NONE,
+    DESCEND,
+    ASCEND,
+    WIN
+};
 
 class BottomScreenUI {
 public:
@@ -53,8 +62,24 @@ public:
     void openPauseMenu();
     void closePauseMenu();
 
+    bool isModalOpen() const {
+        return m_wndOptions.isOpen() || m_wndMessage.isOpen() ||
+               m_wndBag.isOpen || m_wndHero.isOpen() ||
+               m_wndGame.isOpen() || m_wndSettings.isOpen();
+    }
+
     pd::windows::GameAction getPendingGameAction() const { return m_pendingGameAction; }
     void clearPendingGameAction() { m_pendingGameAction = pd::windows::GameAction::NONE; }
+
+    LevelTransition getPendingTransition() const { return m_pendingTransition; }
+    void clearPendingTransition() { m_pendingTransition = LevelTransition::NONE; }
+
+    void promptStairs(bool descend);
+    void showMessage(std::string text, std::function<void()> onDismiss = nullptr);
+    void showOptions(std::string title, std::string message,
+                     std::vector<std::string> options,
+                     std::function<void(int)> onSelect);
+    void inspectCell(int cell, pd::Level* level);
 
     // Ranged targeting mode
     bool isTargeting() const { return m_isTargeting; }
@@ -74,7 +99,11 @@ private:
     pd::windows::WndHero m_wndHero;
     pd::windows::WndGame m_wndGame;
     pd::windows::WndSettings m_wndSettings;
+    WndOptions m_wndOptions;
+    WndMessage m_wndMessage;
     pd::windows::GameAction m_pendingGameAction = pd::windows::GameAction::NONE;
+    LevelTransition m_pendingTransition = LevelTransition::NONE;
+    bool m_isInspecting = false;
 
     // Ranged Targeting State
     bool m_isTargeting = false;

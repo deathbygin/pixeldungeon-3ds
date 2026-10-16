@@ -61,9 +61,11 @@ int Terrain::flags(int tile) {
         case PEDESTAL:
             return PASSABLE | UNSTITCHABLE;
 
+        case SIGN:
+            return PASSABLE | FLAMABLE;
+
         case EMPTY_WELL:
         case ALCHEMY:
-        case SIGN:
         case LOCKED_EXIT:
             return SOLID;
 

@@ -105,6 +105,19 @@ bool Belongings::consumeKey(const std::string& keyName, int depth) {
     return false;
 }
 
+Item* Belongings::getItem(const std::string& itemName) {
+    if (equippedWeapon && equippedWeapon->name == itemName) return equippedWeapon;
+    if (equippedArmor && equippedArmor->name == itemName) return equippedArmor;
+    if (equippedRing1 && equippedRing1->name == itemName) return equippedRing1;
+    if (equippedRing2 && equippedRing2->name == itemName) return equippedRing2;
+    for (auto& item : backpack) {
+        if (item && item->name == itemName) {
+            return item.get();
+        }
+    }
+    return nullptr;
+}
+
 void Belongings::observe() {
     if (equippedWeapon) {
         equippedWeapon->identify();

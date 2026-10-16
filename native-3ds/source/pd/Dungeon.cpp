@@ -203,7 +203,7 @@ void Dungeon::switchLevel(int newDepth) {
         }
         mobs.clear();
 
-        int spawnPos = level->entrance;
+        int spawnPos = descending ? level->entrance : level->exit;
         for (const auto& r : level->rooms) {
             if (r && r->type == Room::Type::PIT) {
                 spawnPos = level->pitCell();

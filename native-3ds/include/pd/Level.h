@@ -116,6 +116,9 @@ public:
     Heap* getHeap(int cell) const;
     Heap* drop(std::unique_ptr<Item> item, int cell);
     void removeHeap(Heap* heap);
+
+    static const char* tileName(int tile);
+    static const char* tileDesc(int tile);
 };
 
 } // namespace pd

@@ -13,6 +13,7 @@
 #include "pd/Mob.h"
 #include "pd/FX.h"
 #include "pd/Assets.h"
+#include "pd/Sign.h"
 #include "noosa/Audio.h"
 #include <algorithm>
 
@@ -36,6 +37,11 @@ BottomScreenUI& BottomScreenUI::operator=(BottomScreenUI&& other) noexcept {
         m_wndBag = std::move(other.m_wndBag);
         m_logConsole = std::move(other.m_logConsole);
         m_wndHero = std::move(other.m_wndHero);
+        m_wndOptions = std::move(other.m_wndOptions);
+        m_wndMessage = std::move(other.m_wndMessage);
+        m_pendingGameAction = other.m_pendingGameAction;
+        m_pendingTransition = other.m_pendingTransition;
+        m_isInspecting = other.m_isInspecting;
         m_isTargeting = other.m_isTargeting;
         m_targetCell = other.m_targetCell;
         m_targetItem = other.m_targetItem;
@@ -52,6 +58,9 @@ void BottomScreenUI::initLogger() {
     GLog::setLogger([this](const std::string& msg, u32 color) {
         m_logConsole.addMessage(msg, color);
     });
+    pd::Sign::setMessageCallback([this](const std::string& msg) {
+        showMessage(msg);
+    });
 }
 
 void BottomScreenUI::reset() {
@@ -61,7 +70,11 @@ void BottomScreenUI::reset() {
     if (m_wndHero.isOpen()) m_wndHero.hide();
     m_wndGame.hide();
     m_wndSettings.hide();
+    m_wndOptions.hide();
+    m_wndMessage.hide();
     m_pendingGameAction = pd::windows::GameAction::NONE;
+    m_pendingTransition = LevelTransition::NONE;
+    m_isInspecting = false;
     m_toolbar = Toolbar();
     m_showMinimap = true;
     initLogger();
@@ -226,6 +239,18 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
         return false;
     }
 
+    // Modal Message Window (WndMessage)
+    if (m_wndMessage.isOpen()) {
+        m_wndMessage.update(m_touch, kDown);
+        return false;
+    }
+
+    // Modal Options Window (WndOptions)
+    if (m_wndOptions.isOpen()) {
+        m_wndOptions.update(m_touch, kDown);
+        return false;
+    }
+
     // 1. If WndSettings modal is open, route input exclusively to it
     if (m_wndSettings.isOpen()) {
         m_wndSettings.update(m_touch, kDown);
@@ -383,6 +408,17 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
     } else if (statusAction == 2 || (kDown & KEY_START)) {
         openPauseMenu();
         return false;
+    } else if (statusAction == 3) {
+        if (level && hero) {
+            if (level->map[hero->pos] == Terrain::EXIT) {
+                promptStairs(true);
+            } else if (level->map[hero->pos] == Terrain::ENTRANCE) {
+                promptStairs(false);
+            } else {
+                log("Depth " + std::to_string(Dungeon::depth) + ". Find the stairs down to progress.", C2D_Color32(0xff, 0xcc, 0x66, 0xFF));
+            }
+        }
+        return false;
     }
 
     if (kDown & KEY_SELECT) {
@@ -390,10 +426,46 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
         return false;
     }
 
-    // 5. Persistent Toolbar Handling (Wait, Search, Info, Bag, Quickslots)
+    // 5. Minimap Touch Inspection
+    if (!m_wndBag.isOpen && !m_wndHero.isOpen() && level && hero) {
+        float vpX = 10.0f;
+        float vpY = 42.0f;
+        float vpW = 142.0f;
+        float vpH = 106.0f;
+        noosa::RectF minimapRect(vpX, vpY, vpW, vpH);
+        if (m_touch.justReleased() && minimapRect.contains(static_cast<float>(m_touch.x()), static_cast<float>(m_touch.y()))) {
+            float cellSize = 3.0f;
+            int cols = static_cast<int>(vpW / cellSize);
+            int rows = static_cast<int>(vpH / cellSize);
+            int startX = (hero->pos % Level::WIDTH) - (cols / 2);
+            int startY = (hero->pos / Level::WIDTH) - (rows / 2);
+
+            int clickedX = startX + static_cast<int>((m_touch.x() - vpX) / cellSize);
+            int clickedY = startY + static_cast<int>((m_touch.y() - vpY) / cellSize);
+            if (clickedX >= 0 && clickedX < Level::WIDTH && clickedY >= 0 && clickedY < Level::HEIGHT) {
+                int cell = clickedY * Level::WIDTH + clickedX;
+                if (level->visited[cell] || level->mapped[cell]) {
+                    inspectCell(cell, level);
+                    m_isInspecting = false;
+                    return false;
+                }
+            }
+        }
+    }
+
+    // 6. Persistent Toolbar Handling (Wait, Search, Info, Bag, Quickslots)
     Toolbar::Action tbAction = m_toolbar.update(m_touch, kDown, hero);
     switch (tbAction) {
         case Toolbar::Action::WAIT: {
+            if (level && hero) {
+                if (level->map[hero->pos] == Terrain::EXIT) {
+                    promptStairs(true);
+                    return false;
+                } else if (level->map[hero->pos] == Terrain::ENTRANCE) {
+                    promptStairs(false);
+                    return false;
+                }
+            }
             Heap* standingHeap = level ? level->getHeap(hero->pos) : nullptr;
             if (standingHeap && !standingHeap->isEmpty()) {
                 if (hero->pickUp(level)) {
@@ -416,7 +488,12 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
         }
 
         case Toolbar::Action::INFO: {
-            log("Tap a visible tile or creature to inspect.", C2D_Color32(0xff, 0xcc, 0x66, 0xFF));
+            m_isInspecting = !m_isInspecting;
+            if (m_isInspecting) {
+                log("Examine mode: tap a tile on the minimap.", C2D_Color32(0xff, 0xcc, 0x66, 0xFF));
+            } else {
+                log("Examine mode cancelled.", C2D_Color32(0xa5, 0xcd, 0xe4, 0xFF));
+            }
             break;
         }
 
@@ -721,6 +798,127 @@ void BottomScreenUI::draw(const pd::Hero* hero, int depth, C2D_TextBuf textBuf) 
     // 9. Modal Settings Window (WndSettings)
     if (m_wndSettings.isOpen()) {
         m_wndSettings.draw(textBuf);
+    }
+
+    // 10. Modal Options Window (WndOptions)
+    if (m_wndOptions.isOpen()) {
+        m_wndOptions.draw(textBuf, 0.85f);
+    }
+
+    // 11. Modal Message Window (WndMessage)
+    if (m_wndMessage.isOpen()) {
+        m_wndMessage.draw(textBuf, 0.86f);
+    }
+}
+
+void BottomScreenUI::showMessage(std::string text, std::function<void()> onDismiss) {
+    if (m_wndBag.isOpen) m_wndBag.close();
+    if (m_wndHero.isOpen()) m_wndHero.hide();
+    m_wndMessage.show(std::move(text), std::move(onDismiss));
+}
+
+void BottomScreenUI::showOptions(std::string title, std::string message,
+                                 std::vector<std::string> options,
+                                 std::function<void(int)> onSelect) {
+    if (m_wndBag.isOpen) m_wndBag.close();
+    if (m_wndHero.isOpen()) m_wndHero.hide();
+    m_wndOptions.show(std::move(title), std::move(message), std::move(options), std::move(onSelect));
+}
+
+void BottomScreenUI::promptStairs(bool descend) {
+    if (m_wndOptions.isOpen() || m_wndMessage.isOpen()) return;
+
+    if (descend) {
+        showOptions("Stairs Down", "Do you want to descend to the next depth?",
+            { "Yes, descend", "Cancel" },
+            [this](int idx) {
+                if (idx == 0) {
+                    m_pendingTransition = LevelTransition::DESCEND;
+                }
+            });
+    } else {
+        if (Dungeon::depth == 1) {
+            bool hasAmulet = false;
+            if (Dungeon::hero && Dungeon::hero->belongings.getItem("Amulet of Yendor")) {
+                hasAmulet = true;
+            }
+            if (!hasAmulet) {
+                showMessage("One does not simply leave Pixel Dungeon.");
+            } else {
+                showOptions("Leave Dungeon", "Are you ready to return to the surface with the Amulet of Yendor?",
+                    { "Yes, return to surface!", "Cancel" },
+                    [this](int idx) {
+                        if (idx == 0) {
+                            m_pendingTransition = LevelTransition::WIN;
+                        }
+                    });
+            }
+        } else {
+            showOptions("Stairs Up", "Do you want to ascend to the previous depth?",
+                { "Yes, ascend", "Cancel" },
+                [this](int idx) {
+                    if (idx == 0) {
+                        m_pendingTransition = LevelTransition::ASCEND;
+                    }
+                });
+        }
+    }
+}
+
+void BottomScreenUI::inspectCell(int cell, pd::Level* level) {
+    if (!level || cell < 0 || cell >= Level::LENGTH) return;
+
+    if (level->map[cell] == Terrain::SIGN) {
+        pd::Sign::read(cell);
+        return;
+    }
+
+    // Check for mob at cell
+    for (const auto& m : Dungeon::mobs) {
+        if (m && m->isAlive() && m->pos == cell && Dungeon::visible[cell]) {
+            showMessage(m->name + " (HP: " + std::to_string(m->HP) + "/" + std::to_string(m->HT) + ")");
+            return;
+        }
+    }
+
+    // Check for item heap
+    Heap* heap = level->getHeap(cell);
+    if (heap && (level->visited[cell] || Dungeon::visible[cell])) {
+        if (heap->type == Heap::Type::CHEST) {
+            showMessage("Chest\n\nThis wooden chest is unlocked and may hold valuable treasure.");
+            return;
+        } else if (heap->type == Heap::Type::LOCKED_CHEST) {
+            showMessage("Locked Chest\n\nA solid golden lock secures this chest. You need a golden key to open it.");
+            return;
+        } else if (heap->type == Heap::Type::CRYSTAL_CHEST) {
+            showMessage("Crystal Chest\n\nA translucent crystal chest. You can see the prize inside, but you need a golden key.");
+            return;
+        } else if (heap->type == Heap::Type::TOMB) {
+            showMessage("Tomb\n\nAn ancient sarcophagus. Disturbing it may anger the spirits within.");
+            return;
+        } else if (heap->type == Heap::Type::SKELETON) {
+            showMessage("Skeletal Remains\n\nThe bones of an unfortunate adventurer who perished here long ago.");
+            return;
+        } else if (!heap->isEmpty() && heap->peek()) {
+            Item* it = heap->peek();
+            std::string itInfo = it->info();
+            if (itInfo.empty()) {
+                showMessage(it->displayName());
+            } else {
+                showMessage(it->displayName() + "\n\n" + itInfo);
+            }
+            return;
+        }
+    }
+
+    int tile = level->map[cell];
+    std::string tName = Level::tileName(tile);
+    std::string tDesc = Level::tileDesc(tile);
+
+    if (tDesc.empty()) {
+        log(tName, C2D_Color32(0xff, 0xcc, 0x66, 0xFF));
+    } else {
+        showMessage(tName + "\n\n" + tDesc);
     }
 }
 

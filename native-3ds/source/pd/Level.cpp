@@ -487,4 +487,83 @@ int Level::randomDestination() const {
     return entrance;
 }
 
+const char* Level::tileName(int tile) {
+    if (tile >= Terrain::WATER_TILES) {
+        return "Water";
+    }
+    switch (tile) {
+        case Terrain::CHASM: return "Chasm";
+        case Terrain::EMPTY:
+        case Terrain::EMPTY_SP:
+        case Terrain::EMPTY_DECO:
+            return "Floor";
+        case Terrain::GRASS: return "Grass";
+        case Terrain::WATER: return "Water";
+        case Terrain::WALL:
+        case Terrain::WALL_DECO:
+            return "Wall";
+        case Terrain::DOOR: return "Closed door";
+        case Terrain::OPEN_DOOR: return "Open door";
+        case Terrain::ENTRANCE: return "Depth entrance";
+        case Terrain::EXIT: return "Depth exit";
+        case Terrain::EMBERS: return "Embers";
+        case Terrain::LOCKED_DOOR: return "Locked door";
+        case Terrain::PEDESTAL: return "Pedestal";
+        case Terrain::BARRICADE: return "Barricade";
+        case Terrain::HIGH_GRASS: return "High grass";
+        case Terrain::LOCKED_EXIT: return "Locked depth exit";
+        case Terrain::UNLOCKED_EXIT: return "Unlocked depth exit";
+        case Terrain::SIGN: return "Sign";
+        case Terrain::WELL: return "Well";
+        case Terrain::EMPTY_WELL: return "Empty well";
+        case Terrain::STATUE:
+        case Terrain::STATUE_SP: return "Statue";
+        case Terrain::TOXIC_TRAP: return "Toxic gas trap";
+        case Terrain::FIRE_TRAP: return "Fire trap";
+        case Terrain::PARALYTIC_TRAP: return "Paralytic gas trap";
+        case Terrain::POISON_TRAP: return "Poison dart trap";
+        case Terrain::ALARM_TRAP: return "Alarm trap";
+        case Terrain::LIGHTNING_TRAP: return "Lightning trap";
+        case Terrain::GRIPPING_TRAP: return "Gripping trap";
+        case Terrain::SUMMONING_TRAP: return "Summoning trap";
+        case Terrain::INACTIVE_TRAP: return "Triggered trap";
+        case Terrain::BOOKSHELF: return "Bookshelf";
+        case Terrain::ALCHEMY: return "Alchemy pot";
+        default: return "???";
+    }
+}
+
+const char* Level::tileDesc(int tile) {
+    switch (tile) {
+        case Terrain::CHASM: return "You can't see the bottom.";
+        case Terrain::WATER: return "In case of burning step into the water to extinguish the fire.";
+        case Terrain::ENTRANCE: return "Stairs lead up to the upper depth.";
+        case Terrain::EXIT:
+        case Terrain::UNLOCKED_EXIT: return "Stairs lead down to the lower depth.";
+        case Terrain::EMBERS: return "Embers cover the floor.";
+        case Terrain::HIGH_GRASS: return "Dense vegetation blocks the view.";
+        case Terrain::LOCKED_DOOR: return "This door is locked, you need a matching key to unlock it.";
+        case Terrain::LOCKED_EXIT: return "Heavy bars block the stairs leading down.";
+        case Terrain::BARRICADE: return "The wooden barricade is firmly set but has dried over the years. Might it burn?";
+        case Terrain::SIGN: return "You can't read the text from here.";
+        case Terrain::TOXIC_TRAP:
+        case Terrain::FIRE_TRAP:
+        case Terrain::PARALYTIC_TRAP:
+        case Terrain::POISON_TRAP:
+        case Terrain::ALARM_TRAP:
+        case Terrain::LIGHTNING_TRAP:
+        case Terrain::GRIPPING_TRAP:
+        case Terrain::SUMMONING_TRAP:
+            return "Stepping onto a hidden pressure plate will activate the trap.";
+        case Terrain::INACTIVE_TRAP: return "The trap has been triggered before and it's not dangerous anymore.";
+        case Terrain::STATUE:
+        case Terrain::STATUE_SP: return "Someone wanted to adorn this place, but failed, obviously.";
+        case Terrain::ALCHEMY: return "Drop some seeds here to cook a potion.";
+        case Terrain::EMPTY_WELL: return "The well has run dry.";
+        default:
+            if (tile >= Terrain::WATER_TILES) return "In case of burning step into the water to extinguish the fire.";
+            return "";
+    }
+}
+
 } // namespace pd

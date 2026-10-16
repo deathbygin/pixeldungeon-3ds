@@ -11,6 +11,7 @@
 #include "pd/Heap.h"
 #include "pd/Assets.h"
 #include "pd/Badges.h"
+#include "pd/Sign.h"
 #include "noosa/Audio.h"
 #include <algorithm>
 
@@ -310,6 +311,10 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
         search(currentLevel, false);
 
         Dungeon::observe();
+
+        if (currentLevel->map[nextCell] == Terrain::SIGN) {
+            pd::Sign::read(nextCell);
+        }
 
         if (currentLevel->water[nextCell]) {
             FX::ripple(nextCell);

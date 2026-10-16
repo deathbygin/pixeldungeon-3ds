@@ -27,6 +27,7 @@ public:
     std::unique_ptr<Item> drop(Item* item);
     Item* getKey(const std::string& keyName, int depth);
     bool consumeKey(const std::string& keyName, int depth);
+    Item* getItem(const std::string& itemName);
     void observe();
     bool isFull() const { return backpack.size() >= BACKPACK_SIZE; }
 };
