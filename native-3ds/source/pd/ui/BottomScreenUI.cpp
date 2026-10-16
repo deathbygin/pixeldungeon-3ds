@@ -430,7 +430,7 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
     // 4. If WndBag (Inventory) is open, route inputs exclusively to it
     if (m_wndBag.isOpen) {
         std::string bagMsg;
-        bool actionTaken = m_wndBag.update(hero, m_touch, kDown, bagMsg);
+        bool actionTaken = m_wndBag.update(hero, m_touch, kDown, kHeld, bagMsg);
 
         if (!hero->isAlive()) {
             // Dead hero can view inventory and inspect items, but not take gameplay actions

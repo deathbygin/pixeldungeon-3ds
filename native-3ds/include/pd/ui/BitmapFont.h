@@ -2,6 +2,7 @@
 
 #include <citro2d.h>
 #include <string>
+#include <vector>
 #include <memory>
 #include <cstdint>
 
@@ -27,6 +28,12 @@ public:
 
     // Draws multiline text wrapped to maxWidth.
     static float drawMultiline(FontType font, const std::string& text, float x, float y, float maxWidth, float z = 0.6f, u32 color = 0xFFFFFFFF, float scale = 1.0f);
+
+    // Splits text into multiline wrapped strings respecting newlines and maxWidth.
+    static std::vector<std::string> splitMultiline(FontType font, const std::string& text, float maxWidth, float scale = 1.0f);
+
+    // Draws text vertically clipped between clipTop and clipBottom (software glyph clipping).
+    static float drawClipped(FontType font, const std::string& text, float x, float y, float clipTop, float clipBottom, float z = 0.6f, u32 color = 0xFFFFFFFF, float scale = 1.0f);
 
     // Measures the width of a single line of text.
     static float width(FontType font, const std::string& text, float scale = 1.0f);

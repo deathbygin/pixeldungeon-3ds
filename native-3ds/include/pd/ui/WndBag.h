@@ -2,6 +2,7 @@
 
 #include "pd/ui/TouchController.h"
 #include "pd/ui/Chrome.h"
+#include "pd/ui/WndItem.h"
 #include <citro2d.h>
 #include <memory>
 #include <string>
@@ -38,14 +39,6 @@ public:
     static constexpr float GRID_START_X = 60.0f;
     static constexpr float GRID_START_Y = 56.0f;
 
-    static constexpr float SUB_WIN_X = 35.0f;
-    static constexpr float SUB_WIN_Y = 38.0f;
-    static constexpr float SUB_WIN_W = 250.0f;
-    static constexpr float SUB_WIN_H = 160.0f;
-    static constexpr float SUB_BTN_Y = 108.0f;
-    static constexpr float SUB_BTN_H = 20.0f;
-    static constexpr float SUB_BTN_W = (SUB_WIN_W - 24.0f) / 2.0f;
-
     bool isOpen = false;
 
     WndBag();
@@ -62,7 +55,10 @@ public:
     // Updates touch and hardware inputs.
     // Returns true if a turn-advancing action occurred.
     // outMessage receives narrative log feedback.
-    bool update(pd::Hero* hero, const TouchController& touch, u32 kDown, std::string& outMessage);
+    bool update(pd::Hero* hero, const TouchController& touch, u32 kDown, std::string& outMessage) {
+        return update(hero, touch, kDown, 0, outMessage);
+    }
+    bool update(pd::Hero* hero, const TouchController& touch, u32 kDown, u32 kHeld, std::string& outMessage);
 
     void draw(const pd::Hero* hero, C2D_TextBuf textBuf) const;
 
@@ -71,10 +67,7 @@ public:
 
 private:
     int m_selectedSlot = 0;
-    bool m_subWindowOpen = false;
-    pd::Item* m_subItem = nullptr;
-    std::vector<std::string> m_subActions;
-    int m_selectedAction = 0;
+    WndItem m_wndItem;
 
     Mode m_selectionMode = Mode::ALL;
     std::string m_selectionTitle;

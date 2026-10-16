@@ -30,8 +30,7 @@ WndBag::WndBag() {
 
 void WndBag::open() {
     isOpen = true;
-    m_subWindowOpen = false;
-    m_subItem = nullptr;
+    m_wndItem.hide();
     m_selectedSlot = 0;
     m_selectionMode = Mode::ALL;
     m_selectionTitle.clear();
@@ -40,8 +39,7 @@ void WndBag::open() {
 
 void WndBag::openForSelection(Mode mode, const std::string& title, std::function<void(pd::Item*)> listener) {
     isOpen = true;
-    m_subWindowOpen = false;
-    m_subItem = nullptr;
+    m_wndItem.hide();
     m_selectedSlot = 0;
     m_selectionMode = mode;
     m_selectionTitle = title;
@@ -50,8 +48,7 @@ void WndBag::openForSelection(Mode mode, const std::string& title, std::function
 
 void WndBag::close() {
     isOpen = false;
-    m_subWindowOpen = false;
-    m_subItem = nullptr;
+    m_wndItem.hide();
     m_selectionMode = Mode::ALL;
     m_selectionTitle.clear();
     m_selectionListener = nullptr;
@@ -89,122 +86,47 @@ pd::Item* WndBag::getSelectedItem(pd::Hero* hero) const {
 
 void WndBag::openSubWindow(pd::Item* it, pd::Hero* hero) {
     if (!it) return;
-    m_subWindowOpen = true;
-    m_subItem = it;
-    m_selectedAction = 0;
-    m_subActions.clear();
-
-    if (!hero || !hero->isAlive()) {
-        m_subActions.push_back("CLOSE");
-        return;
-    }
-
-    bool isEquipped = (it == hero->belongings.equippedWeapon || it == hero->belongings.equippedArmor ||
-                       it == hero->belongings.equippedRing1 || it == hero->belongings.equippedRing2);
-
-    if (isEquipped) {
-        m_subActions.push_back("UNEQUIP");
-    } else if (it->isEquippable()) {
-        m_subActions.push_back("EQUIP");
-    }
-
-    if (it->category() == ItemCategory::Potion) {
-        m_subActions.push_back("DRINK");
-    } else if (it->category() == ItemCategory::Scroll) {
-        m_subActions.push_back("READ");
-    }
-
-    if (it->name == "Ration of Food" || it->name == "Pasty" || it->name == "Mystery Meat") {
-        m_subActions.push_back("EAT");
-    }
-
-    if (it->asWand()) {
-        m_subActions.push_back("ZAP");
-    }
-
-    if (it->asShortSword()) {
-        m_subActions.push_back("REFORGE");
-    }
-
-    m_subActions.push_back("THROW");
-    m_subActions.push_back("DROP");
-    m_subActions.push_back("QUICKSLOT");
-    m_subActions.push_back("CLOSE");
+    m_wndItem.show(it, hero, true);
 }
 
 void WndBag::closeSubWindow() {
-    m_subWindowOpen = false;
-    m_subItem = nullptr;
-    m_subActions.clear();
+    m_wndItem.hide();
 }
 
-bool WndBag::update(pd::Hero* hero, const TouchController& touch, u32 kDown, std::string& outMessage) {
+bool WndBag::update(pd::Hero* hero, const TouchController& touch, u32 kDown, u32 kHeld, std::string& outMessage) {
     if (!isOpen || !hero) return false;
 
     // -------------------------------------------------------------------------
     // Sub-window (WndItem options popup) is active
     // -------------------------------------------------------------------------
-    if (m_subWindowOpen && m_subItem) {
-        if (kDown & KEY_B) {
-            Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
-            closeSubWindow();
-            return false;
-        }
+    if (m_wndItem.isOpen()) {
+        std::string action;
+        pd::Item* subIt = m_wndItem.getItem();
+        bool turnAdvanced = m_wndItem.update(hero, touch, kDown, kHeld, action);
 
-        // Sub-window action button layout
-        for (size_t i = 0; i < m_subActions.size(); ++i) {
-            float bx = SUB_WIN_X + 8.0f + (i % 2) * (SUB_BTN_W + 4.0f);
-            float by = SUB_BTN_Y + (i / 2) * (SUB_BTN_H + 4.0f);
-            noosa::RectF rBtn(bx, by, SUB_BTN_W, SUB_BTN_H);
-
-            if (touch.clicked(rBtn) || ((kDown & KEY_A) && static_cast<int>(i) == m_selectedAction)) {
-                Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
-                const std::string action = m_subActions[i];
-
-                if (action == "CLOSE") {
-                    closeSubWindow();
-                    return false;
-                }
-
-                if (action == "QUICKSLOT") {
-                    outMessage = "SET_QUICKSLOT";
-                    closeSubWindow();
-                    close();
-                    return false;
-                }
-
-                if (action == "THROW" || action == "ZAP") {
-                    outMessage = "START_TARGETING";
-                    closeSubWindow();
-                    close();
-                    return false;
-                }
-
-                outMessage = action + " " + m_subItem->displayName();
-                bool used = m_subItem->execute(hero, action);
-                if (isSelectionMode()) {
-                    closeSubWindow();
-                    return false;
-                }
-                if (used) {
-                    if (m_subItem->quantity <= 0) {
-                        hero->belongings.drop(m_subItem);
-                    }
-                    closeSubWindow();
-                    close();
-                    return true; // Advancing turn
-                }
-                closeSubWindow();
+        if (!m_wndItem.isOpen()) {
+            if (action == "QUICKSLOT") {
+                outMessage = "SET_QUICKSLOT";
+                close();
                 return false;
             }
+            if (action == "THROW" || action == "ZAP") {
+                outMessage = "START_TARGETING";
+                close();
+                return false;
+            }
+            if (isSelectionMode()) {
+                return false;
+            }
+            if (turnAdvanced && subIt) {
+                outMessage = action + " " + subIt->displayName();
+                if (subIt->quantity <= 0) {
+                    hero->belongings.drop(subIt);
+                }
+                close();
+                return true;
+            }
         }
-
-        // D-pad navigation between sub-window actions
-        if (kDown & KEY_DLEFT)  m_selectedAction = std::max(0, m_selectedAction - 1);
-        if (kDown & KEY_DRIGHT) m_selectedAction = std::min(static_cast<int>(m_subActions.size()) - 1, m_selectedAction + 1);
-        if (kDown & KEY_DUP)    m_selectedAction = std::max(0, m_selectedAction - 2);
-        if (kDown & KEY_DDOWN)  m_selectedAction = std::min(static_cast<int>(m_subActions.size()) - 1, m_selectedAction + 2);
-
         return false;
     }
 
@@ -501,55 +423,8 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
     // -------------------------------------------------------------------------
     // 6. Sub-window (WndItem Action Menu) Overlay
     // -------------------------------------------------------------------------
-    if (m_subWindowOpen && m_subItem) {
-        float subZ = 0.82f;
-        float subTextZ = 0.86f;
-
-        // Dim background behind subwindow
-        C2D_DrawRectSolid(0.0f, 0.0f, subZ - 0.02f, 320.0f, 240.0f, C2D_Color32(0x00, 0x00, 0x00, 0x77));
-
-        // Stone frame for item details
-        Chrome::get(Chrome::Type::WINDOW).draw(SUB_WIN_X, SUB_WIN_Y, SUB_WIN_W, SUB_WIN_H, subZ);
-
-        // Item Icon (16x16)
-        if (iTex) {
-            int imgIdx = m_subItem->image;
-            setupSubTex(m_subItemIcon, potW, potH, (imgIdx % 8) * 16, (imgIdx / 8) * 16, 16, 16);
-            C2D_Image imgSub = { iTex, &m_subItemIcon };
-            C2D_DrawParams pS;
-            pS.pos.x = SUB_WIN_X + 12.0f; pS.pos.y = SUB_WIN_Y + 10.0f; pS.pos.w = 16.0f; pS.pos.h = 16.0f;
-            pS.center.x = pS.center.y = 0.0f; pS.depth = subTextZ; pS.angle = 0.0f;
-            C2D_DrawImage(imgSub, &pS, nullptr);
-        }
-
-        // Item Name
-        std::string dName = m_subItem->displayName();
-        C2D_Text txtName;
-        C2D_TextParse(&txtName, textBuf, dName.c_str());
-        C2D_TextOptimize(&txtName);
-        u32 nameCol = (m_subItem->levelKnown && m_subItem->level > 0) ? 0x44FF44FF :
-                      (m_subItem->cursed && m_subItem->cursedKnown ? 0xFF4444FF : 0xFFEBA4FF);
-        BitmapFont::draw(BitmapFont::FontType::Font2x, dName, SUB_WIN_X + 34.0f, SUB_WIN_Y + 11.0f, subTextZ, nameCol);
-
-        // Item Info description using multiline BitmapFont::Font1x
-        std::string infoStr = m_subItem->info();
-        if (infoStr.length() > 95) infoStr = infoStr.substr(0, 92) + "...";
-        BitmapFont::drawMultiline(BitmapFont::FontType::Font1x, infoStr, SUB_WIN_X + 12.0f, SUB_WIN_Y + 34.0f, SUB_WIN_W - 24.0f, subTextZ, 0xCACFC2FF);
-
-        // Action Buttons using Chrome::BUTTON (RedButton)
-        for (size_t i = 0; i < m_subActions.size(); ++i) {
-            float bx = SUB_WIN_X + 8.0f + (i % 2) * (SUB_BTN_W + 4.0f);
-            float by = SUB_BTN_Y + (i / 2) * (SUB_BTN_H + 4.0f);
-
-            bool isSelected = (static_cast<int>(i) == m_selectedAction);
-            Chrome::get(Chrome::Type::BUTTON).draw(bx, by, SUB_BTN_W, SUB_BTN_H, subZ + 0.02f,
-                                                   0xFFFFFFFF, isSelected ? 1.4f : 1.0f);
-
-            u32 btnTxtCol = (i == 0) ? 0xFFFF44FF : 0xFFFFFFFF;
-            float tw = BitmapFont::width(BitmapFont::FontType::Font1x, m_subActions[i]);
-            float tx = bx + (SUB_BTN_W - tw) * 0.5f;
-            BitmapFont::draw(BitmapFont::FontType::Font1x, m_subActions[i], tx, by + 6.0f, subTextZ, btnTxtCol);
-        }
+    if (m_wndItem.isOpen()) {
+        m_wndItem.draw(textBuf, 0.82f);
     }
 }
 

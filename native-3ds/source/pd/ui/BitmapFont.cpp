@@ -334,7 +334,50 @@ float BitmapFont::drawWithShadow(FontType font, const std::string& text, float x
     return draw(font, text, x, y, z, color, scale);
 }
 
-float BitmapFont::drawMultiline(FontType font, const std::string& text, float x, float y, float maxWidth, float z, u32 color, float scale) {
+std::vector<std::string> BitmapFont::splitMultiline(FontType font, const std::string& text, float maxWidth, float scale) {
+    std::vector<std::string> lines;
+    std::stringstream textStream(text);
+    std::string paragraph;
+    while (std::getline(textStream, paragraph)) {
+        if (paragraph.empty()) {
+            lines.push_back("");
+            continue;
+        }
+
+        std::stringstream ss(paragraph);
+        std::string word;
+        std::string currentLine;
+        while (ss >> word) {
+            float wordW = width(font, word, scale);
+            float spaceW = (font == FontType::Font1x || font == FontType::Font1xInk ? 4.0f : 6.0f) * scale;
+            float lineW = currentLine.empty() ? 0.0f : (width(font, currentLine, scale) + spaceW);
+
+            if (!currentLine.empty() && (lineW + wordW) > maxWidth) {
+                lines.push_back(currentLine);
+                currentLine = word;
+            } else {
+                if (!currentLine.empty()) currentLine += " ";
+                currentLine += word;
+            }
+        }
+        if (!currentLine.empty()) {
+            lines.push_back(currentLine);
+        }
+    }
+    if (lines.empty()) {
+        lines.push_back("");
+    }
+    return lines;
+}
+
+float BitmapFont::drawClipped(FontType font, const std::string& text, float x, float y, float clipTop, float clipBottom, float z, u32 color, float scale) {
+    if (clipBottom <= clipTop) return x;
+    bool is1x = (font == FontType::Font1x || font == FontType::Font1xInk);
+    float nominalH = (is1x ? 8.0f : 16.0f) * scale;
+    if (y + nominalH <= clipTop || y >= clipBottom) {
+        return x; // Completely outside vertical clipping range
+    }
+
     init();
     std::shared_ptr<noosa::Texture> tex;
     switch (font) {
@@ -343,26 +386,90 @@ float BitmapFont::drawMultiline(FontType font, const std::string& text, float x,
         case FontType::Font1xInk: tex = (s_tex1xInk && s_tex1xInk->isLoaded()) ? s_tex1xInk : s_tex1x; break;
         case FontType::Font2xInk: tex = (s_tex2xInk && s_tex2xInk->isLoaded()) ? s_tex2xInk : s_tex2x; break;
     }
-    if (!tex || !tex->isLoaded()) return y;
+    if (!tex || !tex->isLoaded()) return x;
 
-    float curX = x;
-    float curY = y;
-    float lineH = lineHeight(font, scale);
-    float spaceW = (font == FontType::Font1x ? 3.0f : 5.0f) * scale;
+    int potW = tex->potWidth();
+    int potH = tex->potHeight();
+    C3D_Tex* rawTex = tex->getTex();
 
-    std::stringstream ss(text);
-    std::string word;
-    while (ss >> word) {
-        float wordW = width(font, word, scale);
-        if (curX > x && (curX + wordW - x) > maxWidth) {
-            curX = x;
-            curY += lineH;
-        }
-        draw(font, word, curX, curY, z, color, scale);
-        curX += wordW + spaceW;
+    float curX = std::floor(x);
+    float tracking = 0.0f * scale;
+    float spaceW = (is1x ? 4.0f : 6.0f) * scale;
+    int baseGlyphH = (is1x ? 8 : 16);
+
+    C2D_ImageTint tint;
+    bool hasTint = (color != 0xFFFFFFFF);
+    if (hasTint) {
+        C2D_PlainImageTint(&tint, color, 1.0f);
     }
 
-    return curY + lineH;
+    Tex3DS_SubTexture sub;
+    for (char c : text) {
+        if (c == '\n') break;
+        if (c == ' ') {
+            curX += spaceW;
+            continue;
+        }
+        unsigned char uc = static_cast<unsigned char>(c);
+        if (uc >= 33 && uc <= 127) {
+            int idx = uc - 33;
+            int gx = (is1x ? GLYPHS_1X[idx].x : GLYPHS_2X[idx].x);
+            int gw = (is1x ? GLYPHS_1X[idx].w : GLYPHS_2X[idx].w);
+
+            float drawY = y;
+            int glyphH = baseGlyphH;
+            int glyphSrcY = 0;
+
+            if (drawY < clipTop) {
+                float topCut = (clipTop - drawY) / scale;
+                int cutPx = static_cast<int>(std::ceil(topCut));
+                if (cutPx >= glyphH) continue;
+                glyphSrcY += cutPx;
+                glyphH -= cutPx;
+                drawY += cutPx * scale;
+            }
+            if (drawY + glyphH * scale > clipBottom) {
+                float botCut = ((drawY + glyphH * scale) - clipBottom) / scale;
+                int cutPx = static_cast<int>(std::ceil(botCut));
+                if (cutPx >= glyphH) continue;
+                glyphH -= cutPx;
+            }
+
+            if (glyphH > 0 && gw > 0) {
+                setupSubTex(sub, potW, potH, gx, glyphSrcY, gw, glyphH);
+                C2D_Image img = { rawTex, &sub };
+
+                C2D_DrawParams p;
+                p.pos.x = std::floor(curX);
+                p.pos.y = std::floor(drawY);
+                p.pos.w = gw * scale;
+                p.pos.h = glyphH * scale;
+                p.center.x = 0.0f;
+                p.center.y = 0.0f;
+                p.depth = z;
+                p.angle = 0.0f;
+
+                C2D_DrawImage(img, &p, hasTint ? &tint : nullptr);
+            }
+
+            curX += (gw * scale) + tracking;
+        }
+    }
+
+    return curX;
+}
+
+float BitmapFont::drawMultiline(FontType font, const std::string& text, float x, float y, float maxWidth, float z, u32 color, float scale) {
+    auto lines = splitMultiline(font, text, maxWidth, scale);
+    float lineH = lineHeight(font, scale);
+    float curY = y;
+    for (const auto& line : lines) {
+        if (!line.empty()) {
+            draw(font, line, x, curY, z, color, scale);
+        }
+        curY += lineH;
+    }
+    return curY;
 }
 
 } // namespace pd::ui
