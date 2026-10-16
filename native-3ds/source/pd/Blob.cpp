@@ -25,9 +25,24 @@ void Blob::clear() {
 
 void Blob::seed(int cell, int amount) {
     if (cell >= 0 && cell < Level::LENGTH && amount > 0) {
-        cur[cell] += amount;
-        volume += amount;
+        if (type == BlobType::FIRE) {
+            if (cur[cell] == 0) {
+                volume += amount;
+                cur[cell] = amount;
+            }
+        } else {
+            cur[cell] += amount;
+            volume += amount;
+        }
     }
+}
+
+bool Blob::act() {
+    spend(TICK);
+    if (volume > 0 && Dungeon::level) {
+        evolve(Dungeon::level.get());
+    }
+    return true;
 }
 
 void Blob::evolve(const Level* level) {
@@ -36,76 +51,129 @@ void Blob::evolve(const Level* level) {
     volume = 0;
     std::fill_n(off, Level::LENGTH, 0);
 
-    for (int y = 1; y < Level::HEIGHT - 1; ++y) {
-        int rowStart = y * Level::WIDTH;
-        for (int x = 1; x < Level::WIDTH - 1; ++x) {
-            int pos = rowStart + x;
-            if (level->isPassable(pos)) {
-                int count = 1;
-                int sum = cur[pos];
+    if (type == BlobType::FIRE) {
+        // =====================================================================
+        // 1:1 Pixel Dungeon Fire Spread
+        // =====================================================================
+        bool observeNeeded = false;
 
-                if (level->isPassable(pos - 1)) {
-                    sum += cur[pos - 1];
-                    count++;
-                }
-                if (level->isPassable(pos + 1)) {
-                    sum += cur[pos + 1];
-                    count++;
-                }
-                if (level->isPassable(pos - Level::WIDTH)) {
-                    sum += cur[pos - Level::WIDTH];
-                    count++;
-                }
-                if (level->isPassable(pos + Level::WIDTH)) {
-                    sum += cur[pos + Level::WIDTH];
-                    count++;
+        for (int y = 1; y < Level::HEIGHT - 1; ++y) {
+            int rowStart = y * Level::WIDTH;
+            for (int x = 1; x < Level::WIDTH - 1; ++x) {
+                int pos = rowStart + x;
+                int fire = 0;
+                bool flamable = level->isFlamable(pos);
+
+                if (cur[pos] > 0) {
+                    // Burn characters standing in the fire
+                    Char* ch = Actor::findChar(pos);
+                    if (ch && ch->isAlive()) {
+                        ch->affect<Burning>(5);
+                    }
+
+                    // Burn heaps on the tile
+                    Heap* heap = level->getHeap(pos);
+                    if (heap) {
+                        heap->burn();
+                    }
+
+                    fire = cur[pos] - 1;
+                    if (fire <= 0 && flamable) {
+                        // Destroy flammable terrain (grass, doors, barricades) turning to embers
+                        const_cast<Level*>(level)->destroy(pos);
+                        observeNeeded = true;
+                    }
+                } else {
+                    // Spread fire to adjacent flammable cells (4-way orthogonal)
+                    if (flamable && (cur[pos - 1] > 0 ||
+                                     cur[pos + 1] > 0 ||
+                                     cur[pos - Level::WIDTH] > 0 ||
+                                     cur[pos + Level::WIDTH] > 0)) {
+                        fire = 4;
+
+                        Char* ch = Actor::findChar(pos);
+                        if (ch && ch->isAlive()) {
+                            ch->affect<Burning>(5);
+                        }
+
+                        Heap* heap = level->getHeap(pos);
+                        if (heap) {
+                            heap->burn();
+                        }
+                    } else {
+                        fire = 0;
+                    }
                 }
 
-                int val = sum / count;
-                if (val > 0) {
-                    val--; // gradual dissipation
-                }
-
-                off[pos] = val;
-                volume += val;
+                off[pos] = fire;
+                volume += fire;
             }
         }
-    }
 
-    std::copy_n(off, Level::LENGTH, cur);
+        std::copy_n(off, Level::LENGTH, cur);
 
-    // Apply effects to characters occupying blob tiles
-    for (int i = 0; i < Level::LENGTH; ++i) {
-        if (cur[i] > 0) {
-            Char* ch = Actor::findChar(i);
-            if (ch && ch->isAlive()) {
-                if (type == BlobType::TOXIC_GAS) {
-                    int levelDamage = 5 + Dungeon::depth * 5;
-                    int dmg = (ch->HT + levelDamage) / 40;
-                    if (Random::Int(40) < (ch->HT + levelDamage) % 40) {
-                        dmg++;
+        if (observeNeeded) {
+            Dungeon::observe();
+        }
+    } else {
+        // =====================================================================
+        // Toxic & Paralytic Gas Diffusion
+        // =====================================================================
+        for (int y = 1; y < Level::HEIGHT - 1; ++y) {
+            int rowStart = y * Level::WIDTH;
+            for (int x = 1; x < Level::WIDTH - 1; ++x) {
+                int pos = rowStart + x;
+                if (level->isPassable(pos)) {
+                    int count = 1;
+                    int sum = cur[pos];
+
+                    if (level->isPassable(pos - 1)) {
+                        sum += cur[pos - 1];
+                        count++;
                     }
-                    if (dmg > 0) {
-                        ch->damage(dmg, nullptr);
-                        FX::floatingText(ch->pos, std::to_string(dmg), 0x38b764FF);
-                        if (!ch->isAlive() && ch == Dungeon::hero.get()) {
-                            Badges::validateDeathFromGas();
-                        }
+                    if (level->isPassable(pos + 1)) {
+                        sum += cur[pos + 1];
+                        count++;
                     }
-                } else if (type == BlobType::PARALYTIC_GAS) {
-                    ch->affect<Paralysis>(1);
-                } else if (type == BlobType::FIRE) {
-                    ch->affect<Burning>(5);
+                    if (level->isPassable(pos - Level::WIDTH)) {
+                        sum += cur[pos - Level::WIDTH];
+                        count++;
+                    }
+                    if (level->isPassable(pos + Level::WIDTH)) {
+                        sum += cur[pos + Level::WIDTH];
+                        count++;
+                    }
+
+                    int val = sum >= count ? (sum / count) - 1 : 0;
+                    off[pos] = val;
+                    volume += val;
                 }
             }
+        }
 
-            if (type == BlobType::FIRE && level) {
-                if (level->isFlamable(i)) {
-                    const_cast<Level*>(level)->destroy(i);
-                }
-                Heap* h = level->getHeap(i);
-                if (h) {
-                    h->burn();
+        std::copy_n(off, Level::LENGTH, cur);
+
+        // Apply gas effects to characters in cloud
+        for (int i = 0; i < Level::LENGTH; ++i) {
+            if (cur[i] > 0) {
+                Char* ch = Actor::findChar(i);
+                if (ch && ch->isAlive()) {
+                    if (type == BlobType::TOXIC_GAS) {
+                        int levelDamage = 5 + Dungeon::depth * 5;
+                        int dmg = (ch->HT + levelDamage) / 40;
+                        if (Random::Int(40) < (ch->HT + levelDamage) % 40) {
+                            dmg++;
+                        }
+                        if (dmg > 0) {
+                            ch->damage(dmg, nullptr);
+                            FX::floatingText(ch->pos, std::to_string(dmg), 0x38b764FF);
+                            if (!ch->isAlive() && ch == Dungeon::hero.get()) {
+                                Badges::validateDeathFromGas();
+                            }
+                        }
+                    } else if (type == BlobType::PARALYTIC_GAS) {
+                        ch->affect<Paralysis>(1);
+                    }
                 }
             }
         }
@@ -126,4 +194,3 @@ uint32_t Blob::getParticleColor() const {
 }
 
 } // namespace pd
-

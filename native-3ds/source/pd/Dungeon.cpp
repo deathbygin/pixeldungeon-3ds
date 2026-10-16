@@ -7,6 +7,8 @@
 #include <unordered_map>
 #include <ctime>
 
+#include "pd/FX.h"
+
 namespace pd {
 
 static std::unordered_map<int, std::unique_ptr<Level>> s_cachedLevels;
@@ -146,6 +148,9 @@ void Dungeon::resetLevel() {
     }
 
     spawnMobs(4);
+    Actor::add(FX::getBlob(Blob::BlobType::FIRE), Actor::TICK);
+    Actor::add(FX::getBlob(Blob::BlobType::TOXIC_GAS), Actor::TICK);
+    Actor::add(FX::getBlob(Blob::BlobType::PARALYTIC_GAS), Actor::TICK);
     observe();
     announceLevelEntrance();
     Actor::process();
@@ -225,6 +230,9 @@ void Dungeon::switchLevel(int newDepth) {
     }
 
     fog = std::make_unique<FogOfWar>(Level::WIDTH, Level::HEIGHT);
+    Actor::add(FX::getBlob(Blob::BlobType::FIRE), Actor::TICK);
+    Actor::add(FX::getBlob(Blob::BlobType::TOXIC_GAS), Actor::TICK);
+    Actor::add(FX::getBlob(Blob::BlobType::PARALYTIC_GAS), Actor::TICK);
     placeChasmItems();
     observe();
     announceLevelEntrance();

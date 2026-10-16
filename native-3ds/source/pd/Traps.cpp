@@ -33,14 +33,11 @@ void Traps::trigger(int tile, int cell, Char* ch) {
         case Terrain::FIRE_TRAP: {
             isTrap = true;
             GLog::w("A fire trap was activated!");
-            FX::seedBlob(cell, Blob::BlobType::FIRE, 40);
-            FX::burst(cell, 0xff7708FFu, 10);
+            FX::seedBlob(cell, Blob::BlobType::FIRE, 2);
+            FX::burst(cell, 0xff7708FFu, 5);
             noosa::Audio::play(noosa::Audio::getSample(Assets::SND_BURNING).get());
 
             if (Dungeon::level) {
-                if (Dungeon::level->isFlamable(cell)) {
-                    Dungeon::level->destroy(cell);
-                }
                 Heap* h = Dungeon::level->getHeap(cell);
                 if (h) {
                     h->burn();
@@ -49,22 +46,6 @@ void Traps::trigger(int tile, int cell, Char* ch) {
 
             if (ch) {
                 ch->affect<Burning>(5);
-                if (ch == Dungeon::hero.get()) {
-                    Hero* hero = Dungeon::hero.get();
-                    std::vector<size_t> scrollIndices;
-                    for (size_t i = 0; i < hero->belongings.backpack.size(); ++i) {
-                        if (hero->belongings.backpack[i] && hero->belongings.backpack[i]->category() == ItemCategory::Scroll) {
-                            scrollIndices.push_back(i);
-                        }
-                    }
-                    if (!scrollIndices.empty()) {
-                        size_t idx = scrollIndices[Random::Int(static_cast<int>(scrollIndices.size()))];
-                        std::string name = hero->belongings.backpack[idx]->displayName();
-                        hero->belongings.backpack.erase(hero->belongings.backpack.begin() + idx);
-                        GLog::w(name + " burns up!");
-                        FX::burst(hero->pos, 0xee7722FF, 6);
-                    }
-                }
             }
             break;
         }

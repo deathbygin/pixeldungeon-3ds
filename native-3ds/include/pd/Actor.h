@@ -23,6 +23,7 @@ public:
     virtual bool act() = 0;
     virtual Char* asChar() { return nullptr; }
     virtual Buff* asBuff() { return nullptr; }
+    virtual class Blob* asBlob() { return nullptr; }
 
     virtual void spend(float t) { time += t; }
     void spendAndNext(float t) { spend(t); next(); }

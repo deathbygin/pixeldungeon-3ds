@@ -1,11 +1,11 @@
 #pragma once
-
+#include "pd/Actor.h"
 #include "pd/Level.h"
 #include <cstdint>
 
 namespace pd {
 
-class Blob {
+class Blob : public Actor {
 public:
     enum class BlobType {
         TOXIC_GAS,
@@ -19,6 +19,10 @@ public:
     int off[Level::LENGTH] = { 0 };
 
     explicit Blob(BlobType t);
+    ~Blob() override = default;
+
+    Blob* asBlob() override { return this; }
+    bool act() override;
 
     void clear();
     void seed(int cell, int amount = 100);
