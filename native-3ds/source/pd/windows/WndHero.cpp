@@ -4,11 +4,19 @@
 #include "pd/HeroSubClass.h"
 #include "pd/Dungeon.h"
 #include "pd/Assets.h"
+#include "pd/ui/Chrome.h"
+#include "pd/ui/BitmapFont.h"
 #include "noosa/Audio.h"
 #include <cstdio>
 #include <algorithm>
+#include <cctype>
+#include <cmath>
 
 namespace pd::windows {
+
+WndHero::WndHero() {
+    m_texLargeBuffs = noosa::Texture::get(Assets::BUFFS_LARGE);
+}
 
 void WndHero::show() {
     m_open = true;
@@ -19,36 +27,54 @@ bool WndHero::update(const pd::ui::TouchController& touch, u32 kDown, pd::Hero* 
     (void)hero;
     if (!m_open) return false;
 
-    // Toggle/Close via B or SELECT
-    if (kDown & (KEY_B | KEY_SELECT)) {
+    // Toggle/Close via B, SELECT, or START
+    if (kDown & (KEY_B | KEY_SELECT | KEY_START)) {
+        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
         hide();
         return false;
     }
 
     // Tab switching via D-Pad Left/Right or L/R shoulders
     if (kDown & (KEY_DLEFT | KEY_L)) {
-        m_tab = Tab::STATS;
+        if (m_tab != Tab::STATS) {
+            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+            m_tab = Tab::STATS;
+        }
     }
     if (kDown & (KEY_DRIGHT | KEY_R)) {
-        m_tab = Tab::BUFFS;
+        if (m_tab != Tab::BUFFS) {
+            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+            m_tab = Tab::BUFFS;
+        }
     }
 
-    // Touch handling for tabs
-    float tabW = 80.0f;
-    float tabH = 20.0f;
-    if (touch.clicked(noosa::RectF(m_x + 8.0f, m_y + 6.0f, tabW, tabH))) {
-        m_tab = Tab::STATS;
+    // Touch handling for tabs along top edge
+    float tabY = m_y - 13.0f;
+    float tabW = 60.0f;
+    float tabH = 16.0f;
+    float tab1X = m_x + 14.0f;
+    float tab2X = tab1X + tabW + 6.0f;
+
+    if (touch.clicked(noosa::RectF(tab1X, tabY, tabW, tabH))) {
+        if (m_tab != Tab::STATS) {
+            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+            m_tab = Tab::STATS;
+        }
     }
-    if (touch.clicked(noosa::RectF(m_x + 92.0f, m_y + 6.0f, tabW, tabH))) {
-        m_tab = Tab::BUFFS;
+    if (touch.clicked(noosa::RectF(tab2X, tabY, tabW, tabH))) {
+        if (m_tab != Tab::BUFFS) {
+            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+            m_tab = Tab::BUFFS;
+        }
     }
 
     // Close button at bottom
-    float btnW = 100.0f;
-    float btnH = 22.0f;
-    float btnX = m_x + (m_w - btnW) * 0.5f;
+    float btnW = 90.0f;
+    float btnH = 20.0f;
+    float btnX = std::round(m_x + (m_w - btnW) * 0.5f);
     float btnY = m_y + m_h - 26.0f;
     if (touch.clicked(noosa::RectF(btnX, btnY, btnW, btnH))) {
+        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
         hide();
         return false;
     }
@@ -57,203 +83,268 @@ bool WndHero::update(const pd::ui::TouchController& touch, u32 kDown, pd::Hero* 
 }
 
 void WndHero::draw(const pd::Hero* hero, C2D_TextBuf textBuf) {
+    (void)textBuf;
     if (!m_open || !hero) return;
 
-    // Dim background overlay
-    C2D_DrawRectSolid(0.0f, 0.0f, 0.70f, 320.0f, 240.0f, C2D_Color32(0x10, 0x14, 0x12, 0xD8));
+    float zDim  = 0.70f;
+    float zWin  = 0.72f;
+    float zText = zWin + 0.04f;
 
-    // Outer frame
-    C2D_DrawRectSolid(m_x, m_y, 0.72f, m_w, m_h, C2D_Color32(0x44, 0x49, 0x46, 0xFF));
-    C2D_DrawRectSolid(m_x, m_y, 0.74f, m_w, 1.0f, C2D_Color32(0x6e, 0x75, 0x71, 0xFF));
-    C2D_DrawRectSolid(m_x, m_y + m_h - 1.0f, 0.74f, m_w, 1.0f, C2D_Color32(0x6e, 0x75, 0x71, 0xFF));
-    C2D_DrawRectSolid(m_x, m_y, 0.74f, 1.0f, m_h, C2D_Color32(0x6e, 0x75, 0x71, 0xFF));
-    C2D_DrawRectSolid(m_x + m_w - 1.0f, m_y, 0.74f, 1.0f, m_h, C2D_Color32(0x6e, 0x75, 0x71, 0xFF));
+    // 1. Semi-transparent dark background backdrop
+    C2D_DrawRectSolid(0.0f, 0.0f, zDim, 320.0f, 240.0f, C2D_Color32(0x00, 0x00, 0x00, 0xAA));
 
-    // Inner shadow border
-    C2D_DrawRectSolid(m_x + 1.0f, m_y + 1.0f, 0.74f, m_w - 2.0f, 1.0f, C2D_Color32(0x33, 0x38, 0x35, 0xFF));
-    C2D_DrawRectSolid(m_x + 1.0f, m_y + m_h - 2.0f, 0.74f, m_w - 2.0f, 1.0f, C2D_Color32(0x33, 0x38, 0x35, 0xFF));
-    C2D_DrawRectSolid(m_x + 1.0f, m_y + 1.0f, 0.74f, 1.0f, m_h - 2.0f, C2D_Color32(0x33, 0x38, 0x35, 0xFF));
-    C2D_DrawRectSolid(m_x + m_w - 2.0f, m_y + 1.0f, 0.74f, 1.0f, m_h - 2.0f, C2D_Color32(0x33, 0x38, 0x35, 0xFF));
+    // 2. 9-slice stone window chrome from chrome.png
+    pd::ui::Chrome::get(pd::ui::Chrome::Type::WINDOW).draw(m_x, m_y, m_w, m_h, zWin);
 
-    // Tab Headers
-    float tabW = 80.0f;
-    float tabH = 18.0f;
-    u32 statTabBg = (m_tab == Tab::STATS) ? C2D_Color32(0x5a, 0x61, 0x5d, 0xFF) : C2D_Color32(0x33, 0x38, 0x35, 0xFF);
-    u32 buffTabBg = (m_tab == Tab::BUFFS) ? C2D_Color32(0x5a, 0x61, 0x5d, 0xFF) : C2D_Color32(0x33, 0x38, 0x35, 0xFF);
+    // 3. Top Tabs: Stats & Buffs
+    float tabY = m_y - 13.0f;
+    float tabW = 60.0f;
+    float tabH = 16.0f;
+    float tab1X = m_x + 14.0f;
+    float tab2X = tab1X + tabW + 6.0f;
 
-    C2D_DrawRectSolid(m_x + 8.0f, m_y + 6.0f, 0.75f, tabW, tabH, statTabBg);
-    C2D_DrawRectSolid(m_x + 92.0f, m_y + 6.0f, 0.75f, tabW, tabH, buffTabBg);
+    bool isStats = (m_tab == Tab::STATS);
 
-    C2D_Text textObj;
-    C2D_TextParse(&textObj, textBuf, "STATS");
-    C2D_TextOptimize(&textObj);
-    C2D_DrawText(&textObj, C2D_WithColor, m_x + 28.0f, m_y + 8.0f, 0.78f, 0.40f, 0.40f, C2D_Color32(0xff, 0xff, 0xff, 0xFF));
+    // Tab 1 (Stats)
+    const auto& patchTab1 = pd::ui::Chrome::get(isStats ? pd::ui::Chrome::Type::TAB_SELECTED : pd::ui::Chrome::Type::TAB_UNSELECTED);
+    patchTab1.draw(tab1X, tabY, tabW, tabH, isStats ? (zWin + 0.02f) : (zWin + 0.01f));
+    float sTxtW = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, "Stats");
+    float sTxtX = std::round(tab1X + (tabW - sTxtW) * 0.5f);
+    pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, "Stats", sTxtX, tabY + 4.0f, zWin + 0.04f, isStats ? 0xFFEE88FF : 0x889988FF, 0x000000FF);
 
-    C2D_TextParse(&textObj, textBuf, "BUFFS");
-    C2D_TextOptimize(&textObj);
-    C2D_DrawText(&textObj, C2D_WithColor, m_x + 112.0f, m_y + 8.0f, 0.78f, 0.40f, 0.40f, C2D_Color32(0xff, 0xff, 0xff, 0xFF));
+    // Tab 2 (Buffs)
+    const auto& patchTab2 = pd::ui::Chrome::get(!isStats ? pd::ui::Chrome::Type::TAB_SELECTED : pd::ui::Chrome::Type::TAB_UNSELECTED);
+    patchTab2.draw(tab2X, tabY, tabW, tabH, !isStats ? (zWin + 0.02f) : (zWin + 0.01f));
+    float bTxtW = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, "Buffs");
+    float bTxtX = std::round(tab2X + (tabW - bTxtW) * 0.5f);
+    pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, "Buffs", bTxtX, tabY + 4.0f, zWin + 0.04f, !isStats ? 0xFFEE88FF : 0x889988FF, 0x000000FF);
 
-    // Divider line
-    C2D_DrawRectSolid(m_x + 4.0f, m_y + 26.0f, 0.75f, m_w - 8.0f, 1.0f, C2D_Color32(0x2d, 0x31, 0x2f, 0xFF));
-
-    float contentY = m_y + 32.0f;
+    float curY = m_y + 14.0f;
 
     if (m_tab == Tab::STATS) {
         // Hero Class Title
-        char titleBuf[64];
-        std::snprintf(titleBuf, sizeof(titleBuf), "LEVEL %d %s", hero->level, hero->className().c_str());
-        C2D_TextParse(&textObj, textBuf, titleBuf);
-        C2D_TextOptimize(&textObj);
-        C2D_DrawText(&textObj, C2D_WithColor, m_x + 12.0f, contentY, 0.78f, 0.50f, 0.50f, C2D_Color32(0xff, 0xd7, 0x00, 0xFF));
-        contentY += 20.0f;
+        std::string title = "LEVEL " + std::to_string(hero->level) + " " + hero->className();
+        for (auto& c : title) c = static_cast<char>(std::toupper(c));
+
+        float titleW = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, title);
+        float titleX = std::round(m_x + (m_w - titleW) * 0.5f);
+        pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, title, titleX, curY, zText, 0xFFFF44FF, 0x000000FF);
+        curY += 14.0f;
 
         // Subclass description if active
         if (hero->subClass != HeroSubClass::None) {
-            const char* desc = subClassDesc(hero->subClass);
-            C2D_TextParse(&textObj, textBuf, desc);
-            C2D_TextOptimize(&textObj);
-            C2D_DrawText(&textObj, C2D_WithColor, m_x + 12.0f, contentY, 0.78f, 0.30f, 0.30f, C2D_Color32(0xcc, 0xd0, 0xcc, 0xFF));
-            contentY += 28.0f;
+            std::string desc = subClassDesc(hero->subClass);
+            float descW = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, desc);
+            float descX = std::round(m_x + (m_w - descW) * 0.5f);
+            pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, desc, descX, curY, zText, 0xCACFC2FF, 0x000000FF);
+            curY += 12.0f;
         }
 
+        // Horizontal divider
+        C2D_DrawRectSolid(m_x + 14.0f, curY, zWin + 0.03f, m_w - 28.0f, 1.0f, C2D_Color32(0x35, 0x30, 0x2A, 0xFF));
+        C2D_DrawRectSolid(m_x + 14.0f, curY + 1.0f, zWin + 0.03f, m_w - 28.0f, 1.0f, C2D_Color32(0x5A, 0x55, 0x4D, 0xFF));
+        curY += 8.0f;
+
         // Stats grid
-        char statBuf[128];
-        std::snprintf(statBuf, sizeof(statBuf), "Health:          %d / %d", hero->HP, hero->HT);
-        C2D_TextParse(&textObj, textBuf, statBuf);
-        C2D_TextOptimize(&textObj);
-        C2D_DrawText(&textObj, C2D_WithColor, m_x + 16.0f, contentY, 0.78f, 0.38f, 0.38f, C2D_Color32(0xff, 0xff, 0xff, 0xFF));
-        contentY += 15.0f;
+        struct StatRow {
+            std::string label;
+            std::string value;
+            uint32_t valColor;
+        };
 
-        std::snprintf(statBuf, sizeof(statBuf), "Strength:        %d", hero->STR);
-        C2D_TextParse(&textObj, textBuf, statBuf);
-        C2D_TextOptimize(&textObj);
-        C2D_DrawText(&textObj, C2D_WithColor, m_x + 16.0f, contentY, 0.78f, 0.38f, 0.38f, C2D_Color32(0xff, 0xff, 0xff, 0xFF));
-        contentY += 15.0f;
+        std::vector<StatRow> stats = {
+            { "Health:",        std::to_string(hero->HP) + " / " + std::to_string(hero->HT), (hero->HP == hero->HT) ? 0x56BB77FF : 0xFFFFFFFF },
+            { "Strength:",      std::to_string(hero->STR), 0xFFFFFFFF },
+            { "Experience:",    std::to_string(hero->exp) + " / " + std::to_string(hero->maxExp), 0xBBAAFFFF },
+            { "Gold Collected:",std::to_string(hero->gold > 0 ? hero->gold : Dungeon::gold), 0xFFD700FF },
+            { "Dungeon Depth:", std::to_string(Dungeon::depth), 0x55AAFFFF },
+            { "Attack Skill:",  std::to_string(const_cast<Hero*>(hero)->attackSkill(nullptr)), 0xCACFC2FF },
+            { "Defense Skill:", std::to_string(const_cast<Hero*>(hero)->defenseSkill(nullptr)), 0xCACFC2FF }
+        };
 
-        std::snprintf(statBuf, sizeof(statBuf), "Experience:    %d / %d", hero->exp, hero->maxExp);
-        C2D_TextParse(&textObj, textBuf, statBuf);
-        C2D_TextOptimize(&textObj);
-        C2D_DrawText(&textObj, C2D_WithColor, m_x + 16.0f, contentY, 0.78f, 0.38f, 0.38f, C2D_Color32(0xff, 0xff, 0xff, 0xFF));
-        contentY += 15.0f;
+        float leftX = m_x + 22.0f;
+        float rightX = m_x + m_w - 22.0f;
 
-        std::snprintf(statBuf, sizeof(statBuf), "Gold Pieces:   %d", hero->gold > 0 ? hero->gold : Dungeon::gold);
-        C2D_TextParse(&textObj, textBuf, statBuf);
-        C2D_TextOptimize(&textObj);
-        C2D_DrawText(&textObj, C2D_WithColor, m_x + 16.0f, contentY, 0.78f, 0.38f, 0.38f, C2D_Color32(0xff, 0xd0, 0x33, 0xFF));
-        contentY += 15.0f;
+        for (const auto& row : stats) {
+            pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, row.label, leftX, curY, zText, 0xCACFC2FF, 0x000000FF);
 
-        std::snprintf(statBuf, sizeof(statBuf), "Dungeon Depth: %d", Dungeon::depth);
-        C2D_TextParse(&textObj, textBuf, statBuf);
-        C2D_TextOptimize(&textObj);
-        C2D_DrawText(&textObj, C2D_WithColor, m_x + 16.0f, contentY, 0.78f, 0.38f, 0.38f, C2D_Color32(0xaa, 0xdd, 0xff, 0xFF));
-        contentY += 15.0f;
+            float vw = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, row.value);
+            pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, row.value, rightX - vw, curY, zText, row.valColor, 0x000000FF);
 
-        std::snprintf(statBuf, sizeof(statBuf), "Attack Skill:    %d", const_cast<Hero*>(hero)->attackSkill(nullptr));
-        C2D_TextParse(&textObj, textBuf, statBuf);
-        C2D_TextOptimize(&textObj);
-        C2D_DrawText(&textObj, C2D_WithColor, m_x + 16.0f, contentY, 0.78f, 0.38f, 0.38f, C2D_Color32(0xcc, 0xcc, 0xcc, 0xFF));
-        contentY += 15.0f;
-
-        std::snprintf(statBuf, sizeof(statBuf), "Defense Skill:  %d", const_cast<Hero*>(hero)->defenseSkill(nullptr));
-        C2D_TextParse(&textObj, textBuf, statBuf);
-        C2D_TextOptimize(&textObj);
-        C2D_DrawText(&textObj, C2D_WithColor, m_x + 16.0f, contentY, 0.78f, 0.38f, 0.38f, C2D_Color32(0xcc, 0xcc, 0xcc, 0xFF));
+            curY += 13.0f;
+        }
     } else {
-        // Buffs & Effects Tab
-        C2D_TextParse(&textObj, textBuf, "ACTIVE BUFFS & CONDITIONS");
-        C2D_TextOptimize(&textObj);
-        C2D_DrawText(&textObj, C2D_WithColor, m_x + 12.0f, contentY, 0.78f, 0.44f, 0.44f, C2D_Color32(0xff, 0xd7, 0x00, 0xFF));
-        contentY += 18.0f;
+        // Buffs & Status Title
+        float titleW = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, "BUFFS & CONDITIONS");
+        float titleX = std::round(m_x + (m_w - titleW) * 0.5f);
+        pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, "BUFFS & CONDITIONS", titleX, curY, zText, 0xFFFF44FF, 0x000000FF);
+        curY += 14.0f;
+
+        // Horizontal divider
+        C2D_DrawRectSolid(m_x + 14.0f, curY, zWin + 0.03f, m_w - 28.0f, 1.0f, C2D_Color32(0x35, 0x30, 0x2A, 0xFF));
+        C2D_DrawRectSolid(m_x + 14.0f, curY + 1.0f, zWin + 0.03f, m_w - 28.0f, 1.0f, C2D_Color32(0x5A, 0x55, 0x4D, 0xFF));
+        curY += 8.0f;
 
         int buffCount = 0;
+        int potW = (m_texLargeBuffs && m_texLargeBuffs->isLoaded()) ? m_texLargeBuffs->potWidth() : 256;
+        int potH = (m_texLargeBuffs && m_texLargeBuffs->isLoaded()) ? m_texLargeBuffs->potHeight() : 32;
+        C3D_Tex* tex = (m_texLargeBuffs && m_texLargeBuffs->isLoaded()) ? m_texLargeBuffs->getTex() : nullptr;
+
         for (const auto& b : hero->buffs) {
             if (!b) continue;
             std::string bName = b->name();
             std::string bDesc = "";
-            u32 col = C2D_Color32(0xdd, 0xdd, 0xdd, 0xFF);
+            uint32_t col = 0xCACFC2FF;
+            int iconIndex = -1;
 
             switch (b->type()) {
                 case BuffType::Regeneration:
-                    bDesc = "Slowly restores health over time.";
-                    col = C2D_Color32(0x56, 0xbb, 0x77, 0xFF);
+                    bDesc = "Restores health over time.";
+                    col = 0x56BB77FF;
+                    iconIndex = 19;
                     break;
                 case BuffType::Hunger:
-                    bDesc = hero->isStarving() ? "Starving! Taking damage from starvation." : (hero->isHungry() ? "Hungry. Will start starving soon." : "Well-fed and energized.");
-                    col = hero->isStarving() ? C2D_Color32(0xee, 0x44, 0x44, 0xFF) : (hero->isHungry() ? C2D_Color32(0xff, 0x99, 0x33, 0xFF) : C2D_Color32(0x56, 0xbb, 0x77, 0xFF));
+                    bDesc = hero->isStarving() ? "Starving! Taking damage." : (hero->isHungry() ? "Hungry. Need food soon." : "Energized and fed.");
+                    col = hero->isStarving() ? 0xEE4444FF : (hero->isHungry() ? 0xFF9933FF : 0x56BB77FF);
+                    iconIndex = hero->isStarving() ? 6 : 5;
                     break;
                 case BuffType::Fury:
-                    bDesc = "Berserker rage: Damage increased by +50%!";
-                    col = C2D_Color32(0xff, 0x33, 0x33, 0xFF);
+                    bDesc = "Berserker rage: Damage increased!";
+                    col = 0xFF3333FF;
+                    iconIndex = 18;
                     break;
                 case BuffType::Combo: {
                     Combo* cmb = b->asCombo();
-                    bDesc = "Gladiator combo: " + std::to_string(cmb ? cmb->count : 0) + " hits landed in succession.";
-                    col = C2D_Color32(0xff, 0x77, 0x33, 0xFF);
+                    bDesc = "Gladiator: " + std::to_string(cmb ? cmb->count : 0) + " hits landed in succession.";
+                    col = 0xFF7733FF;
+                    iconIndex = 17;
                     break;
                 }
                 case BuffType::Barkskin:
-                    bDesc = "Natural hardened bark absorbing incoming physical damage.";
-                    col = C2D_Color32(0x88, 0xbb, 0x44, 0xFF);
+                    bDesc = "Hardened bark absorbs incoming damage.";
+                    col = 0x88BB44FF;
+                    iconIndex = 24;
                     break;
                 case BuffType::Shadows:
-                    bDesc = "Stealth concealment reducing mob detection radius.";
-                    col = C2D_Color32(0xaa, 0x88, 0xdd, 0xFF);
+                    bDesc = "Stealth concealment reduces detection.";
+                    col = 0xAA88DDFF;
+                    iconIndex = 13;
                     break;
                 case BuffType::SnipersMark:
-                    bDesc = "Target marked: Armor completely ignored on next missile hit.";
-                    col = C2D_Color32(0x33, 0xcc, 0xdd, 0xFF);
+                    bDesc = "Marked: Next missile ignores armor.";
+                    col = 0x33CCDDFF;
+                    iconIndex = 27;
                     break;
                 case BuffType::Invisibility:
-                    bDesc = "Completely invisible to enemies until attacking.";
-                    col = C2D_Color32(0x55, 0x99, 0xdd, 0xFF);
+                    bDesc = "Completely invisible to enemies.";
+                    col = 0x5599DDFF;
+                    iconIndex = 12;
                     break;
                 case BuffType::Burning:
-                    bDesc = "Engulfed in flames! Taking continuous fire damage.";
-                    col = C2D_Color32(0xff, 0x55, 0x11, 0xFF);
+                    bDesc = "Engulfed in fire! Taking damage.";
+                    col = 0xFF5511FF;
+                    iconIndex = 2;
                     break;
                 case BuffType::Poison:
-                    bDesc = "Deadly venom coursing through veins.";
-                    col = C2D_Color32(0x33, 0xaa, 0x44, 0xFF);
+                    bDesc = "Deadly venom coursing in veins.";
+                    col = 0x33AA44FF;
+                    iconIndex = 3;
                     break;
                 case BuffType::Paralysis:
-                    bDesc = "Completely immobilized and unable to act.";
-                    col = C2D_Color32(0xee, 0x33, 0x33, 0xFF);
+                    bDesc = "Paralyzed and unable to act.";
+                    col = 0xEE3333FF;
+                    iconIndex = 4;
+                    break;
+                case BuffType::Bleeding:
+                    bDesc = "Bleeding out from wounds.";
+                    col = 0xDD2222FF;
+                    iconIndex = 26;
+                    break;
+                case BuffType::Cripple:
+                    bDesc = "Crippled: Movement speed halved.";
+                    col = 0xCC7733FF;
+                    iconIndex = 23;
+                    break;
+                case BuffType::Roots:
+                    bDesc = "Rooted in place: Cannot move.";
+                    col = 0x997744FF;
+                    iconIndex = 11;
+                    break;
+                case BuffType::Frost:
+                    bDesc = "Frozen solid by intense cold.";
+                    col = 0x66CCFFFF;
+                    iconIndex = 15;
+                    break;
+                case BuffType::Levitation:
+                    bDesc = "Floating gracefully above ground.";
+                    col = 0x88EEFFFF;
+                    iconIndex = 1;
+                    break;
+                case BuffType::Light:
+                    bDesc = "Illuminating surrounding darkness.";
+                    col = 0xFFEE55FF;
+                    iconIndex = 22;
                     break;
                 default:
                     bDesc = "Active effect.";
                     break;
             }
 
-            std::string line = "- " + bName + ": " + bDesc;
-            C2D_TextParse(&textObj, textBuf, line.c_str());
-            C2D_TextOptimize(&textObj);
-            C2D_DrawText(&textObj, C2D_WithColor, m_x + 14.0f, contentY, 0.78f, 0.32f, 0.32f, col);
-            contentY += 14.0f;
+            float slotX = m_x + 18.0f;
+
+            // Draw 16x16 icon if available
+            if (tex && iconIndex >= 0) {
+                int colIdx = iconIndex % 16;
+                int rowIdx = iconIndex / 16;
+                Tex3DS_SubTexture sub;
+                sub.width = 16;
+                sub.height = 16;
+                sub.left = static_cast<float>(colIdx * 16) / static_cast<float>(potW);
+                sub.right = static_cast<float>((colIdx + 1) * 16) / static_cast<float>(potW);
+                sub.top = 1.0f - (static_cast<float>(rowIdx * 16) / static_cast<float>(potH));
+                sub.bottom = 1.0f - (static_cast<float>((rowIdx + 1) * 16) / static_cast<float>(potH));
+
+                C2D_Image img = { tex, &sub };
+                C2D_DrawParams p;
+                p.pos.x = slotX;
+                p.pos.y = curY;
+                p.pos.w = 16.0f;
+                p.pos.h = 16.0f;
+                p.center.x = p.center.y = 0.0f;
+                p.depth = zWin + 0.03f;
+                p.angle = 0.0f;
+                C2D_DrawImage(img, &p, nullptr);
+
+                slotX += 22.0f;
+            }
+
+            // Buff Title & short description
+            pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, bName, slotX, curY, zText, col, 0x000000FF);
+            pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, bDesc, slotX, curY + 9.0f, zText, 0xCACFC2FF, 0x000000FF);
+
+            curY += 21.0f;
             buffCount++;
+            if (curY > m_y + m_h - 40.0f) break; // Don't overflow close button
         }
 
         if (buffCount == 0) {
-            C2D_TextParse(&textObj, textBuf, "No active status effects.");
-            C2D_TextOptimize(&textObj);
-            C2D_DrawText(&textObj, C2D_WithColor, m_x + 14.0f, contentY, 0.78f, 0.36f, 0.36f, C2D_Color32(0x88, 0x88, 0x88, 0xFF));
+            pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, "No active status effects.", m_x + 24.0f, curY + 16.0f, zText, 0x889988FF, 0x000000FF);
         }
     }
 
-    // Close Button [B]
-    float btnW = 100.0f;
+    // Close Button [B] using authentic Chrome::BUTTON
+    float btnW = 90.0f;
     float btnH = 20.0f;
-    float btnX = m_x + (m_w - btnW) * 0.5f;
-    float btnY = m_y + m_h - 24.0f;
-    C2D_DrawRectSolid(btnX, btnY, 0.76f, btnW, btnH, C2D_Color32(0x33, 0x38, 0x35, 0xFF));
-    C2D_DrawRectSolid(btnX, btnY, 0.77f, btnW, 1.0f, C2D_Color32(0x6e, 0x75, 0x71, 0xFF));
-    C2D_DrawRectSolid(btnX, btnY + btnH - 1.0f, 0.77f, btnW, 1.0f, C2D_Color32(0x6e, 0x75, 0x71, 0xFF));
-    C2D_DrawRectSolid(btnX, btnY, 0.77f, 1.0f, btnH, C2D_Color32(0x6e, 0x75, 0x71, 0xFF));
-    C2D_DrawRectSolid(btnX + btnW - 1.0f, btnY, 0.77f, 1.0f, btnH, C2D_Color32(0x6e, 0x75, 0x71, 0xFF));
+    float btnX = std::round(m_x + (m_w - btnW) * 0.5f);
+    float btnY = m_y + m_h - 26.0f;
 
-    C2D_TextParse(&textObj, textBuf, "CLOSE [B]");
-    C2D_TextOptimize(&textObj);
-    C2D_DrawText(&textObj, C2D_WithColor, btnX + 18.0f, btnY + 3.0f, 0.78f, 0.38f, 0.38f, C2D_Color32(0xff, 0xff, 0xff, 0xFF));
+    const auto& btnPatch = pd::ui::Chrome::get(pd::ui::Chrome::Type::BUTTON);
+    btnPatch.draw(btnX, btnY, btnW, btnH, zWin + 0.03f, 0xFFFFFFFF, 1.0f);
+
+    float btnTxtW = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, "Close [B]");
+    float btnTxtX = std::round(btnX + (btnW - btnTxtW) * 0.5f);
+    float btnTxtY = std::round(btnY + (btnH - 8.0f) * 0.5f);
+    pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, "Close [B]", btnTxtX, btnTxtY, zWin + 0.05f, 0xFFFFFFFF, 0x000000FF);
 }
 
 } // namespace pd::windows
-

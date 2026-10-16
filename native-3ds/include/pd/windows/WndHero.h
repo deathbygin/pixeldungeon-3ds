@@ -3,7 +3,9 @@
 #include <citro2d.h>
 #include <string>
 #include <vector>
+#include <memory>
 #include "pd/ui/TouchController.h"
+#include "noosa/Texture.h"
 
 namespace pd {
 class Hero;
@@ -18,7 +20,7 @@ public:
         BUFFS
     };
 
-    WndHero() = default;
+    WndHero();
     ~WndHero() = default;
 
     void show();
@@ -33,10 +35,12 @@ private:
     bool m_open = false;
     Tab m_tab = Tab::STATS;
 
-    float m_x = 16.0f;
-    float m_y = 16.0f;
-    float m_w = 288.0f;
-    float m_h = 208.0f;
+    float m_x = 24.0f;
+    float m_y = 26.0f;
+    float m_w = 272.0f;
+    float m_h = 194.0f;
+
+    std::shared_ptr<noosa::Texture> m_texLargeBuffs;
 };
 
 } // namespace pd::windows
