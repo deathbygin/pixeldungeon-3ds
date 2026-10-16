@@ -49,9 +49,9 @@ bool WndHero::update(const pd::ui::TouchController& touch, u32 kDown, pd::Hero* 
     }
 
     // Touch handling for tabs along top edge
-    float tabY = m_y - 13.0f;
+    float tabY = m_y - 14.0f;
     float tabW = 60.0f;
-    float tabH = 16.0f;
+    float tabH = 15.0f;
     float tab1X = m_x + 14.0f;
     float tab2X = tab1X + tabW + 6.0f;
 
@@ -82,6 +82,40 @@ bool WndHero::update(const pd::ui::TouchController& touch, u32 kDown, pd::Hero* 
     return false;
 }
 
+static void drawStoneTabButton(float x, float y, float w, float h, float z, bool selected, const char* label) {
+    // Authentic Pixel Dungeon stone chrome palette:
+    // Highlight stone: 0x9FA896, Mid stone: 0x7A8173, Shadow stone: 0x62665B, Dark shadow/inner: 0x353831
+    // Selected tab: lighter stone highlight border, stone fill, warm gold text
+    // Unselected tab: recessed darker stone border, darker fill, muted grayish-green text
+    u32 cBorderHi = selected ? C2D_Color32(0x9F, 0xA8, 0x96, 0xFF) : C2D_Color32(0x7A, 0x81, 0x73, 0xFF);
+    u32 cBorderSh = selected ? C2D_Color32(0x62, 0x66, 0x5B, 0xFF) : C2D_Color32(0x35, 0x38, 0x31, 0xFF);
+    u32 cBevelHi  = selected ? C2D_Color32(0x7A, 0x81, 0x73, 0xFF) : C2D_Color32(0x55, 0x5A, 0x50, 0xFF);
+    u32 cBevelSh  = selected ? C2D_Color32(0x35, 0x38, 0x31, 0xFF) : C2D_Color32(0x23, 0x26, 0x21, 0xFF);
+    u32 cFill      = selected ? C2D_Color32(0x41, 0x46, 0x3E, 0xFF) : C2D_Color32(0x28, 0x2B, 0x26, 0xFF);
+
+    // 1. Fill interior
+    C2D_DrawRectSolid(x + 1.0f, y + 1.0f, z, w - 2.0f, h - 2.0f, cFill);
+
+    // 2. Inner bevel for depth
+    C2D_DrawRectSolid(x + 1.0f, y + 1.0f, z + 0.005f, w - 2.0f, 1.0f, cBevelHi);
+    C2D_DrawRectSolid(x + 1.0f, y + 1.0f, z + 0.005f, 1.0f, h - 2.0f, cBevelHi);
+    C2D_DrawRectSolid(x + 1.0f, y + h - 2.0f, z + 0.005f, w - 2.0f, 1.0f, cBevelSh);
+    C2D_DrawRectSolid(x + w - 2.0f, y + 1.0f, z + 0.005f, 1.0f, h - 2.0f, cBevelSh);
+
+    // 3. Fully wrapped 4-sided outer gray border with 1px beveled corners
+    C2D_DrawRectSolid(x + 1.0f, y, z + 0.01f, w - 2.0f, 1.0f, cBorderHi);              // Top
+    C2D_DrawRectSolid(x, y + 1.0f, z + 0.01f, 1.0f, h - 2.0f, cBorderHi);              // Left
+    C2D_DrawRectSolid(x + 1.0f, y + h - 1.0f, z + 0.01f, w - 2.0f, 1.0f, cBorderSh);   // Bottom
+    C2D_DrawRectSolid(x + w - 1.0f, y + 1.0f, z + 0.01f, 1.0f, h - 2.0f, cBorderSh);   // Right
+
+    // 4. Centered label text with drop shadow
+    float txtW = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, label);
+    float txtX = std::round(x + (w - txtW) * 0.5f);
+    float txtY = std::round(y + (h - 7.0f) * 0.5f);
+    u32 txtColor = selected ? 0xFFEE88FF : 0x889988FF;
+    pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, label, txtX, txtY, z + 0.02f, txtColor, 0x000000FF);
+}
+
 void WndHero::draw(const pd::Hero* hero, C2D_TextBuf textBuf) {
     (void)textBuf;
     if (!m_open || !hero) return;
@@ -96,28 +130,16 @@ void WndHero::draw(const pd::Hero* hero, C2D_TextBuf textBuf) {
     // 2. 9-slice stone window chrome from chrome.png
     pd::ui::Chrome::get(pd::ui::Chrome::Type::WINDOW).draw(m_x, m_y, m_w, m_h, zWin);
 
-    // 3. Top Tabs: Stats & Buffs
-    float tabY = m_y - 13.0f;
+    // 3. Top Tabs: Stats & Buffs (fully wrapped by their gray stone border)
+    float tabY = m_y - 14.0f;
     float tabW = 60.0f;
-    float tabH = 16.0f;
+    float tabH = 15.0f;
     float tab1X = m_x + 14.0f;
     float tab2X = tab1X + tabW + 6.0f;
 
     bool isStats = (m_tab == Tab::STATS);
-
-    // Tab 1 (Stats)
-    const auto& patchTab1 = pd::ui::Chrome::get(isStats ? pd::ui::Chrome::Type::TAB_SELECTED : pd::ui::Chrome::Type::TAB_UNSELECTED);
-    patchTab1.draw(tab1X, tabY, tabW, tabH, isStats ? (zWin + 0.02f) : (zWin + 0.01f));
-    float sTxtW = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, "Stats");
-    float sTxtX = std::round(tab1X + (tabW - sTxtW) * 0.5f);
-    pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, "Stats", sTxtX, tabY + 4.0f, zWin + 0.04f, isStats ? 0xFFEE88FF : 0x889988FF, 0x000000FF);
-
-    // Tab 2 (Buffs)
-    const auto& patchTab2 = pd::ui::Chrome::get(!isStats ? pd::ui::Chrome::Type::TAB_SELECTED : pd::ui::Chrome::Type::TAB_UNSELECTED);
-    patchTab2.draw(tab2X, tabY, tabW, tabH, !isStats ? (zWin + 0.02f) : (zWin + 0.01f));
-    float bTxtW = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, "Buffs");
-    float bTxtX = std::round(tab2X + (tabW - bTxtW) * 0.5f);
-    pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, "Buffs", bTxtX, tabY + 4.0f, zWin + 0.04f, !isStats ? 0xFFEE88FF : 0x889988FF, 0x000000FF);
+    drawStoneTabButton(tab1X, tabY, tabW, tabH, zWin + 0.02f, isStats, "Stats");
+    drawStoneTabButton(tab2X, tabY, tabW, tabH, zWin + 0.02f, !isStats, "Buffs");
 
     float curY = m_y + 14.0f;
 
