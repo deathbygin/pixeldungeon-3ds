@@ -29,13 +29,29 @@ public:
     bool avoid[LENGTH] = { false };
     bool water[LENGTH] = { false };
 
+    enum class Feeling {
+        NONE,
+        CHASM,
+        WATER,
+        GRASS
+    };
+
+    Feeling feeling = Feeling::NONE;
+    int secretDoors = 0;
+
     int entrance = 0;
     int exit = 0;
-    std::vector<Room> rooms;
+    std::vector<std::shared_ptr<Room>> rooms;
     std::vector<std::unique_ptr<Heap>> heaps;
 
     Level();
     virtual ~Level() = default;
+
+    static std::unique_ptr<Level> create(int depth);
+
+    virtual int tunnelTile() const {
+        return feeling == Feeling::CHASM ? Terrain::EMPTY_SP : Terrain::EMPTY;
+    }
 
     int getWaterTile(int pos) const;
 
@@ -47,6 +63,7 @@ public:
 
     // Refresh passability & line of sight caches
     void buildFlags();
+    void cleanWalls();
 
     // Tile access
     int get(int x, int y) const { return map[y * WIDTH + x]; }
@@ -81,10 +98,6 @@ public:
     Heap* getHeap(int cell) const;
     Heap* drop(std::unique_ptr<Item> item, int cell);
     void removeHeap(Heap* heap);
-
-protected:
-    void digRoom(const Room& r);
-    void digCorridor(int x1, int y1, int x2, int y2);
 };
 
 } // namespace pd

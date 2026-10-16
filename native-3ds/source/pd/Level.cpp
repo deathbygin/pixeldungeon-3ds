@@ -1,4 +1,5 @@
 #include "pd/Level.h"
+#include "pd/RegularLevel.h"
 #include "pd/ShadowCaster.h"
 #include "pd/Random.h"
 #include "pd/FX.h"
@@ -238,269 +239,52 @@ void Level::removeHeap(Heap* heap) {
     }
 }
 
-void Level::digRoom(const Room& r) {
-    for (int y = r.top; y <= r.bottom; ++y) {
-        for (int x = r.left; x <= r.right; ++x) {
-            map[y * WIDTH + x] = Terrain::EMPTY;
-        }
-    }
+std::unique_ptr<Level> Level::create(int depth) {
+    (void)depth;
+    return std::make_unique<RegularLevel>();
 }
 
-void Level::digCorridor(int x1, int y1, int x2, int y2) {
-    int cx = x1;
-    int cy = y1;
-
-    // Dig horizontally then vertically
-    while (cx != x2) {
-        if (map[cy * WIDTH + cx] == Terrain::WALL) {
-            map[cy * WIDTH + cx] = Terrain::EMPTY;
+void Level::cleanWalls() {
+    const int neighbours9[9] = { 0, +1, -1, +WIDTH, -WIDTH, +1+WIDTH, +1-WIDTH, -1+WIDTH, -1-WIDTH };
+    for (int i = 0; i < LENGTH; ++i) {
+        bool d = false;
+        for (int j = 0; j < 9; ++j) {
+            int n = i + neighbours9[j];
+            if (n >= 0 && n < LENGTH && map[n] != Terrain::WALL && map[n] != Terrain::WALL_DECO) {
+                d = true;
+                break;
+            }
         }
-        cx += (x2 > cx) ? 1 : -1;
-    }
-    while (cy != y2) {
-        if (map[cy * WIDTH + cx] == Terrain::WALL) {
-            map[cy * WIDTH + cx] = Terrain::EMPTY;
+        if (d) {
+            d = false;
+            for (int j = 0; j < 9; ++j) {
+                int n = i + neighbours9[j];
+                if (n >= 0 && n < LENGTH && !pit[n]) {
+                    d = true;
+                    break;
+                }
+            }
         }
-        cy += (y2 > cy) ? 1 : -1;
-    }
-    if (map[cy * WIDTH + cx] == Terrain::WALL) {
-        map[cy * WIDTH + cx] = Terrain::EMPTY;
     }
 }
 
 bool Level::build() {
-    std::fill_n(map, LENGTH, Terrain::WALL);
-    std::fill_n(visited, LENGTH, false);
-    std::fill_n(fieldOfView, LENGTH, false);
-    rooms.clear();
-    heaps.clear();
-
-    const int targetRooms = Random::IntRange(6, 9);
-    int attempts = 0;
-
-    // Room partitioning
-    while (static_cast<int>(rooms.size()) < targetRooms && attempts < 150) {
-        attempts++;
-        int rw = Random::IntRange(4, 7);
-        int rh = Random::IntRange(4, 7);
-        int rx = Random::IntRange(1, WIDTH - rw - 2);
-        int ry = Random::IntRange(1, HEIGHT - rh - 2);
-
-        Room candidate(rx, ry, rx + rw - 1, ry + rh - 1);
-
-        bool overlaps = false;
-        for (const auto& r : rooms) {
-            if (candidate.intersects(r, 1)) {
-                overlaps = true;
-                break;
-            }
-        }
-
-        if (!overlaps) {
-            rooms.push_back(candidate);
-            digRoom(candidate);
-        }
+    RegularLevel reg;
+    reg.feeling = feeling;
+    int tries = 0;
+    while (!reg.build()) {
+        if (++tries > 20) return false;
     }
-
-    if (rooms.size() < 3) return false;
-
-    // Connect rooms sequentially
-    for (size_t i = 0; i < rooms.size() - 1; ++i) {
-        digCorridor(rooms[i].centerX(), rooms[i].centerY(),
-                    rooms[i + 1].centerX(), rooms[i + 1].centerY());
-    }
-    // Add cycle connection between first and middle room
-    digCorridor(rooms[0].centerX(), rooms[0].centerY(),
-                rooms[rooms.size() / 2].centerX(), rooms[rooms.size() / 2].centerY());
-
-    // Place entrance and exit
-    rooms[0].type = Room::Type::ENTRANCE;
-    entrance = rooms[0].centerY() * WIDTH + rooms[0].centerX();
-    map[entrance] = Terrain::ENTRANCE;
-
-    rooms.back().type = Room::Type::EXIT;
-    exit = rooms.back().centerY() * WIDTH + rooms.back().centerX();
-    map[exit] = Terrain::EXIT;
-
-    // Identify doorway transitions (empty tile adjacent to wall on 2 opposite sides)
-    for (int y = 1; y < HEIGHT - 1; ++y) {
-        for (int x = 1; x < WIDTH - 1; ++x) {
-            int c = y * WIDTH + x;
-            if (map[c] == Terrain::EMPTY) {
-                bool horizontalWalls = (map[c - 1] == Terrain::WALL && map[c + 1] == Terrain::WALL &&
-                                        map[c - WIDTH] == Terrain::EMPTY && map[c + WIDTH] == Terrain::EMPTY);
-                bool verticalWalls   = (map[c - WIDTH] == Terrain::WALL && map[c + WIDTH] == Terrain::WALL &&
-                                        map[c - 1] == Terrain::EMPTY && map[c + 1] == Terrain::EMPTY);
-
-                if (horizontalWalls || verticalWalls) {
-                    if (Random::Float() < 0.65f) {
-                        map[c] = (Random::Float() < 0.15f) ? Terrain::SECRET_DOOR : Terrain::DOOR;
-                    }
-                }
-            }
-        }
-    }
-
-    // Procedural organic lakes and pools using cellular automaton Patch
-    std::vector<bool> lake = Patch::generate(0.45f, 5);
-    for (int i = 0; i < LENGTH; ++i) {
-        if (map[i] == Terrain::EMPTY && lake[i] && i != entrance && i != exit) {
-            map[i] = Terrain::WATER;
-        }
-    }
-
-    // Procedural organic meadows and high grass using cellular automaton Patch
-    std::vector<bool> grass = Patch::generate(0.40f, 4);
-    const int neighbours8[8] = { +1, -1, +WIDTH, -WIDTH, +1+WIDTH, +1-WIDTH, -1+WIDTH, -1-WIDTH };
-    for (int i = 0; i < LENGTH; ++i) {
-        if (map[i] == Terrain::EMPTY && grass[i] && i != entrance && i != exit) {
-            int count = 0;
-            for (int j = 0; j < 8; ++j) {
-                int n = i + neighbours8[j];
-                if (n >= 0 && n < LENGTH && grass[n]) {
-                    count++;
-                }
-            }
-            map[i] = (Random::Float() < static_cast<float>(count) / 12.0f) ? Terrain::HIGH_GRASS : Terrain::GRASS;
-        }
-    }
-
-    // Scatter traps (both visible and secret traps)
-    for (size_t i = 1; i < rooms.size() - 1; ++i) {
-        const auto& r = rooms[i];
-        if (Random::Float() < 0.60f) {
-            int trapCount = Random::IntRange(1, 2);
-            for (int t = 0; t < trapCount; ++t) {
-                int tx = Random::IntRange(r.left + 1, r.right - 1);
-                int ty = Random::IntRange(r.top + 1, r.bottom - 1);
-                int tc = ty * WIDTH + tx;
-                if (map[tc] == Terrain::EMPTY && tc != entrance && tc != exit) {
-                    int trapTypes[] = {
-                        Terrain::FIRE_TRAP, Terrain::TOXIC_TRAP, Terrain::PARALYTIC_TRAP,
-                        Terrain::POISON_TRAP, Terrain::ALARM_TRAP, Terrain::LIGHTNING_TRAP,
-                        Terrain::GRIPPING_TRAP, Terrain::SUMMONING_TRAP, Terrain::TELEPORTATION_TRAP
-                    };
-                    int secretTypes[] = {
-                        Terrain::SECRET_FIRE_TRAP, Terrain::SECRET_TOXIC_TRAP, Terrain::SECRET_PARALYTIC_TRAP,
-                        Terrain::SECRET_POISON_TRAP, Terrain::SECRET_ALARM_TRAP, Terrain::SECRET_LIGHTNING_TRAP,
-                        Terrain::SECRET_GRIPPING_TRAP, Terrain::SECRET_SUMMONING_TRAP, Terrain::SECRET_TELEPORTATION_TRAP
-                    };
-                    int idx = Random::Int(9);
-                    bool isSec = (Random::Float() < 0.70f);
-                    map[tc] = isSec ? secretTypes[idx] : trapTypes[idx];
-                }
-            }
-        }
-    }
-
-    // Resolve water shore tiles matching Java Level.java
-    for (int i = 0; i < LENGTH; ++i) {
-        if (map[i] == Terrain::WATER) {
-            water[i] = true;
-        }
-    }
-    for (int i = 0; i < LENGTH; ++i) {
-        if (water[i]) {
-            map[i] = getWaterTile(i);
-        }
-    }
+    std::memcpy(map, reg.map, sizeof(map));
+    entrance = reg.entrance;
+    exit = reg.exit;
+    rooms = std::move(reg.rooms);
+    heaps = std::move(reg.heaps);
+    secretDoors = reg.secretDoors;
+    feeling = reg.feeling;
 
     buildFlags();
-
-    // Authentic special room generation (e.g. Vault room with crystal chests or locked chest and golden key)
-    bool vaultGenerated = false;
-    for (size_t i = 1; i < rooms.size() - 1; ++i) {
-        if (!vaultGenerated && Random::Float() < 0.35f) {
-            rooms[i].type = Room::Type::VAULT;
-            vaultGenerated = true;
-
-            int c = rooms[i].centerY() * WIDTH + rooms[i].centerX();
-            // In Vault room: 2 Crystal Chests with different prizes (or 1 Locked Chest) + Golden Key hidden in the level
-            if (Random::Int(2) == 0) {
-                // Crystal chests choice
-                auto chest1 = std::make_unique<Heap>(c, Heap::Type::CRYSTAL_CHEST);
-                auto w = std::make_unique<Weapon>("Battle Axe", 5, 20, 16);
-                w->random();
-                chest1->drop(std::move(w));
-                heaps.push_back(std::move(chest1));
-
-                // Adjacent crystal chest
-                int c2 = c + 1;
-                if (!isPassable(c2)) c2 = c - 1;
-                if (isPassable(c2)) {
-                    auto chest2 = std::make_unique<Heap>(c2, Heap::Type::CRYSTAL_CHEST);
-                    auto a = std::make_unique<Armor>("Scale Armor", 4, 16);
-                    a->random();
-                    chest2->drop(std::move(a));
-                    heaps.push_back(std::move(chest2));
-                }
-            } else {
-                auto lChest = std::make_unique<Heap>(c, Heap::Type::LOCKED_CHEST);
-                auto w = std::make_unique<Weapon>("Longsword", 4, 15, 14);
-                w->random();
-                lChest->drop(std::move(w));
-                heaps.push_back(std::move(lChest));
-            }
-
-            // Spawn the required Golden Key in a different room
-            size_t keyRoomIdx = (i == 1) ? (rooms.size() - 2) : 1;
-            int keyCell = rooms[keyRoomIdx].centerY() * WIDTH + rooms[keyRoomIdx].centerX() + 1;
-            if (!isPassable(keyCell)) keyCell = rooms[keyRoomIdx].centerY() * WIDTH + rooms[keyRoomIdx].centerX();
-            drop(std::make_unique<GoldenKey>(Dungeon::depth), keyCell);
-            continue;
-        }
-
-        const auto& r = rooms[i];
-        int cell = r.centerY() * WIDTH + r.centerX();
-        if (isPassable(cell) && !getHeap(cell)) {
-            float roll = Random::Float();
-            if (roll < 0.25f) {
-                // Regular unlocked chest (does not need a key)
-                auto chest = std::make_unique<Heap>(cell, Heap::Type::CHEST);
-                if (Random::Float() < 0.5f) {
-                    chest->drop(std::make_unique<Potion>(Potion::PotionType::HEALING));
-                } else {
-                    chest->drop(std::make_unique<Scroll>(Scroll::ScrollType::UPGRADE));
-                }
-                heaps.push_back(std::move(chest));
-            } else if (roll < 0.45f) {
-                // Skeletal remains containing unidentified weapon or armor
-                auto skel = std::make_unique<Heap>(cell, Heap::Type::SKELETON);
-                if (Random::Float() < 0.5f) {
-                    auto w = std::make_unique<Weapon>("Shortsword", 3, 8, 11);
-                    w->random();
-                    skel->drop(std::move(w));
-                } else {
-                    auto a = std::make_unique<Armor>("Leather Armor", 2, 12);
-                    a->random();
-                    skel->drop(std::move(a));
-                }
-                heaps.push_back(std::move(skel));
-            } else if (roll < 0.75f) {
-                auto ground = std::make_unique<Heap>(cell, Heap::Type::HEAP);
-                float lootRoll = Random::Float();
-                if (lootRoll < 0.35f) {
-                    ground->drop(std::make_unique<Food>());
-                } else if (lootRoll < 0.55f) {
-                    ground->drop(std::make_unique<Potion>(Potion::PotionType::STRENGTH));
-                } else if (lootRoll < 0.75f) {
-                    ground->drop(std::make_unique<Scroll>(Scroll::ScrollType::MAGIC_MAPPING));
-                } else {
-                    // Ground equipment drop (unidentified, possibly cursed)
-                    if (Random::Float() < 0.5f) {
-                        auto w = std::make_unique<Weapon>("Mace", 3, 10, 12);
-                        w->random();
-                        ground->drop(std::move(w));
-                    } else {
-                        auto a = std::make_unique<Armor>("Mail Armor", 3, 14);
-                        a->random();
-                        ground->drop(std::move(a));
-                    }
-                }
-                heaps.push_back(std::move(ground));
-            }
-        }
-    }
+    cleanWalls();
 
     return true;
 }
@@ -525,9 +309,11 @@ int Level::randomDestination() const {
     if (!rooms.empty()) {
         for (int attempts = 0; attempts < 50; ++attempts) {
             size_t r = Random::Int(static_cast<int>(rooms.size()));
-            int c = rooms[r].randomCell();
-            if (isPassable(c)) {
-                return c;
+            if (rooms[r] && rooms[r]->type != Room::Type::NONE) {
+                int c = rooms[r]->random();
+                if (isPassable(c)) {
+                    return c;
+                }
             }
         }
     }

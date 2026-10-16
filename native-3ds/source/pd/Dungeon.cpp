@@ -73,8 +73,11 @@ void Dungeon::resetLevel() {
     mobs.clear();
     std::fill_n(visible, Level::LENGTH, false);
 
-    level = std::make_unique<Level>();
-    level->build();
+    level = Level::create(depth);
+    int tries = 0;
+    while (!level->build()) {
+        if (++tries > 20) break;
+    }
 
     fog = std::make_unique<FogOfWar>(Level::WIDTH, Level::HEIGHT);
 
@@ -137,8 +140,11 @@ void Dungeon::switchLevel(int newDepth) {
             }
         }
     } else {
-        level = std::make_unique<Level>();
-        level->build();
+        level = Level::create(depth);
+        int tries = 0;
+        while (!level->build()) {
+            if (++tries > 20) break;
+        }
         mobs.clear();
 
         hero->place(level->entrance);

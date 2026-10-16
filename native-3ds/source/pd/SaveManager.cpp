@@ -368,11 +368,12 @@ bool SaveManager::saveGame(const std::string& customPath) {
     uint32_t roomCount = static_cast<uint32_t>(level->rooms.size());
     std::fwrite(&roomCount, sizeof(uint32_t), 1, fp);
     for (const auto& r : level->rooms) {
-        int32_t left = r.left;
-        int32_t top = r.top;
-        int32_t right = r.right;
-        int32_t bottom = r.bottom;
-        int32_t rType = static_cast<int32_t>(r.type);
+        if (!r) continue;
+        int32_t left = r->left;
+        int32_t top = r->top;
+        int32_t right = r->right;
+        int32_t bottom = r->bottom;
+        int32_t rType = static_cast<int32_t>(r->type);
         std::fwrite(&left, sizeof(int32_t), 1, fp);
         std::fwrite(&top, sizeof(int32_t), 1, fp);
         std::fwrite(&right, sizeof(int32_t), 1, fp);
@@ -735,7 +736,7 @@ bool SaveManager::loadGame(const std::string& customPath) {
         std::fread(&right, sizeof(int32_t), 1, fp);
         std::fread(&bottom, sizeof(int32_t), 1, fp);
         std::fread(&rType, sizeof(int32_t), 1, fp);
-        level->rooms.emplace_back(left, top, right, bottom, static_cast<Room::Type>(rType));
+        level->rooms.push_back(std::make_shared<Room>(left, top, right, bottom, static_cast<Room::Type>(rType)));
     }
 
     // 5b. Ground Heaps State (v2+)

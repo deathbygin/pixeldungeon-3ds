@@ -31,8 +31,19 @@ public:
     // Pick an index from a list of relative probabilities
     static int Chances(const float* chances, int count);
 
+    // Returns an integer in [min, max) matching Java Random.Int(min, max)
+    static int Int(int min, int max) {
+        if (min >= max) return min;
+        return min + Int(max - min);
+    }
+
     template<typename T>
     static const T& element(const std::vector<T>& vec) {
+        return vec[Int(static_cast<int>(vec.size()))];
+    }
+
+    template<typename T>
+    static T& element(std::vector<T>& vec) {
         return vec[Int(static_cast<int>(vec.size()))];
     }
 
