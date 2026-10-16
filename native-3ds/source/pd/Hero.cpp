@@ -12,6 +12,7 @@
 #include "pd/Assets.h"
 #include "pd/Badges.h"
 #include "pd/Sign.h"
+#include "pd/Sample.h"
 #include "noosa/Audio.h"
 #include <algorithm>
 
@@ -285,7 +286,7 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
     int tile = currentLevel->get(nextCell);
     if (tile == Terrain::DOOR || tile == Terrain::SECRET_DOOR) {
         currentLevel->set(nextCell, Terrain::OPEN_DOOR);
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_OPEN).get());
+        Sample::playAt(Assets::SND_OPEN, nextCell);
         spend(TICK);
         next();
         Dungeon::observe();
@@ -296,7 +297,7 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
     if (tile == Terrain::LOCKED_DOOR) {
         if (belongings.consumeKey("Iron Key", Dungeon::depth)) {
             currentLevel->set(nextCell, Terrain::DOOR);
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_UNLOCK).get());
+            Sample::playAt(Assets::SND_UNLOCK, nextCell);
             GLog::p("You unlock the door with an iron key.");
             spend(TICK);
             next();
@@ -451,7 +452,7 @@ bool Hero::pickUp(Level* currentLevel, bool spendTurn) {
         } else {
             GLog::i("You drank a fresh dewdrop.");
         }
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_DEWDROP).get());
+        Sample::play(Assets::SND_DEWDROP);
     } else if (item->name == "Gold") {
         int g = item->quantity;
         gold += g;
@@ -459,10 +460,10 @@ bool Hero::pickUp(Level* currentLevel, bool spendTurn) {
         Badges::validateGoldCollected(Dungeon::gold);
         FX::floatingText(pos, "+" + std::to_string(g), 0xffd700FF);
         GLog::p("You collected " + std::to_string(g) + " gold.");
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_GOLD).get());
+        Sample::play(Assets::SND_GOLD, 1.0f, 1.0f, Random::Float(0.9f, 1.1f));
     } else if (belongings.collect(std::move(item))) {
         GLog::p("You picked up " + itemName);
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_ITEM).get());
+        Sample::play(Assets::SND_ITEM);
     } else {
         GLog::w("Your pack is too full for " + itemName);
         heap->drop(std::move(item));
@@ -531,7 +532,6 @@ bool Hero::search(Level* currentLevel, bool intentional) {
         }
         FX::floatingText(pos, "search", 0xFFFFFFFF);
         FX::ripple(pos);
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_MISS).get());
     }
 
     int ax = std::max(0, cx - distance);
@@ -593,7 +593,7 @@ bool Hero::search(Level* currentLevel, bool intentional) {
         } else {
             GLog::w("You noticed something!");
         }
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_SECRET).get());
+        Sample::play(Assets::SND_SECRET);
         interrupt();
     }
 
@@ -628,12 +628,13 @@ void Hero::earnExp(int amount) {
         }
         updateAwareness();
         GLog::h("Welcome to level " + std::to_string(level) + "!");
+        Sample::play(Assets::SND_LEVELUP);
         Badges::validateLevelReached(level);
     }
 }
 
 void Hero::die(Actor* src) {
-    noosa::Audio::play(noosa::Audio::getSample(Assets::SND_DEATH).get());
+    Sample::play(Assets::SND_DEATH);
     GLog::n("You died...");
     if (src) {
         Buff* b = src->asBuff();

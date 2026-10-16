@@ -1,6 +1,7 @@
 #include "pd/Badges.h"
 #include "pd/GLog.h"
 #include "pd/Assets.h"
+#include "pd/Sample.h"
 #include "noosa/Audio.h"
 #include <cstdio>
 #include <cstring>
@@ -81,7 +82,7 @@ void Badges::unlock(Badge badge, const std::string& description) {
     if (!s_unlocked[idx]) {
         s_unlocked[idx] = true;
         GLog::h("BADGE UNLOCKED: " + description + "!");
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_BADGE).get());
+        Sample::play(Assets::SND_BADGE);
         save();
     }
 }

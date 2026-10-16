@@ -1,4 +1,6 @@
 #include "pd/ui/UIButton.h"
+#include "pd/Sample.h"
+#include "pd/Assets.h"
 
 namespace pd::ui {
 
@@ -14,6 +16,7 @@ bool UIButton::update(const TouchController& touch, u32 kDown) {
     }
 
     if (triggered) {
+        Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
         if (onClick) {
             onClick();
         }

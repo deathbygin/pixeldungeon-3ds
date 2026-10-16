@@ -12,6 +12,7 @@
 #include "pd/Assets.h"
 #include "pd/Patch.h"
 #include "pd/Item.h"
+#include "pd/Sample.h"
 #include "noosa/Audio.h"
 #include <cmath>
 #include <cstring>
@@ -199,7 +200,7 @@ void Level::press(int cell, Char* ch) {
         trample(cell, ch);
     } else if (tile == Terrain::DOOR) {
         set(cell, Terrain::OPEN_DOOR);
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_OPEN).get());
+        Sample::playAt(Assets::SND_OPEN, cell);
     }
 
     Plant* plant = getPlant(cell);
@@ -230,7 +231,7 @@ void Level::mobPress(Mob* mob) {
         trample(cell, mob);
     } else if (tile == Terrain::DOOR) {
         set(cell, Terrain::OPEN_DOOR);
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_OPEN).get());
+        Sample::playAt(Assets::SND_OPEN, cell);
     }
 
     Plant* plant = getPlant(cell);

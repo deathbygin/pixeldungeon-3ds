@@ -8,13 +8,14 @@
 #include "pd/Random.h"
 #include "pd/Assets.h"
 #include "pd/Badges.h"
+#include "pd/Sample.h"
 #include "noosa/Audio.h"
 #include "noosa/Camera.h"
 
 namespace pd {
 
 void Chasm::heroFall(int pos) {
-    noosa::Audio::play(noosa::Audio::getSample(Assets::SND_FALLING).get());
+    Sample::play(Assets::SND_FALLING);
 
     if (Dungeon::hero && Dungeon::hero->isAlive()) {
         Dungeon::hero->interrupt();
@@ -51,6 +52,7 @@ void Chasm::heroLand() {
 
 void Chasm::mobFall(Mob* mob) {
     if (!mob) return;
+    Sample::playAt(Assets::SND_FALLING, mob->pos);
     GLog::i(mob->name + " fell into the chasm!");
     mob->die(nullptr);
 }

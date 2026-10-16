@@ -4,6 +4,7 @@
 #include "pd/ui/Chrome.h"
 #include "pd/ui/BitmapFont.h"
 #include "pd/Assets.h"
+#include "pd/Sample.h"
 #include "noosa/Audio.h"
 #include <algorithm>
 #include <cmath>
@@ -55,7 +56,7 @@ bool WndSettings::update(const pd::ui::TouchController& touch, u32 kDown) {
 
     // B or START closes settings modal
     if (kDown & (KEY_B | KEY_START)) {
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
         hide();
         return true;
     }
@@ -89,43 +90,43 @@ bool WndSettings::update(const pd::ui::TouchController& touch, u32 kDown) {
 
         // Touch interaction
         if (touch.clicked(noosa::RectF(z1X, zBtnY, z1W, zH))) {
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+            Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
             Preferences::setZoom(1.0f);
             m_selected = 0;
             return true;
         }
         if (touch.clicked(noosa::RectF(z2X, zBtnY, z2W, zH))) {
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+            Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
             Preferences::setZoom(2.0f);
             m_selected = 1;
             return true;
         }
         if (touch.clicked(noosa::RectF(z3X, zBtnY, z3W, zH))) {
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+            Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
             Preferences::setZoom(3.0f);
             m_selected = 2;
             return true;
         }
         if (touch.clicked(noosa::RectF(rowX, musicY, rowW, btnH))) {
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+            Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
             Preferences::setMusic(!Preferences::music());
             m_selected = 3;
             return true;
         }
         if (touch.clicked(noosa::RectF(rowX, sfxY, rowW, btnH))) {
             Preferences::setSoundFx(!Preferences::soundFx());
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+            Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
             m_selected = 4;
             return true;
         }
         if (touch.clicked(noosa::RectF(rowX, brightY, rowW, btnH))) {
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+            Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
             Preferences::setBrightness(!Preferences::brightness());
             m_selected = 5;
             return true;
         }
         if (touch.clicked(noosa::RectF(retX, retY, retW, retH))) {
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+            Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
             hide();
             return true;
         }
@@ -151,7 +152,7 @@ bool WndSettings::update(const pd::ui::TouchController& touch, u32 kDown) {
             else if (m_selected == 4) Preferences::setSoundFx(!Preferences::soundFx());
             else if (m_selected == 5) Preferences::setBrightness(!Preferences::brightness());
             else if (m_selected == 6) hide();
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+            Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
             return true;
         }
     } else {
@@ -166,7 +167,7 @@ bool WndSettings::update(const pd::ui::TouchController& touch, u32 kDown) {
         float retH = 22.0f;
 
         auto triggerClearData = [this]() {
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+            Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
             m_confirmWipe.show(
                 "Erase All Data?",
                 "Are you sure you want to erase all data? This will permanently delete your active run, rankings, high scores, unlocked badges, and settings.",
@@ -174,7 +175,7 @@ bool WndSettings::update(const pd::ui::TouchController& touch, u32 kDown) {
                 [this](int idx) {
                     if (idx == 0) {
                         SaveManager::wipeAllData();
-                        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_SHATTER).get());
+                        Sample::play(Assets::SND_SHATTER);
                         m_confirmWipe.hide();
                         hide();
                         if (m_onDataWiped) {
@@ -188,19 +189,19 @@ bool WndSettings::update(const pd::ui::TouchController& touch, u32 kDown) {
 
         // Touch interaction
         if (touch.clicked(noosa::RectF(rowX, musicY, rowW, btnH))) {
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+            Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
             Preferences::setMusic(!Preferences::music());
             m_selected = 0;
             return true;
         }
         if (touch.clicked(noosa::RectF(rowX, sfxY, rowW, btnH))) {
             Preferences::setSoundFx(!Preferences::soundFx());
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+            Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
             m_selected = 1;
             return true;
         }
         if (touch.clicked(noosa::RectF(rowX, brightY, rowW, btnH))) {
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+            Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
             Preferences::setBrightness(!Preferences::brightness());
             m_selected = 2;
             return true;
@@ -211,7 +212,7 @@ bool WndSettings::update(const pd::ui::TouchController& touch, u32 kDown) {
             return true;
         }
         if (touch.clicked(noosa::RectF(retX, retY, retW, retH))) {
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+            Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
             hide();
             return true;
         }
@@ -226,17 +227,17 @@ bool WndSettings::update(const pd::ui::TouchController& touch, u32 kDown) {
         } else if (kDown & KEY_A) {
             if (m_selected == 0) {
                 Preferences::setMusic(!Preferences::music());
-                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+                Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
             } else if (m_selected == 1) {
                 Preferences::setSoundFx(!Preferences::soundFx());
-                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+                Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
             } else if (m_selected == 2) {
                 Preferences::setBrightness(!Preferences::brightness());
-                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+                Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
             } else if (m_selected == 3) {
                 triggerClearData();
             } else if (m_selected == 4) {
-                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+                Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
                 hide();
             }
             return true;

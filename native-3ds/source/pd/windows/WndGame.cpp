@@ -2,6 +2,7 @@
 #include "pd/ui/Chrome.h"
 #include "pd/ui/BitmapFont.h"
 #include "pd/Assets.h"
+#include "pd/Sample.h"
 #include "noosa/Audio.h"
 
 namespace pd::windows {
@@ -47,7 +48,7 @@ GameAction WndGame::update(const pd::ui::TouchController& touch, u32 kDown) {
 
     // B or START acts as "Return to Game"
     if (kDown & (KEY_B | KEY_START)) {
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
         hide();
         return GameAction::RESUME;
     }
@@ -67,7 +68,7 @@ GameAction WndGame::update(const pd::ui::TouchController& touch, u32 kDown) {
     // Hardware confirmation A
     if (kDown & KEY_A) {
         if (m_selected >= 0 && m_selected < static_cast<int>(m_buttons.size())) {
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+            Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
             GameAction act = m_buttons[m_selected].action;
             if (act == GameAction::RESUME) {
                 hide();
@@ -84,7 +85,7 @@ GameAction WndGame::update(const pd::ui::TouchController& touch, u32 kDown) {
             m_selected = static_cast<int>(i);
         }
         if (touch.clicked(r)) {
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+            Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
             GameAction act = b.action;
             if (act == GameAction::RESUME) {
                 hide();

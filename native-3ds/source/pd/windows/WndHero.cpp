@@ -6,6 +6,7 @@
 #include "pd/Assets.h"
 #include "pd/ui/Chrome.h"
 #include "pd/ui/BitmapFont.h"
+#include "pd/Sample.h"
 #include "noosa/Audio.h"
 #include <cstdio>
 #include <algorithm>
@@ -29,7 +30,7 @@ bool WndHero::update(const pd::ui::TouchController& touch, u32 kDown, pd::Hero* 
 
     // Toggle/Close via B, SELECT, or START
     if (kDown & (KEY_B | KEY_SELECT | KEY_START)) {
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
         hide();
         return false;
     }
@@ -37,13 +38,13 @@ bool WndHero::update(const pd::ui::TouchController& touch, u32 kDown, pd::Hero* 
     // Tab switching via D-Pad Left/Right or L/R shoulders
     if (kDown & (KEY_DLEFT | KEY_L)) {
         if (m_tab != Tab::STATS) {
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+            Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
             m_tab = Tab::STATS;
         }
     }
     if (kDown & (KEY_DRIGHT | KEY_R)) {
         if (m_tab != Tab::BUFFS) {
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+            Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
             m_tab = Tab::BUFFS;
         }
     }
@@ -57,13 +58,13 @@ bool WndHero::update(const pd::ui::TouchController& touch, u32 kDown, pd::Hero* 
 
     if (touch.clicked(noosa::RectF(tab1X, tabY, tabW, tabH))) {
         if (m_tab != Tab::STATS) {
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+            Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
             m_tab = Tab::STATS;
         }
     }
     if (touch.clicked(noosa::RectF(tab2X, tabY, tabW, tabH))) {
         if (m_tab != Tab::BUFFS) {
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+            Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
             m_tab = Tab::BUFFS;
         }
     }
@@ -74,7 +75,7 @@ bool WndHero::update(const pd::ui::TouchController& touch, u32 kDown, pd::Hero* 
     float btnX = std::round(m_x + (m_w - btnW) * 0.5f);
     float btnY = m_y + m_h - 26.0f;
     if (touch.clicked(noosa::RectF(btnX, btnY, btnW, btnH))) {
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
         hide();
         return false;
     }

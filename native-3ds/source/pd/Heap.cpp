@@ -5,6 +5,7 @@
 #include "pd/FX.h"
 #include "pd/GLog.h"
 #include "pd/Assets.h"
+#include "pd/Sample.h"
 #include "noosa/Audio.h"
 #include <algorithm>
 
@@ -41,20 +42,25 @@ void Heap::open(Hero* hero) {
     switch (type) {
     case Type::CHEST:
         GLog::i("You opened the chest.");
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_UNLOCK).get());
+        Sample::playAt(Assets::SND_UNLOCK, pos);
         FX::burst(pos, 0xffd700FFu, 6);
+        type = Type::HEAP;
+        break;
+    case Type::MIMIC:
+        Sample::playAt(Assets::SND_MIMIC, pos);
+        FX::burst(pos, 0x9955ffFFu, 8);
         type = Type::HEAP;
         break;
     case Type::SKELETON:
         GLog::i("You search the skeletal remains...");
         FX::burst(pos, 0xd0c090FFu, 8);
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_BONES).get());
+        Sample::playAt(Assets::SND_BONES, pos);
         type = Type::HEAP;
         break;
     case Type::TOMB:
         GLog::w("You disturbed the ancient tomb!");
         FX::burst(pos, 0x505050FFu, 10);
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_TOMB).get());
+        Sample::playAt(Assets::SND_TOMB, pos);
         type = Type::HEAP;
         break;
     case Type::LOCKED_CHEST:
@@ -69,7 +75,7 @@ void Heap::open(Hero* hero) {
         } else {
             GLog::p("You unlock the chest with your golden key!");
         }
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_UNLOCK).get());
+        Sample::playAt(Assets::SND_UNLOCK, pos);
         FX::burst(pos, 0xffd700FFu, 10);
         type = Type::HEAP;
         break;
@@ -139,6 +145,7 @@ void Heap::burn() {
     }
 
     if (burnt) {
+        Sample::playAt(Assets::SND_BURNING, pos);
         FX::burst((pos % 32) * 16.0f + 8.0f, (pos / 32) * 16.0f + 8.0f, 0xee7722FF, 6);
     }
 }

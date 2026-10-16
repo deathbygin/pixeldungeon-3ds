@@ -10,6 +10,7 @@
 #include "pd/GLog.h"
 #include "pd/Random.h"
 #include "pd/Assets.h"
+#include "pd/Sample.h"
 #include "noosa/Audio.h"
 #include "noosa/Camera.h"
 #include <algorithm>
@@ -35,7 +36,7 @@ void Traps::trigger(int tile, int cell, Char* ch) {
             GLog::w("A fire trap was activated!");
             FX::seedBlob(cell, Blob::BlobType::FIRE, 2);
             FX::burst(cell, 0xff7708FFu, 5);
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_BURNING).get());
+            Sample::playAt(Assets::SND_BURNING, cell);
 
             if (Dungeon::level) {
                 Heap* h = Dungeon::level->getHeap(cell);
@@ -102,7 +103,7 @@ void Traps::trigger(int tile, int cell, Char* ch) {
                 GLog::w("The trap emits a piercing sound that echoes throughout the dungeon!");
                 FX::burst(cell, 0xdd3333FFu, 8);
             }
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_ALERT).get());
+            Sample::playAt(Assets::SND_ALERT, cell);
             break;
         }
 
@@ -110,7 +111,7 @@ void Traps::trigger(int tile, int cell, Char* ch) {
         case Terrain::LIGHTNING_TRAP: {
             isTrap = true;
             GLog::w("A lightning trap was activated!");
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_LIGHTNING).get());
+            Sample::playAt(Assets::SND_LIGHTNING, cell);
             FX::burst(cell, 0x66cceeFFu, 8);
             FX::burst(cell, 0xffffffffu, 6);
 
@@ -231,7 +232,7 @@ void Traps::trigger(int tile, int cell, Char* ch) {
                 }
             }
             FX::burst(cell, 0x770088FFu, 8);
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_TELEPORT).get());
+            Sample::playAt(Assets::SND_TELEPORT, cell);
             break;
         }
 
@@ -269,7 +270,7 @@ void Traps::trigger(int tile, int cell, Char* ch) {
             } else {
                 FX::burst(cell, 0xaa44ffFF, 6);
             }
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_TELEPORT).get());
+            Sample::playAt(Assets::SND_TELEPORT, cell);
             break;
         }
 
@@ -278,7 +279,7 @@ void Traps::trigger(int tile, int cell, Char* ch) {
     }
 
     if (isTrap) {
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_TRAP).get());
+        Sample::playAt(Assets::SND_TRAP, cell);
         if (ch == Dungeon::hero.get()) {
             Dungeon::hero->interrupt();
         }

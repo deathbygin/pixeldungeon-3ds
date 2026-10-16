@@ -53,6 +53,7 @@
 #include "pd/GLog.h"
 #include "pd/Ballistica.h"
 #include "pd/MissileSprite.h"
+#include "pd/Sample.h"
 
 // Dual-Screen UI Subsystems (Phase 4)
 #include "pd/ui/TouchController.h"
@@ -310,10 +311,6 @@ int main(int argc, char* argv[]) {
     if (!yogFilm)      yogFilm      = fallbackFilm;
     if (!itemsFilm)    itemsFilm    = fallbackFilm;
     MissileSprite::initFilm(itemsFilm);
-
-    // 4. Audio feedback
-    SoundSample sndStep;    sndStep.synthesizeTone(240.0f, 0.03f, 0.3f);
-    SoundSample sndHit;     sndHit.synthesizeTone(180.0f, 0.08f, 0.6f);
 
     // 5. Setup Preferences, Camera & Dual-Screen UI
     Preferences::init();
@@ -587,7 +584,7 @@ int main(int argc, char* argv[]) {
                 } else if (interlevelMode == InterlevelMode::RESUME) {
                     resumeExistingRun();
                 } else if (interlevelMode == InterlevelMode::DESCEND) {
-                    noosa::Audio::play(noosa::Audio::getSample(Assets::SND_DESCEND).get());
+                    Sample::play(Assets::SND_DESCEND);
                     if (Dungeon::hero) {
                         Hunger* hunger = Dungeon::hero->getBuff<Hunger>();
                         if (hunger && !hunger->isStarving()) {
@@ -596,6 +593,9 @@ int main(int argc, char* argv[]) {
                     }
                     SaveManager::saveGame();
                     int nextDepth = Dungeon::depth + 1;
+                    if (Dungeon::bossLevel(nextDepth)) {
+                        Sample::play(Assets::SND_BOSS);
+                    }
                     Dungeon::switchLevel(nextDepth);
                     tilemap.loadForDepth(Dungeon::depth);
                     if (Dungeon::hero) {
@@ -606,7 +606,7 @@ int main(int argc, char* argv[]) {
                     bottomUI.reset();
                     bottomUI.log("Descended to Depth " + std::to_string(Dungeon::depth) + " as " + Dungeon::hero->name + ".");
                 } else if (interlevelMode == InterlevelMode::ASCEND) {
-                    noosa::Audio::play(noosa::Audio::getSample(Assets::SND_DESCEND).get());
+                    Sample::play(Assets::SND_DESCEND);
                     if (Dungeon::hero) {
                         Hunger* hunger = Dungeon::hero->getBuff<Hunger>();
                         if (hunger && !hunger->isStarving()) {
@@ -756,7 +756,7 @@ int main(int argc, char* argv[]) {
                         Dungeon::mobs.end()
                     );
                     if (!hero->isAlive()) {
-                        sndHit.play(0.8f, 0.0f);
+                        Sample::play(Assets::SND_DEATH);
                         SaveManager::deleteSave();
                         GLog::n("HERO PERISHED! Save erased.");
                     }
@@ -808,7 +808,7 @@ int main(int argc, char* argv[]) {
                         }
 
                         if (targetEnemy) {
-                            sndHit.play(0.6f, 0.0f);
+                            Sample::playAt(Assets::SND_HIT, targetEnemy->pos, 1.0f, Random::Float(0.8f, 1.25f));
                             int dealt = prevTargetHp - targetEnemy->HP;
                             if (targetEnemy->isAlive()) {
                                 GLog::i("Hero hit " + targetEnemy->name + " for " + std::to_string(dealt) + " dmg!");
@@ -816,7 +816,7 @@ int main(int argc, char* argv[]) {
                                 GLog::p("Hero defeated " + targetEnemy->name + "!");
                             }
                         } else {
-                            sndStep.play(0.25f, 0.0f);
+                            Sample::play((level && level->water[targetCell]) ? Assets::SND_WATER : Assets::SND_STEP, 0.8f, Random::Float(0.95f, 1.05f));
                         }
 
                         // Run continuous turn timeline scheduler
@@ -831,7 +831,7 @@ int main(int argc, char* argv[]) {
                         );
 
                         if (!hero->isAlive()) {
-                            sndHit.play(0.8f, 0.0f);
+                            Sample::play(Assets::SND_DEATH);
                             SaveManager::deleteSave();
                             GLog::n("HERO PERISHED! Save erased.");
                         } else if (level) {
@@ -883,6 +883,7 @@ int main(int argc, char* argv[]) {
         }
         topCamera.update(dt);
         FX::update(dt);
+        Sample::update(dt);
         tilemap.update(dt);
 
         Profiler::beginRender();

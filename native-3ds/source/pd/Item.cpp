@@ -13,6 +13,7 @@
 #include "pd/Assets.h"
 #include "pd/Ballistica.h"
 #include "pd/Plant.h"
+#include "pd/Sample.h"
 #include "noosa/Audio.h"
 #include <sstream>
 #include <algorithm>
@@ -60,6 +61,7 @@ static bool doDropItem(Hero* hero, Item* item) {
     if (dropped && Dungeon::level) {
         Dungeon::level->drop(std::move(dropped), hero->pos);
         GLog::i("You dropped " + itemName);
+        Sample::play(Assets::SND_ITEM);
     }
     hero->spendAndNext(0.5f * Actor::TICK);
     return true;
@@ -79,7 +81,7 @@ void Item::cast(Hero* hero, int targetCell) {
         hspr->operate(cell);
     }
 
-    noosa::Audio::play(noosa::Audio::getSample(Assets::SND_MISS).get(), 0.6f, 0.0f);
+    Sample::play(Assets::SND_MISS, 0.6f, 1.5f);
 
     float delay = Actor::TICK * speedFactor(hero);
 
@@ -121,6 +123,9 @@ void Item::onThrow(int cell) {
             FX::floatingText(cell, std::to_string(dmg), 0xe43b44FF);
             GLog::i("The " + displayName() + " strikes " + ch->name + " for " + std::to_string(dmg) + " damage!");
         }
+
+        bool water = Dungeon::level->water[cell];
+        Sample::playAt(water ? Assets::SND_WATER : Assets::SND_STEP, cell, 0.8f, 1.2f);
 
         std::unique_ptr<Item> self(this);
         Dungeon::level->drop(std::move(self), cell);
@@ -266,7 +271,7 @@ bool Weapon::execute(Hero* hero, const std::string& action) {
         cursedKnown = true;
         if (cursed) {
             FX::burst(hero->pos, 0x550055FFu, 8);
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CURSED).get());
+            Sample::play(Assets::SND_CURSED);
             GLog::n("The " + displayName() + " is cursed! You cannot take it off!");
         }
         hero->spendAndNext(Actor::TICK);
@@ -383,7 +388,7 @@ bool ShortSword::execute(Hero* hero, const std::string& action) {
             }
         }
         if (target) {
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_EVOKE).get());
+            Sample::play(Assets::SND_EVOKE);
             target->upgrade();
             target->identify();
             GLog::w("You reforged the shortsword to upgrade your " + target->name + "!");
@@ -543,7 +548,7 @@ void Wand::cast(Hero* hero, int targetCell) {
         if (hspr) hspr->operate(cell);
     }
 
-    noosa::Audio::play(noosa::Audio::getSample(Assets::SND_ZAP).get());
+    Sample::play(Assets::SND_ZAP);
     curCharges--;
     onZap(cell);
     hero->spendAndNext(Actor::TICK);
@@ -589,7 +594,7 @@ bool WandOfMagicMissile::execute(Hero* hero, const std::string& action) {
             }
         }
         if (targetWand) {
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_EVOKE).get());
+            Sample::play(Assets::SND_EVOKE);
             targetWand->upgrade();
             targetWand->identify();
             GLog::w("You disenchanted the Wand of Magic Missile to upgrade your " + targetWand->name + "!");
@@ -716,7 +721,7 @@ bool Armor::execute(Hero* hero, const std::string& action) {
         cursedKnown = true;
         if (cursed) {
             FX::burst(hero->pos, 0x550055FFu, 8);
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CURSED).get());
+            Sample::play(Assets::SND_CURSED);
             GLog::n("The " + displayName() + " is cursed! You cannot take it off!");
         }
         hero->spendAndNext(Actor::TICK);
@@ -971,6 +976,13 @@ bool Potion::execute(Hero* hero, const std::string& action) {
         setKnown(type);
         updatePerception();
 
+        if (type == PotionType::INVISIBILITY) {
+            Sample::play(Assets::SND_MELD);
+        } else if (type != PotionType::TOXIC_GAS && type != PotionType::LIQUID_FLAME &&
+                   type != PotionType::PARALYTIC_GAS && type != PotionType::FROST) {
+            Sample::play(Assets::SND_DRINK);
+        }
+
         switch (type) {
             case PotionType::HEALING: {
                 hero->HP = hero->HT;
@@ -1065,8 +1077,8 @@ void Potion::onThrow(int cell) {
 void Potion::shatter(int cell) {
     if (cell < 0 || cell >= Level::LENGTH) return;
 
+    Sample::playAt(Assets::SND_SHATTER, cell);
     if (Dungeon::visible[cell]) {
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_SHATTER).get());
         FX::splash(cell, 0x88ccffFF, 8);
     }
 
@@ -1398,7 +1410,7 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
 
         switch (type) {
             case ScrollType::IDENTIFY: {
-                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_READ).get());
+                Sample::play(Assets::SND_READ);
                 FX::burst(hero->pos, 0x00ffffFFu, 12);
                 bool found = false;
                 for (auto& item : hero->belongings.backpack) {
@@ -1424,7 +1436,7 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
                 break;
             }
             case ScrollType::UPGRADE:
-                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_READ).get());
+                Sample::play(Assets::SND_READ);
                 if (hero->belongings.equippedWeapon) {
                     hero->belongings.equippedWeapon->upgrade();
                     FX::burst(hero->pos, 0xffd700FF, 10);
@@ -1438,7 +1450,7 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
                 }
                 break;
             case ScrollType::TELEPORTATION: {
-                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_READ).get());
+                Sample::play(Assets::SND_READ);
                 if (Dungeon::level) {
                     for (int tries = 0; tries < 100; ++tries) {
                         int cell = Random::Int(Level::LENGTH);
@@ -1455,7 +1467,8 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
                 break;
             }
             case ScrollType::MAGIC_MAPPING: {
-                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_READ).get());
+                Sample::play(Assets::SND_READ);
+                Sample::play(Assets::SND_SECRET);
                 if (Dungeon::level) {
                     for (int i = 0; i < Level::LENGTH; ++i) {
                         if (Dungeon::level->map[i] != Terrain::WALL) {
@@ -1494,7 +1507,7 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
                     }
                 }
                 hero->removeBuff(BuffType::Weakness);
-                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_READ).get());
+                Sample::play(Assets::SND_READ);
                 FX::burst(hero->pos, 0xdda0ddFFu, 16);
                 if (procced) {
                     GLog::p("Your pack glows with a cleansing light, and a malevolent energy disperses.");
@@ -1523,7 +1536,7 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
                         }
                     }
                 }
-                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_READ).get());
+                Sample::play(Assets::SND_READ);
                 FX::burst(hero->pos, 0x55ffaaFF, 15);
                 if (count > 0) {
                     GLog::i("A surge of energy courses through your pack, recharging your wand" + std::string(count > 1 ? "s" : "") + "!");
@@ -1533,7 +1546,7 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
                 break;
             }
             case ScrollType::CHALLENGE: {
-                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CHALLENGE).get());
+                Sample::play(Assets::SND_CHALLENGE);
                 FX::burst(hero->pos, 0xff0000FF, 16);
                 GLog::w("The scroll emits a challenging roar that echoes throughout the dungeon!");
                 for (auto& m : Dungeon::mobs) {
@@ -1548,7 +1561,7 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
                 break;
             }
             case ScrollType::TERROR: {
-                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_READ).get());
+                Sample::play(Assets::SND_READ);
                 FX::burst(hero->pos, 0xff0000FF, 16);
                 int count = 0;
                 std::string affectedName = "";
@@ -1569,7 +1582,7 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
                 break;
             }
             case ScrollType::LULLABY: {
-                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_LULLABY).get());
+                Sample::play(Assets::SND_LULLABY);
                 FX::burst(hero->pos, 0x6699ffFF, 12);
                 int count = 0;
                 std::string affectedName = "";
@@ -1590,7 +1603,7 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
                 break;
             }
             case ScrollType::PSIONIC_BLAST: {
-                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_BLAST).get());
+                Sample::play(Assets::SND_BLAST);
                 FX::burst(hero->pos, 0xffffffFF, 20);
                 GLog::w("A burst of psychic energy explodes around you!");
                 for (auto& m : Dungeon::mobs) {
@@ -1604,7 +1617,7 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
                 break;
             }
             case ScrollType::MIRROR_IMAGE: {
-                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_READ).get());
+                Sample::play(Assets::SND_READ);
                 FX::burst(hero->pos, 0x00ffffFF, 12);
                 GLog::p("Illusory mirror images appear to aid you!");
 
@@ -1640,7 +1653,7 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
                 break;
             }
             case ScrollType::ENCHANTMENT:
-                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_READ).get());
+                Sample::play(Assets::SND_READ);
                 if (hero->belongings.equippedWeapon) {
                     hero->belongings.equippedWeapon->upgrade();
                     FX::burst(hero->pos, 0xff00ffFF, 16);
@@ -1690,6 +1703,8 @@ bool Food::execute(Hero* hero, const std::string& action) {
     if (action == "EAT") {
         HeroSprite* hspr = hero->getSprite() ? hero->getSprite()->asHeroSprite() : nullptr;
         if (hspr) hspr->operate(hero->pos);
+
+        Sample::play(Assets::SND_EAT);
 
         Hunger* hunger = hero->getBuff<Hunger>();
         if (hunger) {
@@ -2319,7 +2334,7 @@ void TomeOfMastery::choose(Hero* hero, HeroSubClass way) {
     if (!hero) return;
     hero->subClass = way;
     hero->spendAndNext(10.0f * Actor::TICK);
-    noosa::Audio::play(noosa::Audio::getSample(Assets::SND_MASTERY).get());
+    Sample::play(Assets::SND_MASTERY);
     FX::burst(hero->pos, 0xffd700FF, 16);
     FX::floatingText(hero->pos, subClassTitle(way), 0xffd700FF);
     GLog::w("You have chosen the way of the " + std::string(subClassTitle(way)) + "!");

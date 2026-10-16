@@ -1,6 +1,7 @@
 #include "pd/scenes/TitleScene.h"
 #include "pd/ui/BitmapFont.h"
 #include "pd/Assets.h"
+#include "pd/Sample.h"
 #include "noosa/Audio.h"
 #include <cmath>
 #include <algorithm>
@@ -152,12 +153,12 @@ void TitleScene::update(float dt, u32 kDown, u32 kHeld, const pd::ui::TouchContr
 
     // Physical Hardware Shortcuts
     if (kDown & KEY_START) {
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        Sample::play(Assets::SND_CLICK, 1.0f, 0.8f);
         m_pendingAction = TitleAction::PLAY;
         return;
     }
     if (kDown & KEY_SELECT) {
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        Sample::play(Assets::SND_CLICK, 1.0f, 0.8f);
         m_pendingAction = TitleAction::SETTINGS;
         return;
     }
@@ -181,7 +182,7 @@ void TitleScene::update(float dt, u32 kDown, u32 kHeld, const pd::ui::TouchContr
 
     // A Button activates selected grid item
     if (kDown & KEY_A) {
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        Sample::play(Assets::SND_CLICK, 1.0f, 0.8f);
         switch (m_selectedGrid) {
             case 0: m_pendingAction = TitleAction::PLAY; break;
             case 1: m_pendingAction = TitleAction::RANKINGS; break;
@@ -202,7 +203,7 @@ void TitleScene::update(float dt, u32 kDown, u32 kHeld, const pd::ui::TouchContr
         }
 
         if (touch.clicked(r)) {
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+            Sample::play(Assets::SND_CLICK, 1.0f, 0.8f);
             m_pendingAction = act;
         }
     };
@@ -220,7 +221,7 @@ void TitleScene::update(float dt, u32 kDown, u32 kHeld, const pd::ui::TouchContr
         m_btnSettingsPressed = false;
     }
     if (touch.clicked(rSettings)) {
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        Sample::play(Assets::SND_CLICK, 1.0f, 0.8f);
         m_pendingAction = TitleAction::SETTINGS;
     }
 }

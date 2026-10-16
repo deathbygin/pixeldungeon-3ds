@@ -12,6 +12,7 @@
 #include "pd/Badges.h"
 #include "pd/Item.h"
 #include "pd/CharSprite.h"
+#include "pd/Sample.h"
 #include "noosa/Audio.h"
 #include <cmath>
 #include <algorithm>
@@ -388,6 +389,7 @@ void Skeleton::die(Actor* src) {
     float wx = (pos % Level::WIDTH) * 16.0f + 8.0f;
     float wy = (pos / Level::WIDTH) * 16.0f + 8.0f;
     FX::burst(wx, wy, 0xddddddFF, 12, 30.0f, 70.0f, +80.0f);
+    Sample::playAt(Assets::SND_BONES, pos);
 
     Mob::die(src);
 }
@@ -544,7 +546,7 @@ bool Shaman::doAttack(Char* enemyChar) {
         enemyChar->damage(zapDmg, this);
         FX::floatingText(enemyChar->pos, std::to_string(zapDmg), 0x55ffffff);
         FX::burst(enemyChar->pos, 0x88ccffffu, 8);
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_LIGHTNING).get());
+        Sample::playAt(Assets::SND_LIGHTNING, pos);
         GLog::w("Gnoll Shaman zaps you with lightning!");
     }
     return true;
@@ -832,7 +834,7 @@ bool Eye::doAttack(Char* enemyChar) {
     enemyChar->damage(gazeDmg, this);
     FX::floatingText(enemyChar->pos, std::to_string(gazeDmg), 0x9900ffFF);
     FX::burst(enemyChar->pos, 0x9900ffFFu, 10);
-    noosa::Audio::play(noosa::Audio::getSample(Assets::SND_ZAP).get());
+    Sample::playAt(Assets::SND_RAY, pos);
     GLog::w("Evil Eye fires deathgaze piercing beam!");
     return true;
 }
@@ -1159,7 +1161,7 @@ void Tengu::jump(Level* currentLevel) {
     if (newPos != -1) {
         move(newPos);
         FX::burst(newPos, 0xddddddFFu, 8);
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_PUFF).get());
+        Sample::playAt(Assets::SND_PUFF, newPos);
         GLog::i("Tengu vanishes in a puff of smoke!");
     }
     spend(TICK / speed());

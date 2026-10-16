@@ -1,6 +1,7 @@
 #include "pd/windows/WndStory.h"
 #include "pd/ui/BitmapFont.h"
 #include "pd/ui/Chrome.h"
+#include "pd/Sample.h"
 #include "noosa/Audio.h"
 #include "pd/Assets.h"
 #include <sstream>
@@ -99,7 +100,7 @@ bool WndStory::update(const pd::ui::TouchController& touch, u32 kDown) {
 
     // Tap anywhere or press A / B / X / Y / START / SELECT to dismiss
     if (touch.justReleased() || (kDown & (KEY_A | KEY_B | KEY_X | KEY_Y | KEY_START | KEY_SELECT))) {
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
         hide();
         return true;
     }

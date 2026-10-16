@@ -2,6 +2,7 @@
 #include "pd/ui/Chrome.h"
 #include "pd/ui/BitmapFont.h"
 #include "pd/Assets.h"
+#include "pd/Sample.h"
 #include "noosa/Audio.h"
 #include <sstream>
 #include <algorithm>
@@ -88,20 +89,20 @@ bool WndOptions::update(const TouchController& touch, u32 kDown) {
     if (kDown & (KEY_DUP | KEY_CPAD_UP)) {
         if (m_selected > 0) m_selected--;
         else m_selected = static_cast<int>(m_buttonLayouts.size()) - 1;
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
         return true;
     }
     if (kDown & (KEY_DDOWN | KEY_CPAD_DOWN)) {
         if (m_selected + 1 < static_cast<int>(m_buttonLayouts.size())) m_selected++;
         else m_selected = 0;
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
         return true;
     }
 
     // Hardware confirmation A
     if (kDown & KEY_A) {
         int choice = m_selected;
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
         hide();
         if (m_callback) m_callback(choice);
         return true;
@@ -110,7 +111,7 @@ bool WndOptions::update(const TouchController& touch, u32 kDown) {
     // Hardware cancel B or START
     if (kDown & (KEY_B | KEY_START)) {
         int cancelIdx = (m_options.size() > 1) ? static_cast<int>(m_options.size() - 1) : 0;
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
         hide();
         if (m_callback) m_callback(cancelIdx);
         return true;
@@ -120,7 +121,7 @@ bool WndOptions::update(const TouchController& touch, u32 kDown) {
     noosa::RectF windowRect(m_x, m_y, m_w, m_h);
     if (touch.justReleased() && !windowRect.contains(touch.pos().x, touch.pos().y)) {
         int cancelIdx = (m_options.size() > 1) ? static_cast<int>(m_options.size() - 1) : 0;
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
         hide();
         if (m_callback) m_callback(cancelIdx);
         return true;
@@ -134,7 +135,7 @@ bool WndOptions::update(const TouchController& touch, u32 kDown) {
             m_selected = static_cast<int>(i);
         }
         if (touch.clicked(r)) {
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+            Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
             hide();
             if (m_callback) m_callback(static_cast<int>(i));
             return true;

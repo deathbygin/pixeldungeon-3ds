@@ -12,6 +12,7 @@
 #include "pd/Blob.h"
 #include "pd/Heap.h"
 #include "pd/Item.h"
+#include "pd/Sample.h"
 #include "noosa/Audio.h"
 #include <unordered_map>
 #include <cmath>
@@ -40,7 +41,7 @@ void SeedRegistry::init() {
         e.alchemyPotion = "Liquid Flame";
         e.activate = [](int cell, Char* target, bool directHit) {
             (void)directHit;
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_BURNING).get());
+            Sample::playAt(Assets::SND_BURNING, cell);
             if (Dungeon::visible[cell]) {
                 FX::burst(cell, 0xff4500FF, 10);
             }
@@ -68,7 +69,7 @@ void SeedRegistry::init() {
         e.activate = [](int cell, Char* target, bool directHit) {
             (void)target;
             (void)directHit;
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_SHATTER).get());
+            Sample::playAt(Assets::SND_SHATTER, cell);
 
             Blob* fire = FX::getBlob(Blob::BlobType::FIRE);
             int cx = cell % Level::WIDTH;
@@ -103,7 +104,7 @@ void SeedRegistry::init() {
         e.alchemyPotion = "Toxic Gas";
         e.activate = [](int cell, Char* target, bool directHit) {
             (void)directHit;
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_STEP).get());
+            Sample::playAt(Assets::SND_STEP, cell);
             if (Dungeon::visible[cell]) {
                 FX::splash(cell, 0x38b764FF, 8);
             }
@@ -130,7 +131,7 @@ void SeedRegistry::init() {
         e.alchemyPotion = "Invisibility";
         e.activate = [](int cell, Char* target, bool directHit) {
             (void)directHit;
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_PUFF).get());
+            Sample::playAt(Assets::SND_PUFF, cell);
             if (Dungeon::visible[cell]) {
                 FX::burst(cell, 0xbf55ecFF, 12);
             }
@@ -157,7 +158,7 @@ void SeedRegistry::init() {
         e.alchemyPotion = "Healing";
         e.activate = [](int cell, Char* target, bool directHit) {
             (void)directHit;
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_RAY).get());
+            Sample::playAt(Assets::SND_RAY, cell);
             if (Dungeon::visible[cell]) {
                 FX::burst(cell, 0xffee44FF, 10);
             }
@@ -183,7 +184,7 @@ void SeedRegistry::init() {
         e.alchemyPotion = "Paralytic Gas";
         e.activate = [](int cell, Char* target, bool directHit) {
             (void)directHit;
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_ROCKS).get());
+            Sample::playAt(Assets::SND_ROCKS, cell);
             if (Dungeon::visible[cell]) {
                 FX::burst(cell, 0x8b5a2bFF, 12);
             }
@@ -212,7 +213,7 @@ void SeedRegistry::init() {
         e.alchemyPotion = "Mind Vision";
         e.activate = [](int cell, Char* target, bool directHit) {
             (void)directHit;
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_TELEPORT).get());
+            Sample::playAt(Assets::SND_TELEPORT, cell);
             if (Dungeon::visible[cell]) {
                 FX::burst(cell, 0x00ffffff, 12);
             }
@@ -263,7 +264,7 @@ void SeedRegistry::init() {
         e.alchemyPotion = "Strength";
         e.activate = [](int cell, Char* target, bool directHit) {
             (void)directHit;
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_PUFF).get());
+            Sample::playAt(Assets::SND_PUFF, cell);
             if (Dungeon::visible[cell]) {
                 FX::burst(cell, 0x55aa33FF, 10);
             }
@@ -310,6 +311,8 @@ Plant::Plant(PlantSeed::PlantType t, int p) : type(t), pos(p) {
 }
 
 void Plant::activate(Char* ch) {
+    Sample::playAt(type == PlantSeed::PlantType::ROTBERRY ? Assets::SND_CHALLENGE : Assets::SND_PLANT, pos);
+
     if (ch && ch == Dungeon::hero.get() && Dungeon::hero->subClass == HeroSubClass::Warden) {
         Barkskin* b = ch->affect<Barkskin>();
         if (b) {
@@ -416,8 +419,8 @@ void OnSeedImpact(PlantSeed::PlantType type, int cell) {
                     }
                 }
 
-                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_PUFF).get());
-                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_EVOKE).get());
+                Sample::playAt(Assets::SND_PUFF, cell);
+                Sample::playAt(Assets::SND_EVOKE, cell);
                 FX::burst(cell, 0xffffff88, 12);
                 FX::burst(cell, 0x44aa33FF, 8);
                 GLog::p("The alchemy pot bubbles vigorously and brews a potion!");
@@ -444,7 +447,7 @@ void OnSeedImpact(PlantSeed::PlantType type, int cell) {
     if (SeedRegistry::isPlantable(Dungeon::level.get(), cell)) {
         Dungeon::level->plant(type, cell);
         if (Dungeon::visible[cell]) {
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_PLANT).get());
+            Sample::playAt(Assets::SND_PLANT, cell);
             FX::burst(cell, 0x44aa33FF, 6);
             GLog::i("The " + SeedRegistry::get(type).seedName + " sprouts into the ground.");
         }

@@ -1,4 +1,6 @@
 #include "noosa/Audio.h"
+#define MINIMP3_IMPLEMENTATION
+#include "noosa/minimp3_ex.h"
 #include <cstdio>
 #include <cstring>
 #include <cmath>
@@ -214,8 +216,44 @@ bool SoundSample::loadWAV(const char* filepath) {
     return true;
 }
 
-int SoundSample::play(float volume, float pan, bool loop) {
-    return Audio::play(this, volume, pan, loop);
+bool SoundSample::loadMP3(const char* filepath) {
+    if (!filepath) return false;
+
+    mp3dec_t mp3d;
+    mp3dec_file_info_t info;
+    std::memset(&info, 0, sizeof(info));
+
+    if (mp3dec_load(&mp3d, filepath, &info, nullptr, nullptr) != 0) {
+        return false;
+    }
+
+    if (!info.buffer || info.samples == 0 || info.channels <= 0 || info.hz <= 0) {
+        if (info.buffer) free(info.buffer);
+        return false;
+    }
+
+    freeSample();
+
+    m_channels = info.channels;
+    m_sampleRate = info.hz;
+    m_sampleCount = static_cast<uint32_t>(info.samples / info.channels);
+    m_dataSize = static_cast<uint32_t>(info.samples * sizeof(int16_t));
+
+    m_data = static_cast<int16_t*>(linearAlloc(m_dataSize));
+    if (!m_data) {
+        free(info.buffer);
+        return false;
+    }
+
+    std::memcpy(m_data, info.buffer, m_dataSize);
+    free(info.buffer);
+
+    DSP_FlushDataCache(m_data, m_dataSize);
+    return true;
+}
+
+int SoundSample::play(float volume, float pan, float pitch, bool loop) {
+    return Audio::play(this, volume, pan, pitch, loop);
 }
 
 // -----------------------------------------------------------------------------
@@ -287,7 +325,7 @@ void Audio::setMusicEnabled(bool enabled) {
     s_musicEnabled = enabled;
 }
 
-int Audio::play(SoundSample* sample, float volume, float pan, bool loop) {
+int Audio::play(SoundSample* sample, float volume, float pan, float pitch, bool loop) {
     if (!s_initialized || !s_soundFxEnabled || !sample || !sample->isLoaded()) {
         return -1;
     }
@@ -296,7 +334,8 @@ int Audio::play(SoundSample* sample, float volume, float pan, bool loop) {
     if (ch < 0) return -1;
 
     ndspChnReset(ch);
-    ndspChnSetRate(ch, sample->sampleRate());
+    float clampedPitch = std::clamp(pitch, 0.25f, 4.0f);
+    ndspChnSetRate(ch, static_cast<float>(sample->sampleRate()) * clampedPitch);
     ndspChnSetFormat(ch, sample->channels() == 1 ? NDSP_FORMAT_MONO_PCM16 : NDSP_FORMAT_STEREO_PCM16);
 
     // Compute left and right stereo mix gains
@@ -322,12 +361,47 @@ int Audio::play(SoundSample* sample, float volume, float pan, bool loop) {
     return ch;
 }
 
+int Audio::playStereo(SoundSample* sample, float leftVol, float rightVol, float pitch, bool loop) {
+    if (!s_initialized || !s_soundFxEnabled || !sample || !sample->isLoaded()) {
+        return -1;
+    }
+
+    int ch = allocateChannel();
+    if (ch < 0) return -1;
+
+    ndspChnReset(ch);
+    float clampedPitch = std::clamp(pitch, 0.25f, 4.0f);
+    ndspChnSetRate(ch, static_cast<float>(sample->sampleRate()) * clampedPitch);
+    ndspChnSetFormat(ch, sample->channels() == 1 ? NDSP_FORMAT_MONO_PCM16 : NDSP_FORMAT_STEREO_PCM16);
+
+    float mix[12] = { 0.0f };
+    mix[0] = std::clamp(leftVol, 0.0f, 1.0f);
+    mix[1] = std::clamp(rightVol, 0.0f, 1.0f);
+    ndspChnSetMix(ch, mix);
+
+    ndspWaveBuf& waveBuf = s_waveBufs[ch];
+    std::memset(&waveBuf, 0, sizeof(ndspWaveBuf));
+    waveBuf.data_pcm16 = sample->data();
+    waveBuf.nsamples = sample->sampleCount();
+    waveBuf.looping = loop;
+    waveBuf.status = NDSP_WBUF_FREE;
+    DSP_FlushDataCache(&waveBuf, sizeof(ndspWaveBuf));
+
+    ndspChnWaveBufAdd(ch, &waveBuf);
+    return ch;
+}
+
 std::shared_ptr<SoundSample> Audio::getSample(const std::string& key) {
     auto it = s_sampleCache.find(key);
     if (it != s_sampleCache.end()) {
         return it->second;
     }
     auto sample = std::make_shared<SoundSample>();
+    if (key.length() >= 4 && key.rfind(".mp3") == key.length() - 4) {
+        sample->loadMP3(key.c_str());
+    } else if (key.length() >= 4 && key.rfind(".wav") == key.length() - 4) {
+        sample->loadWAV(key.c_str());
+    }
     s_sampleCache[key] = sample;
     return sample;
 }

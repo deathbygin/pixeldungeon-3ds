@@ -2,6 +2,7 @@
 #include "pd/ui/Chrome.h"
 #include "pd/ui/BitmapFont.h"
 #include "pd/Assets.h"
+#include "pd/Sample.h"
 #include "noosa/Audio.h"
 #include <sstream>
 #include <algorithm>
@@ -77,7 +78,7 @@ bool WndMessage::update(const TouchController& touch, u32 kDown) {
 
     // Dismiss on hardware button press (A, B, X, Y, START, SELECT)
     if (kDown & (KEY_A | KEY_B | KEY_X | KEY_Y | KEY_START | KEY_SELECT)) {
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
         hide();
         if (m_callback) m_callback();
         return true;
@@ -85,7 +86,7 @@ bool WndMessage::update(const TouchController& touch, u32 kDown) {
 
     // Dismiss on stylus tap anywhere
     if (touch.justReleased()) {
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
         hide();
         if (m_callback) m_callback();
         return true;

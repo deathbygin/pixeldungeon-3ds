@@ -4,6 +4,7 @@
 #include "pd/FX.h"
 #include "pd/GLog.h"
 #include "pd/Assets.h"
+#include "pd/Sample.h"
 #include "noosa/Audio.h"
 
 namespace pd {
@@ -83,7 +84,7 @@ void Sign::read(int pos) {
             Dungeon::level->destroy(pos);
         }
         FX::burst(pos, 0x44dd44FF, 12, 30.0f, 60.0f, -20.0f);
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_BURNING).get());
+        Sample::playAt(Assets::SND_BURNING, pos);
         GLog::w(TXT_BURN);
     }
 }

@@ -7,6 +7,7 @@
 #include "pd/Assets.h"
 #include "pd/GLog.h"
 #include "pd/FX.h"
+#include "pd/Sample.h"
 #include "noosa/Audio.h"
 #include <cstdio>
 #include <algorithm>
@@ -109,7 +110,7 @@ bool WndBag::update(pd::Hero* hero, const TouchController& touch, u32 kDown, std
     // -------------------------------------------------------------------------
     if (m_subWindowOpen && m_subItem) {
         if (kDown & KEY_B) {
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+            Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
             closeSubWindow();
             return false;
         }
@@ -121,7 +122,7 @@ bool WndBag::update(pd::Hero* hero, const TouchController& touch, u32 kDown, std
             noosa::RectF rBtn(bx, by, SUB_BTN_W, SUB_BTN_H);
 
             if (touch.clicked(rBtn) || ((kDown & KEY_A) && static_cast<int>(i) == m_selectedAction)) {
-                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+                Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
                 const std::string action = m_subActions[i];
 
                 if (action == "CLOSE") {
@@ -167,7 +168,7 @@ bool WndBag::update(pd::Hero* hero, const TouchController& touch, u32 kDown, std
     // Main Backpack Grid Navigation
     // -------------------------------------------------------------------------
     if (kDown & (KEY_B | KEY_X)) {
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
         close();
         return false;
     }
@@ -188,7 +189,7 @@ bool WndBag::update(pd::Hero* hero, const TouchController& touch, u32 kDown, std
 
             if (touch.clicked(rSlot)) {
                 m_selectedSlot = slotIdx;
-                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+                Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
                 pd::Item* it = getSelectedItem(hero);
                 if (it) {
                     openSubWindow(it, hero);
@@ -202,7 +203,7 @@ bool WndBag::update(pd::Hero* hero, const TouchController& touch, u32 kDown, std
     if (kDown & KEY_A) {
         pd::Item* it = getSelectedItem(hero);
         if (it) {
-            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+            Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
             openSubWindow(it, hero);
         }
         return false;

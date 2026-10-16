@@ -3,6 +3,7 @@
 #include "pd/Hero.h"
 #include "pd/Item.h"
 #include "pd/Assets.h"
+#include "pd/Sample.h"
 #include "noosa/Audio.h"
 #include <algorithm>
 
@@ -73,23 +74,23 @@ Toolbar::Action Toolbar::update(const TouchController& touch, u32 kDown, pd::Her
         return Action::WAIT;
     }
     if (touch.clicked(rSearch)) {
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
         return Action::SEARCH;
     }
     if (touch.clicked(rInfo)) {
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
         return Action::INFO;
     }
     if (touch.clicked(rBag)) {
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
         return Action::BAG;
     }
     if (touch.clicked(rQ1)) {
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
         return Action::QUICK1;
     }
     if (touch.clicked(rQ2)) {
-        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
+        Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
         return Action::QUICK2;
     }
 

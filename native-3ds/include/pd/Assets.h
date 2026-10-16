@@ -132,6 +132,9 @@ public:
     inline static const std::string SND_RAY       = "romfs:/snd_ray.mp3";
     inline static const std::string SND_LULLABY   = "romfs:/snd_lullaby.mp3";
     inline static const std::string SND_GHOST     = "romfs:/snd_ghost.mp3";
+    inline static const std::string SND_BOSS      = "romfs:/snd_boss.mp3";
+    inline static const std::string SND_BEACON    = "romfs:/snd_beacon.mp3";
+    inline static const std::string SND_BEE       = "romfs:/snd_bee.mp3";
 
     // Helper returning depth-appropriate tilesheet
     static const std::string& getTilesetForDepth(int depth) {

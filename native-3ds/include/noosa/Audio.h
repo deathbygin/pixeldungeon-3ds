@@ -22,6 +22,9 @@ public:
     // Load standard PCM16 WAV from file (RomFS or SD)
     bool loadWAV(const char* filepath);
 
+    // Load and decode original MP3 from file (RomFS or SD)
+    bool loadMP3(const char* filepath);
+
     // Create from raw PCM16 samples (allocates in 3DS linear memory)
     bool createFromPCM16(const int16_t* samples, uint32_t sampleCount, int channels, int sampleRate);
 
@@ -29,8 +32,8 @@ public:
     bool synthesizeTone(float frequency, float duration, float volume = 0.5f, int sampleRate = 22050);
 
     // Play sound sample on an available NDSP channel
-    // Volume: 0.0 to 1.0, Pan: -1.0 (left) to 1.0 (right)
-    int play(float volume = 1.0f, float pan = 0.0f, bool loop = false);
+    // Volume: 0.0 to 1.0, Pan: -1.0 (left) to 1.0 (right), Pitch: 1.0 = normal
+    int play(float volume = 1.0f, float pan = 0.0f, float pitch = 1.0f, bool loop = false);
 
     void freeSample();
 
@@ -55,7 +58,8 @@ public:
     static bool isInitialized() { return s_initialized; }
 
     // Sound effect playback helper
-    static int play(SoundSample* sample, float volume = 1.0f, float pan = 0.0f, bool loop = false);
+    static int play(SoundSample* sample, float volume = 1.0f, float pan = 0.0f, float pitch = 1.0f, bool loop = false);
+    static int playStereo(SoundSample* sample, float leftVol, float rightVol, float pitch = 1.0f, bool loop = false);
 
     // Stop all audio playback
     static void stopAll();

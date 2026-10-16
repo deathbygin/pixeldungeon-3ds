@@ -7,6 +7,8 @@
 #include "pd/Dungeon.h"
 #include "pd/Terrain.h"
 #include "pd/Hero.h"
+#include "pd/Assets.h"
+#include "pd/Sample.h"
 #include <algorithm>
 
 namespace pd {
@@ -170,6 +172,9 @@ bool Char::attack(Char* enemy) {
 
         enemy->damage(effective, this);
 
+        // Sound effect for hit matching 1:1 Pixel Dungeon with authentic pitch variance
+        Sample::playAt(Assets::SND_HIT, enemy->pos, 1.0f, Random::Float(0.8f, 1.25f));
+
         // Visual effects for combat
         FX::slash(enemy->pos);
         FX::blood(enemy->pos, 8);
@@ -178,6 +183,9 @@ bool Char::attack(Char* enemy) {
         spend(TICK / speed());
         return true;
     } else {
+        // Sound effect for miss/dodge
+        Sample::playAt(Assets::SND_MISS, enemy->pos);
+
         FX::floatingText(enemy->pos, "MISS", 0x8b9bb4FF);
         spend(TICK / speed());
         return false;
