@@ -475,4 +475,24 @@ public:
     void choose(Hero* hero, HeroSubClass way);
 };
 
+// =============================================================================
+// Amulet of Yendor
+// =============================================================================
+class Amulet : public Item {
+public:
+    Amulet() {
+        name = "Amulet of Yendor";
+        image = 15;
+        identified = true;
+    }
+    bool isIdentified() const override { return true; }
+    std::string info() const override {
+        return "The Amulet of Yendor is the most powerful known artifact.";
+    }
+    std::unique_ptr<Item> clone(int qty = 1) const override {
+        (void)qty;
+        return std::make_unique<Amulet>();
+    }
+};
+
 } // namespace pd

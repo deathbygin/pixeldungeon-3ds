@@ -23,7 +23,7 @@ public:
 protected:
     bool initRooms();
     void split(const Rect& rect);
-    void assignRoomType();
+    virtual void assignRoomType();
     void paint();
     void placeDoors(Room* r);
     void paintDoors(Room* r);

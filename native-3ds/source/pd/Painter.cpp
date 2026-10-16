@@ -85,6 +85,12 @@ void Painter::paintRoom(Level* level, Room* room) {
     case Room::Type::EXIT:
         paintExit(level, room);
         break;
+    case Room::Type::BOSS_EXIT:
+        paintBossExit(level, room);
+        break;
+    case Room::Type::RAT_KING:
+        paintRatKing(level, room);
+        break;
     default:
         paintStandard(level, room);
         break;
@@ -117,6 +123,50 @@ void Painter::paintExit(Level* level, Room* room) {
 
     level->exit = room->random(1);
     set(level, level->exit, Terrain::EXIT);
+}
+
+void Painter::paintBossExit(Level* level, Room* room) {
+    fill(level, *room, Terrain::WALL);
+    fill(level, *room, 1, Terrain::EMPTY);
+
+    for (auto& pair : room->connected) {
+        if (pair.second) {
+            pair.second->set(Room::Door::Type::REGULAR);
+        }
+    }
+
+    level->exit = room->top * Level::WIDTH + (room->left + room->right) / 2;
+    set(level, level->exit, Terrain::LOCKED_EXIT);
+}
+
+static void addRatKingChest(Level* level, int pos, int door) {
+    if (pos == door - 1 || pos == door + 1 ||
+        pos == door - Level::WIDTH || pos == door + Level::WIDTH) {
+        return;
+    }
+    auto chest = std::make_unique<Heap>(pos, Heap::Type::CHEST);
+    chest->drop(std::make_unique<Gold>(Random::IntRange(1, 5)));
+    level->heaps.push_back(std::move(chest));
+}
+
+void Painter::paintRatKing(Level* level, Room* room) {
+    fill(level, *room, Terrain::WALL);
+    fill(level, *room, 1, Terrain::EMPTY_SP);
+
+    auto entrance = room->entrance();
+    if (entrance) {
+        entrance->set(Room::Door::Type::HIDDEN);
+        int door = entrance->x + entrance->y * Level::WIDTH;
+
+        for (int i = room->left + 1; i < room->right; ++i) {
+            addRatKingChest(level, (room->top + 1) * Level::WIDTH + i, door);
+            addRatKingChest(level, (room->bottom - 1) * Level::WIDTH + i, door);
+        }
+        for (int i = room->top + 2; i < room->bottom - 1; ++i) {
+            addRatKingChest(level, i * Level::WIDTH + room->left + 1, door);
+            addRatKingChest(level, i * Level::WIDTH + room->right - 1, door);
+        }
+    }
 }
 
 void Painter::paintStandard(Level* level, Room* room) {

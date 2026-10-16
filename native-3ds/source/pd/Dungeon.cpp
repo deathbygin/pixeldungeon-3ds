@@ -82,6 +82,7 @@ void Dungeon::resetLevel() {
     fog = std::make_unique<FogOfWar>(Level::WIDTH, Level::HEIGHT);
 
     if (hero) {
+        hero->viewDistance = level->viewDistance;
         hero->move(level->entrance);
         Actor::occupyCell(hero.get());
         Actor::add(hero.get());
@@ -155,6 +156,10 @@ void Dungeon::switchLevel(int newDepth) {
         }
 
         spawnMobs(4);
+    }
+
+    if (hero && level) {
+        hero->viewDistance = level->viewDistance;
     }
 
     fog = std::make_unique<FogOfWar>(Level::WIDTH, Level::HEIGHT);

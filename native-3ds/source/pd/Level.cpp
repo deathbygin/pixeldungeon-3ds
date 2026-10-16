@@ -1,5 +1,6 @@
 #include "pd/Level.h"
 #include "pd/RegularLevel.h"
+#include "pd/Biomes.h"
 #include "pd/ShadowCaster.h"
 #include "pd/Random.h"
 #include "pd/FX.h"
@@ -240,8 +241,47 @@ void Level::removeHeap(Heap* heap) {
 }
 
 std::unique_ptr<Level> Level::create(int depth) {
-    (void)depth;
-    return std::make_unique<RegularLevel>();
+    switch (depth) {
+    case 1:
+    case 2:
+    case 3:
+    case 4:
+        return std::make_unique<SewerLevel>();
+    case 5:
+        return std::make_unique<SewerBossLevel>();
+    case 6:
+    case 7:
+    case 8:
+    case 9:
+        return std::make_unique<PrisonLevel>();
+    case 10:
+        return std::make_unique<PrisonBossLevel>();
+    case 11:
+    case 12:
+    case 13:
+    case 14:
+        return std::make_unique<CavesLevel>();
+    case 15:
+        return std::make_unique<CavesBossLevel>();
+    case 16:
+    case 17:
+    case 18:
+    case 19:
+    case 21:
+        return std::make_unique<CityLevel>();
+    case 20:
+        return std::make_unique<CityBossLevel>();
+    case 22:
+    case 23:
+    case 24:
+        return std::make_unique<HallsLevel>();
+    case 25:
+        return std::make_unique<HallsBossLevel>();
+    case 26:
+        return std::make_unique<LastLevel>();
+    default:
+        return std::make_unique<RegularLevel>();
+    }
 }
 
 void Level::cleanWalls() {
@@ -264,6 +304,52 @@ void Level::cleanWalls() {
                     break;
                 }
             }
+        }
+    }
+}
+
+std::vector<bool> Level::createWater() {
+    return Patch::generate(feeling == Feeling::WATER ? 0.60f : 0.45f, 5);
+}
+
+std::vector<bool> Level::createGrass() {
+    return Patch::generate(feeling == Feeling::GRASS ? 0.60f : 0.40f, 4);
+}
+
+void Level::paintWater() {
+    auto lake = createWater();
+    for (int i = 0; i < LENGTH; ++i) {
+        if (map[i] == Terrain::EMPTY && lake[i]) {
+            map[i] = Terrain::WATER;
+        }
+    }
+}
+
+void Level::paintGrass() {
+    auto gr = createGrass();
+    if (feeling == Feeling::GRASS) {
+        for (const auto& room : rooms) {
+            if (room && room->type != Room::Type::NONE &&
+                room->type != Room::Type::PASSAGE && room->type != Room::Type::TUNNEL) {
+                gr[(room->left + 1) + (room->top + 1) * WIDTH] = true;
+                gr[(room->right - 1) + (room->top + 1) * WIDTH] = true;
+                gr[(room->left + 1) + (room->bottom - 1) * WIDTH] = true;
+                gr[(room->right - 1) + (room->bottom - 1) * WIDTH] = true;
+            }
+        }
+    }
+
+    const int neighbours8[8] = { +1, -1, +WIDTH, -WIDTH, +1+WIDTH, +1-WIDTH, -1+WIDTH, -1-WIDTH };
+    for (int i = WIDTH + 1; i < LENGTH - WIDTH - 1; ++i) {
+        if (map[i] == Terrain::EMPTY && gr[i]) {
+            int count = 1;
+            for (int j = 0; j < 8; ++j) {
+                int n = i + neighbours8[j];
+                if (n >= 0 && n < LENGTH && gr[n]) {
+                    count++;
+                }
+            }
+            map[i] = (Random::Float() < static_cast<float>(count) / 12.0f) ? Terrain::HIGH_GRASS : Terrain::GRASS;
         }
     }
 }

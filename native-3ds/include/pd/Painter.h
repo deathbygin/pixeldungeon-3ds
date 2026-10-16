@@ -26,6 +26,8 @@ public:
     static void paintPassage(Level* level, Room* room);
     static void paintEntrance(Level* level, Room* room);
     static void paintExit(Level* level, Room* room);
+    static void paintBossExit(Level* level, Room* room);
+    static void paintRatKing(Level* level, Room* room);
 
 private:
     static void paintBurned(Level* level, Room* room);

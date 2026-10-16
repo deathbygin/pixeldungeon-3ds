@@ -38,6 +38,7 @@ public:
 
     Feeling feeling = Feeling::NONE;
     int secretDoors = 0;
+    int viewDistance = 8;
 
     int entrance = 0;
     int exit = 0;
@@ -57,6 +58,11 @@ public:
 
     // Procedural level builder
     virtual bool build();
+    virtual void decorate() {}
+    virtual std::vector<bool> createWater();
+    virtual std::vector<bool> createGrass();
+    virtual void paintWater();
+    virtual void paintGrass();
 
     // Field of view calculation using raycasting
     void updateFieldOfView(int centerCell, int distance = 8);

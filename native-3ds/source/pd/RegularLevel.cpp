@@ -85,7 +85,10 @@ bool RegularLevel::build() {
 
     assignRoomType();
     paint();
+    paintWater();
+    paintGrass();
     placeTraps();
+    decorate();
 
     for (int i = 0; i < LENGTH; ++i) {
         if (map[i] == Terrain::WATER) {
