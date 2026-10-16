@@ -40,10 +40,21 @@ public:
     int secretDoors = 0;
     int viewDistance = 8;
 
+    static bool pitRoomNeeded;
+    static bool weakFloorCreated;
+
     int entrance = 0;
     int exit = 0;
     std::vector<std::shared_ptr<Room>> rooms;
     std::vector<std::unique_ptr<Heap>> heaps;
+    std::vector<std::unique_ptr<Item>> itemsToSpawn;
+
+    void addItemToSpawn(std::unique_ptr<Item> item) {
+        if (item) itemsToSpawn.push_back(std::move(item));
+    }
+    std::unique_ptr<Item> itemToSpawnAsPrize();
+    virtual int pitCell() const;
+    Room* room(int pos) const;
 
     Level();
     virtual ~Level() = default;

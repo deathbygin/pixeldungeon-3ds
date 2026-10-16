@@ -8,6 +8,7 @@ namespace pd {
 class Level;
 class Hero;
 class Item;
+class Weapon;
 
 class Mob : public Char {
 public:
@@ -35,6 +36,7 @@ public:
         Eye,
         Scorpio,
         Piranha,
+        Statue,
         Wraith,
         Goo,
         Tengu,
@@ -265,6 +267,19 @@ public:
     int attackSkill(Char* target) override;
     int defenseSkill(Char* attacker) override;
     void adjustStats(int dungeonDepth);
+};
+
+class Statue : public Mob {
+public:
+    std::unique_ptr<Weapon> weapon;
+
+    Statue();
+    MobType mobType() const override { return MobType::Statue; }
+    int damageRoll() override;
+    int attackSkill(Char* target) override;
+    int defenseSkill(Char* attacker) override;
+    int dr() override;
+    void die(Actor* src) override;
 };
 
 // --- Bosses ---

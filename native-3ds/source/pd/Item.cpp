@@ -1648,6 +1648,12 @@ std::string GoldenKey::info() const {
     return "The notches on this golden key are tiny and intricate. Maybe it can open some chest lock?";
 }
 
+std::unique_ptr<Item> GoldenKey::clone(int qty) const {
+    auto k = std::make_unique<GoldenKey>(depth);
+    k->quantity = qty;
+    return k;
+}
+
 IronKey::IronKey() : IronKey(Dungeon::depth) {}
 
 IronKey::IronKey(int d) : Key(d) {
@@ -1657,6 +1663,12 @@ IronKey::IronKey(int d) : Key(d) {
 
 std::string IronKey::info() const {
     return "A simple iron key that can open a locked door.";
+}
+
+std::unique_ptr<Item> IronKey::clone(int qty) const {
+    auto k = std::make_unique<IronKey>(depth);
+    k->quantity = qty;
+    return k;
 }
 
 // =============================================================================

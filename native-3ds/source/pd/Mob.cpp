@@ -913,6 +913,46 @@ void Wraith::adjustStats(int dungeonDepth) {
     level = dungeonDepth;
 }
 
+// Animated Statue
+Statue::Statue() {
+    name = "Animated Statue";
+    HP = HT = 15 + Dungeon::depth * 5;
+    state = State::SLEEPING;
+    expAward = 0;
+
+    auto w = std::make_unique<Weapon>("Sword", 3, 8 + Dungeon::depth, 10 + Dungeon::depth);
+    w->random();
+    weapon = std::move(w);
+}
+
+int Statue::damageRoll() {
+    if (weapon) {
+        return weapon->damageRoll();
+    }
+    return Random::NormalIntRange(3, 10 + Dungeon::depth);
+}
+
+int Statue::attackSkill(Char* targetChar) {
+    (void)targetChar;
+    return 9 + Dungeon::depth;
+}
+
+int Statue::defenseSkill(Char* attackerChar) {
+    (void)attackerChar;
+    return 4 + Dungeon::depth;
+}
+
+int Statue::dr() {
+    return Dungeon::depth;
+}
+
+void Statue::die(Actor* src) {
+    Mob::die(src);
+    if (weapon && Dungeon::level) {
+        Dungeon::level->drop(std::move(weapon), pos);
+    }
+}
+
 // =============================================================================
 // Boss Implementations
 // =============================================================================

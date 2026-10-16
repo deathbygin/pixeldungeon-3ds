@@ -18,6 +18,38 @@
 
 namespace pd {
 
+bool Level::pitRoomNeeded = false;
+bool Level::weakFloorCreated = false;
+
+std::unique_ptr<Item> Level::itemToSpawnAsPrize() {
+    if (itemsToSpawn.empty()) return nullptr;
+    if (Random::Int(static_cast<int>(itemsToSpawn.size()) + 1) > 0) {
+        size_t idx = Random::Int(static_cast<int>(itemsToSpawn.size()));
+        auto item = std::move(itemsToSpawn[idx]);
+        itemsToSpawn.erase(itemsToSpawn.begin() + idx);
+        return item;
+    }
+    return nullptr;
+}
+
+int Level::pitCell() const {
+    for (const auto& r : rooms) {
+        if (r && r->type == Room::Type::PIT) {
+            return r->random();
+        }
+    }
+    return entrance;
+}
+
+Room* Level::room(int pos) const {
+    for (const auto& r : rooms) {
+        if (r && r->type != Room::Type::NONE && r->inside(pos)) {
+            return r.get();
+        }
+    }
+    return nullptr;
+}
+
 Level::Level() {
     std::fill_n(map, LENGTH, Terrain::WALL);
     std::fill_n(visited, LENGTH, false);

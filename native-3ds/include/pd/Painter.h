@@ -28,6 +28,21 @@ public:
     static void paintExit(Level* level, Room* room);
     static void paintBossExit(Level* level, Room* room);
     static void paintRatKing(Level* level, Room* room);
+    static void paintArmory(Level* level, Room* room);
+    static void paintLaboratory(Level* level, Room* room);
+    static void paintLibrary(Level* level, Room* room);
+    static void paintGarden(Level* level, Room* room);
+    static void paintMagicWell(Level* level, Room* room);
+    static void paintPool(Level* level, Room* room);
+    static void paintPit(Level* level, Room* room);
+    static void paintStorage(Level* level, Room* room);
+    static void paintStatue(Level* level, Room* room);
+    static void paintTraps(Level* level, Room* room);
+    static void paintTreasury(Level* level, Room* room);
+    static void paintVault(Level* level, Room* room);
+    static void paintWeakFloor(Level* level, Room* room);
+    static void paintAltar(Level* level, Room* room);
+    static void paintCrypt(Level* level, Room* room);
 
 private:
     static void paintBurned(Level* level, Room* room);

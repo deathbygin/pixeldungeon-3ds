@@ -895,6 +895,7 @@ bool SaveManager::loadGame(const std::string& customPath) {
             case Mob::MobType::Eye:      mob = std::make_unique<Eye>(); break;
             case Mob::MobType::Scorpio:  mob = std::make_unique<Scorpio>(); break;
             case Mob::MobType::Piranha:  mob = std::make_unique<Piranha>(); break;
+            case Mob::MobType::Statue:   mob = std::make_unique<Statue>(); break;
             case Mob::MobType::Wraith:   mob = std::make_unique<Wraith>(); break;
             case Mob::MobType::Goo:      mob = std::make_unique<Goo>(); break;
             case Mob::MobType::Tengu:    mob = std::make_unique<Tengu>(); break;

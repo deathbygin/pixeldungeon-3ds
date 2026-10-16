@@ -320,6 +320,7 @@ public:
     GoldenKey();
     explicit GoldenKey(int d);
     std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
 };
 
 class IronKey : public Key {
@@ -327,6 +328,7 @@ public:
     IronKey();
     explicit IronKey(int d);
     std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
 };
 
 // =============================================================================

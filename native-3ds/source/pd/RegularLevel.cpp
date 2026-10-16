@@ -9,6 +9,33 @@
 
 namespace pd {
 
+std::vector<Room::Type> RegularLevel::s_specials;
+
+void RegularLevel::initSpecials() {
+    if (s_specials.empty()) {
+        s_specials = {
+            Room::Type::ARMORY,
+            Room::Type::WEAK_FLOOR,
+            Room::Type::MAGIC_WELL,
+            Room::Type::CRYPT,
+            Room::Type::POOL,
+            Room::Type::GARDEN,
+            Room::Type::LIBRARY,
+            Room::Type::TREASURY,
+            Room::Type::TRAPS,
+            Room::Type::STORAGE,
+            Room::Type::STATUE,
+            Room::Type::LABORATORY,
+            Room::Type::VAULT,
+            Room::Type::ALTAR
+        };
+        for (int i = static_cast<int>(s_specials.size()) - 1; i > 0; --i) {
+            int j = Random::Int(i + 1);
+            std::swap(s_specials[i], s_specials[j]);
+        }
+    }
+}
+
 bool RegularLevel::build() {
     std::fill_n(map, LENGTH, feeling == Feeling::CHASM ? Terrain::CHASM : Terrain::WALL);
     std::fill_n(visited, LENGTH, false);
@@ -155,6 +182,74 @@ void RegularLevel::split(const Rect& rect) {
 }
 
 void RegularLevel::assignRoomType() {
+    initSpecials();
+    std::vector<Room::Type> specials = s_specials;
+
+    if (Dungeon::depth % 5 == 4 || Dungeon::depth >= 25) {
+        auto it = std::find(specials.begin(), specials.end(), Room::Type::WEAK_FLOOR);
+        if (it != specials.end()) specials.erase(it);
+    }
+
+    int specialRooms = 0;
+
+    for (auto& r : rooms) {
+        if (r->type == Room::Type::NONE && r->connected.size() == 1) {
+            if (!specials.empty() && r->width() > 3 && r->height() > 3 &&
+                Random::Int(specialRooms * specialRooms + 2) == 0) {
+
+                if (pitRoomNeeded) {
+                    r->type = Room::Type::PIT;
+                    pitRoomNeeded = false;
+
+                    auto removeType = [&](Room::Type t) {
+                        auto it = std::find(specials.begin(), specials.end(), t);
+                        if (it != specials.end()) specials.erase(it);
+                    };
+                    removeType(Room::Type::ARMORY);
+                    removeType(Room::Type::CRYPT);
+                    removeType(Room::Type::LABORATORY);
+                    removeType(Room::Type::LIBRARY);
+                    removeType(Room::Type::STATUE);
+                    removeType(Room::Type::TREASURY);
+                    removeType(Room::Type::VAULT);
+                    removeType(Room::Type::WEAK_FLOOR);
+                } else if (Dungeon::depth % 5 == 2 && std::find(specials.begin(), specials.end(), Room::Type::LABORATORY) != specials.end()) {
+                    r->type = Room::Type::LABORATORY;
+                } else {
+                    int n = static_cast<int>(specials.size());
+                    int idx = std::min(Random::Int(n), Random::Int(n));
+                    r->type = specials[idx];
+                    if (r->type == Room::Type::WEAK_FLOOR) {
+                        weakFloorCreated = true;
+                    }
+                }
+
+                auto itSpec = std::find(s_specials.begin(), s_specials.end(), r->type);
+                if (itSpec != s_specials.end()) {
+                    Room::Type t = *itSpec;
+                    s_specials.erase(itSpec);
+                    s_specials.push_back(t);
+                }
+
+                auto itCur = std::find(specials.begin(), specials.end(), r->type);
+                if (itCur != specials.end()) specials.erase(itCur);
+                specialRooms++;
+            } else if (Random::Int(2) == 0) {
+                std::vector<Room*> nonSpecNeighbors;
+                for (Room* n : r->neigbours) {
+                    if (n && r->connected.find(n) == r->connected.end() &&
+                        n->type != Room::Type::PIT &&
+                        std::find(s_specials.begin(), s_specials.end(), n->type) == s_specials.end()) {
+                        nonSpecNeighbors.push_back(n);
+                    }
+                }
+                if (nonSpecNeighbors.size() > 1) {
+                    r->connect(Random::element(nonSpecNeighbors));
+                }
+            }
+        }
+    }
+
     int count = 0;
     for (auto& r : rooms) {
         if (r->type == Room::Type::NONE) {
@@ -340,58 +435,82 @@ void RegularLevel::placeTraps() {
     }
 }
 
-void RegularLevel::createItems() {
-    for (size_t i = 0; i < rooms.size(); ++i) {
-        const auto& r = rooms[i];
-        if (!r || r->type != Room::Type::STANDARD) continue;
-
-        int cell = r->centerY() * WIDTH + r->centerX();
-        if (isPassable(cell) && !getHeap(cell)) {
-            float roll = Random::Float();
-            if (roll < 0.25f) {
-                auto chest = std::make_unique<Heap>(cell, Heap::Type::CHEST);
-                if (Random::Float() < 0.5f) {
-                    chest->drop(std::make_unique<Potion>(Potion::PotionType::HEALING));
-                } else {
-                    chest->drop(std::make_unique<Scroll>(Scroll::ScrollType::UPGRADE));
-                }
-                heaps.push_back(std::move(chest));
-            } else if (roll < 0.45f) {
-                auto skel = std::make_unique<Heap>(cell, Heap::Type::SKELETON);
-                if (Random::Float() < 0.5f) {
-                    auto w = std::make_unique<Weapon>("Shortsword", 3, 8, 11);
-                    w->random();
-                    skel->drop(std::move(w));
-                } else {
-                    auto a = std::make_unique<Armor>("Leather Armor", 2, 12);
-                    a->random();
-                    skel->drop(std::move(a));
-                }
-                heaps.push_back(std::move(skel));
-            } else if (roll < 0.75f) {
-                auto ground = std::make_unique<Heap>(cell, Heap::Type::HEAP);
-                float lootRoll = Random::Float();
-                if (lootRoll < 0.35f) {
-                    ground->drop(std::make_unique<Food>());
-                } else if (lootRoll < 0.55f) {
-                    ground->drop(std::make_unique<Potion>(Potion::PotionType::STRENGTH));
-                } else if (lootRoll < 0.75f) {
-                    ground->drop(std::make_unique<Scroll>(Scroll::ScrollType::MAGIC_MAPPING));
-                } else {
-                    if (Random::Float() < 0.5f) {
-                        auto w = std::make_unique<Weapon>("Mace", 3, 10, 12);
-                        w->random();
-                        ground->drop(std::move(w));
-                    } else {
-                        auto a = std::make_unique<Armor>("Mail Armor", 3, 14);
-                        a->random();
-                        ground->drop(std::move(a));
-                    }
-                }
-                heaps.push_back(std::move(ground));
+int RegularLevel::randomDropCell() {
+    for (int attempts = 0; attempts < 100; ++attempts) {
+        Room* r = randomRoom(Room::Type::STANDARD, 1);
+        if (r) {
+            int pos = r->random();
+            if (isPassable(pos) && map[pos] != Terrain::EMPTY_WELL && getHeap(pos) == nullptr) {
+                return pos;
             }
         }
     }
+    for (int attempts = 0; attempts < 100; ++attempts) {
+        int pos = Random::Int(LENGTH);
+        if (isPassable(pos) && map[pos] != Terrain::EMPTY_WELL && getHeap(pos) == nullptr) {
+            return pos;
+        }
+    }
+    return entrance;
+}
+
+void RegularLevel::createItems() {
+    int nItems = 3;
+    while (Random::Float() < 0.4f) {
+        nItems++;
+    }
+
+    for (int i = 0; i < nItems; ++i) {
+        int cell = randomDropCell();
+        Heap::Type type = Heap::Type::HEAP;
+        switch (Random::Int(20)) {
+        case 0:
+            type = Heap::Type::SKELETON;
+            break;
+        case 1:
+        case 2:
+        case 3:
+        case 4:
+            type = Heap::Type::CHEST;
+            break;
+        case 5:
+            type = (Dungeon::depth > 1) ? Heap::Type::MIMIC : Heap::Type::CHEST;
+            break;
+        default:
+            type = Heap::Type::HEAP;
+            break;
+        }
+
+        float roll = Random::Float();
+        std::unique_ptr<Item> item;
+        if (roll < 0.25f) {
+            item = std::make_unique<Potion>(static_cast<Potion::PotionType>(Random::Int(12)));
+        } else if (roll < 0.50f) {
+            item = std::make_unique<Scroll>(static_cast<Scroll::ScrollType>(Random::Int(12)));
+        } else if (roll < 0.70f) {
+            item = std::make_unique<Food>();
+        } else if (roll < 0.85f) {
+            item = std::make_unique<Gold>(Random::IntRange(10 * Dungeon::depth, 30 * Dungeon::depth));
+        } else if (roll < 0.93f) {
+            auto w = std::make_unique<Weapon>("Sword", 3, 8 + Dungeon::depth, 10 + Dungeon::depth);
+            w->random();
+            item = std::move(w);
+        } else {
+            auto a = std::make_unique<Armor>("Armor", 1 + Dungeon::depth / 5, 10 + Dungeon::depth);
+            a->random();
+            item = std::move(a);
+        }
+
+        Heap* h = drop(std::move(item), cell);
+        if (h) h->type = type;
+    }
+
+    // Spawn puzzle / special room required items (Keys, Invisibility, Liquid Flame, Levitation)
+    for (auto& itm : itemsToSpawn) {
+        int cell = randomDropCell();
+        drop(std::move(itm), cell);
+    }
+    itemsToSpawn.clear();
 }
 
 } // namespace pd

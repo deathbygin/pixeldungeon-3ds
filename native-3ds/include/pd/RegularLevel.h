@@ -28,7 +28,11 @@ protected:
     void placeDoors(Room* r);
     void paintDoors(Room* r);
     bool joinRooms(Room* r, Room* n);
+    static std::vector<Room::Type> s_specials;
+    static void initSpecials();
+
     Room* randomRoom(Room::Type type, int tries);
+    int randomDropCell();
     void placeTraps();
     void createItems();
 };

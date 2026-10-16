@@ -148,7 +148,14 @@ void Dungeon::switchLevel(int newDepth) {
         }
         mobs.clear();
 
-        hero->place(level->entrance);
+        int spawnPos = level->entrance;
+        for (const auto& r : level->rooms) {
+            if (r && r->type == Room::Type::PIT) {
+                spawnPos = level->pitCell();
+                break;
+            }
+        }
+        hero->place(spawnPos);
         Actor::occupyCell(hero.get());
         Actor::add(hero.get());
         for (Buff* b : hero->buffs) {

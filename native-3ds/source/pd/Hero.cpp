@@ -250,6 +250,29 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
         return true;
     }
 
+    if (tile == Terrain::LOCKED_DOOR) {
+        if (belongings.consumeKey("Iron Key", Dungeon::depth)) {
+            currentLevel->set(nextCell, Terrain::DOOR);
+            noosa::Audio::play(noosa::Audio::getSample(Assets::SND_UNLOCK).get());
+            GLog::p("You unlock the door with an iron key.");
+            spend(TICK);
+            next();
+            Dungeon::observe();
+            waitingForInput = false;
+            return true;
+        } else {
+            GLog::w("This door is locked. You need an iron key to open it.");
+            waitingForInput = true;
+            return false;
+        }
+    }
+
+    if (tile == Terrain::BARRICADE || tile == Terrain::BOOKSHELF) {
+        GLog::i("The wooden barricade blocks your way. Perhaps fire can clear it.");
+        waitingForInput = true;
+        return false;
+    }
+
     // Check for container on adjacent tile BEFORE moving onto it!
     Heap* targetHeap = currentLevel->getHeap(nextCell);
     if (targetHeap && targetHeap->type != Heap::Type::HEAP && targetHeap->type != Heap::Type::FOR_SALE && targetHeap->type != Heap::Type::HIDDEN) {

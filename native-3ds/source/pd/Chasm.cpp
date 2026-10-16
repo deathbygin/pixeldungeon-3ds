@@ -14,12 +14,17 @@
 namespace pd {
 
 void Chasm::heroFall(int pos) {
-    (void)pos;
     noosa::Audio::play(noosa::Audio::getSample(Assets::SND_FALLING).get());
 
     if (Dungeon::hero && Dungeon::hero->isAlive()) {
         Dungeon::hero->interrupt();
         GLog::n("You fall into the dark abyss!");
+
+        Room* r = Dungeon::level ? Dungeon::level->room(pos) : nullptr;
+        if (r && r->type == Room::Type::WEAK_FLOOR) {
+            Level::pitRoomNeeded = true;
+        }
+
         Dungeon::nextLevel();
         heroLand();
     }
