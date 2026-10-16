@@ -447,7 +447,7 @@ void InventoryView::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
                     C2D_DrawText(&textObj, C2D_WithColor, sx + SLOT_SIZE - tw - 1.0f, sy + 2.0f, 0.84f, 0.32f, 0.32f, C2D_Color32(0x00, 0x00, 0x00, 0xCC));
                     C2D_DrawText(&textObj, C2D_WithColor, sx + SLOT_SIZE - tw - 2.0f, sy + 1.0f, 0.85f, 0.32f, 0.32f, col);
                 } else {
-                    std::string s = "?" + std::to_string(w->STR);
+                    std::string s = "?" + std::to_string(w->typicalSTR());
                     C2D_TextParse(&textObj, textBuf, s.c_str());
                     C2D_TextOptimize(&textObj);
                     float tw = textObj.width * 0.32f;
@@ -468,7 +468,7 @@ void InventoryView::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
                     C2D_DrawText(&textObj, C2D_WithColor, sx + SLOT_SIZE - tw - 1.0f, sy + 2.0f, 0.84f, 0.32f, 0.32f, C2D_Color32(0x00, 0x00, 0x00, 0xCC));
                     C2D_DrawText(&textObj, C2D_WithColor, sx + SLOT_SIZE - tw - 2.0f, sy + 1.0f, 0.85f, 0.32f, 0.32f, col);
                 } else {
-                    std::string s = "?" + std::to_string(a->STR);
+                    std::string s = "?" + std::to_string(a->typicalSTR());
                     C2D_TextParse(&textObj, textBuf, s.c_str());
                     C2D_TextOptimize(&textObj);
                     float tw = textObj.width * 0.32f;

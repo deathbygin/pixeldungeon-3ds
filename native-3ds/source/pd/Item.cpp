@@ -179,7 +179,27 @@ Weapon::Weapon(std::string n, int minD, int maxD, int strReq)
     else if (name == "Mace") image = ItemSpriteSheet::MACE;
     else if (name == "Battle Axe") image = ItemSpriteSheet::BATTLE_AXE;
     else if (name == "War Hammer") image = ItemSpriteSheet::WAR_HAMMER;
-    else image = ItemSpriteSheet::WEAPON;
+    else if (name == "Sword") image = ItemSpriteSheet::SWORD;
+    else if (name == "Knuckles" || name == "Knuckleduster") image = ItemSpriteSheet::KNUCKLEDUSTER;
+    else if (name == "Quarterstaff") image = ItemSpriteSheet::QUARTERSTAFF;
+    else if (name == "Spear") image = ItemSpriteSheet::SPEAR;
+    else if (name == "Glaive") image = ItemSpriteSheet::GLAIVE;
+    else {
+        if (STR <= 10) image = ItemSpriteSheet::DAGGER;
+        else if (STR <= 12) image = ItemSpriteSheet::SHORT_SWORD;
+        else if (STR <= 14) image = ItemSpriteSheet::SWORD;
+        else if (STR <= 16) image = ItemSpriteSheet::LONG_SWORD;
+        else image = ItemSpriteSheet::WAR_HAMMER;
+    }
+}
+
+int Weapon::typicalSTR() const {
+    if (name == "Dagger" || name == "Knuckles" || name == "Knuckleduster") return 10;
+    if (name == "Shortsword" || name == "Spear" || name == "Quarterstaff") return 12;
+    if (name == "Sword" || name == "Mace") return 14;
+    if (name == "Longsword" || name == "Battle Axe") return 16;
+    if (name == "War Hammer" || name == "Glaive") return 18;
+    return STR + (levelKnown ? level : 0);
 }
 
 Item* Weapon::identify() {
@@ -623,8 +643,13 @@ Armor::Armor(std::string n, int t, int strReq)
         case 3: image = ItemSpriteSheet::ARMOR_MAIL; break;
         case 4: image = ItemSpriteSheet::ARMOR_SCALE; break;
         case 5: image = ItemSpriteSheet::ARMOR_PLATE; break;
-        default: image = ItemSpriteSheet::ARMOR; break;
+        default: image = (tier <= 1) ? ItemSpriteSheet::ARMOR_CLOTH : ItemSpriteSheet::ARMOR_PLATE; break;
     }
+}
+
+int Armor::typicalSTR() const {
+    if (tier >= 1 && tier <= 5) return 7 + tier * 2;
+    return STR + (levelKnown ? level : 0);
 }
 
 Item* Armor::identify() {

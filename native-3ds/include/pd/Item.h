@@ -10,6 +10,7 @@ namespace pd {
 class Char;
 class Hero;
 class Weapon;
+class Armor;
 class Wand;
 class MissileWeapon;
 class Boomerang;
@@ -67,6 +68,7 @@ public:
     virtual std::string displayName() const;
 
     virtual Weapon* asWeapon() { return nullptr; }
+    virtual Armor* asArmor() { return nullptr; }
     virtual Wand* asWand() { return nullptr; }
     virtual MissileWeapon* asMissile() { return nullptr; }
     virtual Boomerang* asBoomerang() { return nullptr; }
@@ -95,6 +97,7 @@ public:
     bool execute(Hero* hero, const std::string& action) override;
     std::string info() const override;
     std::string displayName() const override;
+    virtual int typicalSTR() const;
 
     virtual float acuracyFactor(Hero* hero) const;
     float speedFactor(Hero* hero) const override;
@@ -159,6 +162,7 @@ public:
     int hitsToKnow = HITS_TO_KNOW;
 
     Armor(std::string n, int t, int strReq);
+    Armor* asArmor() override { return this; }
     ItemCategory category() const override { return ItemCategory::Armor; }
     bool isEquippable() const override { return true; }
     bool isUpgradable() const override { return true; }
@@ -169,6 +173,7 @@ public:
     bool execute(Hero* hero, const std::string& action) override;
     std::string info() const override;
     std::string displayName() const override;
+    virtual int typicalSTR() const;
 
     int drRoll() const;
     int proc(Char* attacker, Char* defender, int damage);

@@ -273,6 +273,9 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
             u32 slotColor = isEquippedSlot ? C2D_Color32(0x63, 0x66, 0x5b, 0xFF) : C2D_Color32(0x4a, 0x4d, 0x44, 0xFF);
             if (it && it->cursed && it->cursedKnown) {
                 slotColor = C2D_Color32(0x73, 0x3d, 0x3d, 0xFF); // Reddish cursed tint
+            } else if (it && !it->isIdentified()) {
+                // Purple shaded background for unidentified items
+                slotColor = isEquippedSlot ? C2D_Color32(0x70, 0x54, 0x7e, 0xFF) : C2D_Color32(0x5a, 0x3d, 0x6e, 0xFF);
             }
             C2D_DrawRectSolid(sx, sy, zSlot, SLOT_SIZE, SLOT_SIZE, slotColor);
 
@@ -319,25 +322,45 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
                     BitmapFont::draw(BitmapFont::FontType::Font1x, qStr, sx + 2.0f, sy + 1.0f, zText, 0xFFFFFFFF);
                 }
 
-                // Top-Right Badge: Strength requirement (:10)
-                if (it->category() == ItemCategory::Weapon || it->category() == ItemCategory::Armor) {
+                // Top-Right Badge: Strength requirement (:10 or ?10)
+                if ((it->category() == ItemCategory::Weapon && !it->asWand()) || it->category() == ItemCategory::Armor) {
+                    bool identified = it->levelKnown;
                     int reqStr = 10;
-                    if (Weapon* w = it->asWeapon()) reqStr = w->STR;
-                    std::string strBadge = ":" + std::to_string(reqStr);
-                    u32 strCol = (reqStr > hero->STR) ? 0xFF4444FF : 0xCACFC2FF;
-                    BitmapFont::draw(BitmapFont::FontType::Font1x, strBadge, sx + 13.0f, sy + 1.0f, zText, strCol);
+                    if (Weapon* w = it->asWeapon()) {
+                        reqStr = identified ? w->STR : w->typicalSTR();
+                    } else if (Armor* a = it->asArmor()) {
+                        reqStr = identified ? a->STR : a->typicalSTR();
+                    }
+
+                    std::string strBadge = identified ? (":" + std::to_string(reqStr)) : ("?" + std::to_string(reqStr));
+                    u32 strCol;
+                    if (!identified) {
+                        strCol = 0xFF8800FF; // Authentic warning orange for typical/unidentified strength
+                    } else if (reqStr > hero->STR) {
+                        strCol = 0xFF4444FF; // Red if hero strength is insufficient
+                    } else {
+                        strCol = 0xCACFC2FF; // Normal light gray
+                    }
+                    float bw = BitmapFont::width(BitmapFont::FontType::Font1x, strBadge);
+                    float bx = sx + SLOT_SIZE - bw - 2.0f;
+                    BitmapFont::draw(BitmapFont::FontType::Font1x, strBadge, bx, sy + 1.0f, zText, strCol);
                 }
 
-                // Bottom-Right Badge: Upgrade Level (+1)
-                if (it->level > 0) {
-                    std::string lvlBadge = "+" + std::to_string(it->level);
-                    BitmapFont::draw(BitmapFont::FontType::Font1x, lvlBadge, sx + 13.0f, sy + 18.0f, zText, 0x44FF44FF);
+                // Bottom-Right Badge: Upgrade Level (+1) or Cursed marker (C)
+                if (it->levelKnown && it->level != 0) {
+                    std::string lvlBadge = (it->level > 0 ? "+" : "") + std::to_string(it->level);
+                    float lw = BitmapFont::width(BitmapFont::FontType::Font1x, lvlBadge);
+                    float lx = sx + SLOT_SIZE - lw - 2.0f;
+                    u32 lCol = (it->level > 0) ? 0x44FF44FF : 0xFF4444FF;
+                    BitmapFont::draw(BitmapFont::FontType::Font1x, lvlBadge, lx, sy + 18.0f, zText, lCol);
                 } else if (it->cursed && it->cursedKnown) {
-                    BitmapFont::draw(BitmapFont::FontType::Font1x, "C", sx + 18.0f, sy + 18.0f, zText, 0xFF4444FF);
+                    float cw = BitmapFont::width(BitmapFont::FontType::Font1x, "C");
+                    float cx = sx + SLOT_SIZE - cw - 2.0f;
+                    BitmapFont::draw(BitmapFont::FontType::Font1x, "C", cx, sy + 18.0f, zText, 0xFF4444FF);
                 }
 
                 // Bottom-Left Ticks: Durability
-                if (it->isUpgradable()) {
+                if (it->isUpgradable() && it->levelKnown) {
                     C2D_DrawRectSolid(sx + 2.0f, sy + 23.0f, zText, 2.0f, 2.0f, C2D_Color32(0x00, 0xee, 0x00, 0xFF));
                     C2D_DrawRectSolid(sx + 5.0f, sy + 23.0f, zText, 2.0f, 2.0f, C2D_Color32(0x00, 0xee, 0x00, 0xFF));
                     C2D_DrawRectSolid(sx + 8.0f, sy + 23.0f, zText, 2.0f, 2.0f, C2D_Color32(0x00, 0xee, 0x00, 0xFF));
@@ -387,7 +410,7 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
         C2D_Text txtName;
         C2D_TextParse(&txtName, textBuf, dName.c_str());
         C2D_TextOptimize(&txtName);
-        u32 nameCol = m_subItem->level > 0 ? 0x44FF44FF :
+        u32 nameCol = (m_subItem->levelKnown && m_subItem->level > 0) ? 0x44FF44FF :
                       (m_subItem->cursed && m_subItem->cursedKnown ? 0xFF4444FF : 0xFFEBA4FF);
         BitmapFont::draw(BitmapFont::FontType::Font2x, dName, SUB_WIN_X + 34.0f, SUB_WIN_Y + 11.0f, subTextZ, nameCol);
 
