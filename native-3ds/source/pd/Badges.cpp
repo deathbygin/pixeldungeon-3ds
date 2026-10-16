@@ -112,6 +112,9 @@ void Badges::validateLevelReached(int heroLevel) {
 void Badges::validateBossSlain(int bossIndex) {
     if (bossIndex == 1) unlock(Badge::BOSS_SLAIN_1, "1st boss slain (Goo)");
     else if (bossIndex == 2) unlock(Badge::BOSS_SLAIN_2, "2nd boss slain (Tengu)");
+    else if (bossIndex == 3) unlock(Badge::BOSS_SLAIN_3, "3rd boss slain (DM-300)");
+    else if (bossIndex == 4) unlock(Badge::BOSS_SLAIN_4, "4th boss slain (King of Dwarves)");
+    else if (bossIndex == 5) unlock(Badge::BOSS_SLAIN_5, "5th boss slain (Yog-Dzewa)");
 }
 
 void Badges::validateDeathFromFalling() {

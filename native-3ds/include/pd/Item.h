@@ -89,6 +89,7 @@ public:
     virtual DewVial* asDewVial() { return nullptr; }
     virtual Potion* asPotion() { return nullptr; }
     virtual Scroll* asScroll() { return nullptr; }
+    virtual class Key* asKey() { return nullptr; }
 };
 
 class Weapon : public Item {
@@ -537,6 +538,7 @@ public:
 
     Key();
     explicit Key(int d);
+    Key* asKey() override { return this; }
     ItemCategory category() const override { return ItemCategory::Generic; }
     bool isStackable() const override { return false; }
     bool isUpgradable() const override { return false; }
@@ -557,6 +559,14 @@ class IronKey : public Key {
 public:
     IronKey();
     explicit IronKey(int d);
+    std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class SkeletonKey : public Key {
+public:
+    SkeletonKey();
+    explicit SkeletonKey(int d);
     std::string info() const override;
     std::unique_ptr<Item> clone(int qty = 1) const override;
 };
@@ -710,23 +720,27 @@ public:
 };
 
 // =============================================================================
-// Amulet of Yendor
+// ArmorKit & Amulet of Yendor
 // =============================================================================
+class ArmorKit : public Item {
+public:
+    ArmorKit();
+    bool isUpgradable() const override { return false; }
+    bool isIdentified() const override { return true; }
+    std::vector<std::string> actions(Hero* hero) override;
+    bool execute(Hero* hero, const std::string& action) override;
+    std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
 class Amulet : public Item {
 public:
-    Amulet() {
-        name = "Amulet of Yendor";
-        image = 15;
-        identified = true;
-    }
+    Amulet();
     bool isIdentified() const override { return true; }
-    std::string info() const override {
-        return "The Amulet of Yendor is the most powerful known artifact.";
-    }
-    std::unique_ptr<Item> clone(int qty = 1) const override {
-        (void)qty;
-        return std::make_unique<Amulet>();
-    }
+    std::vector<std::string> actions(Hero* hero) override;
+    bool execute(Hero* hero, const std::string& action) override;
+    std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
 };
 
 // =============================================================================

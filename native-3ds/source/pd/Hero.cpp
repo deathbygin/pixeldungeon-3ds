@@ -313,6 +313,23 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
         }
     }
 
+    if (tile == Terrain::LOCKED_EXIT) {
+        if (belongings.consumeKey("Skeleton Key", Dungeon::depth)) {
+            currentLevel->set(nextCell, Terrain::UNLOCKED_EXIT);
+            Sample::playAt(Assets::SND_UNLOCK, nextCell);
+            GLog::p("You unlock the exit stairs with a skeleton key.");
+            spend(TICK);
+            next();
+            Dungeon::observe();
+            waitingForInput = false;
+            return true;
+        } else {
+            GLog::w("Heavy bars block the stairs. You need a skeleton key to unlock it.");
+            waitingForInput = true;
+            return false;
+        }
+    }
+
     if (tile == Terrain::BARRICADE || tile == Terrain::BOOKSHELF) {
         GLog::i("The wooden barricade blocks your way. Perhaps fire can clear it.");
         waitingForInput = true;

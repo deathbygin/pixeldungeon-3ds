@@ -849,7 +849,7 @@ int main(int argc, char* argv[]) {
                             SaveManager::deleteSave();
                             GLog::n("HERO PERISHED! Save erased.");
                         } else if (level) {
-                            if (level->map[hero->pos] == Terrain::EXIT) {
+                            if (level->map[hero->pos] == Terrain::EXIT || level->map[hero->pos] == Terrain::UNLOCKED_EXIT) {
                                 bottomUI.promptStairs(true);
                             } else if (level->map[hero->pos] == Terrain::ENTRANCE) {
                                 bottomUI.promptStairs(false);

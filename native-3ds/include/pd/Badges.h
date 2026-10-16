@@ -29,7 +29,8 @@ public:
         DEATH_FROM_HUNGER= 19,
         DEATH_FROM_FALLING= 20,
         ALL_ITEMS_IDENTIFIED = 21,
-        COUNT
+        BOSS_SLAIN_5     = 22, // 5th boss slain (Yog-Dzewa)
+        COUNT            = 23
     };
 
     static void init();

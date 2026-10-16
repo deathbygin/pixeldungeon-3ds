@@ -324,34 +324,67 @@ void Dungeon::spawnMobs(int count) {
 
     if (depth == 15) {
         // Boss floor: DM-300
-        int cell = level->exit;
-        auto dm = std::make_unique<DM300>();
-        dm->place(cell);
-        Actor::occupyCell(dm.get());
-        Actor::add(dm.get(), 1.0f);
-        mobs.push_back(std::move(dm));
+        int cell = -1;
+        for (int attempts = 0; attempts < 100; ++attempts) {
+            int candidate = Random::Int(Level::LENGTH);
+            if (level->isPassable(candidate) && Actor::findChar(candidate) == nullptr) {
+                if (!hero || PathFinder::distanceChebyshev(candidate, hero->pos) >= 5) {
+                    cell = candidate;
+                    break;
+                }
+            }
+        }
+        if (cell != -1) {
+            auto dm = std::make_unique<DM300>();
+            dm->place(cell);
+            Actor::occupyCell(dm.get());
+            Actor::add(dm.get(), 1.0f);
+            mobs.push_back(std::move(dm));
+        }
         return;
     }
 
     if (depth == 20) {
         // Boss floor: King of Dwarves
-        int cell = level->exit;
-        auto king = std::make_unique<King>();
-        king->place(cell);
-        Actor::occupyCell(king.get());
-        Actor::add(king.get(), 1.0f);
-        mobs.push_back(std::move(king));
+        int cell = -1;
+        for (int attempts = 0; attempts < 100; ++attempts) {
+            int candidate = Random::Int(Level::LENGTH);
+            if (level->isPassable(candidate) && Actor::findChar(candidate) == nullptr) {
+                if (!hero || PathFinder::distanceChebyshev(candidate, hero->pos) >= 5) {
+                    cell = candidate;
+                    break;
+                }
+            }
+        }
+        if (cell != -1) {
+            auto king = std::make_unique<King>();
+            king->place(cell);
+            Actor::occupyCell(king.get());
+            Actor::add(king.get(), 1.0f);
+            mobs.push_back(std::move(king));
+        }
         return;
     }
 
     if (depth == 25) {
         // Boss floor: Yog-Dzewa
-        int cell = level->exit;
-        auto yog = std::make_unique<Yog>();
-        yog->place(cell);
-        Actor::occupyCell(yog.get());
-        Actor::add(yog.get(), 1.0f);
-        mobs.push_back(std::move(yog));
+        int cell = -1;
+        for (int attempts = 0; attempts < 100; ++attempts) {
+            int candidate = Random::Int(Level::LENGTH);
+            if (level->isPassable(candidate) && Actor::findChar(candidate) == nullptr) {
+                if (!hero || PathFinder::distanceChebyshev(candidate, hero->pos) >= 5) {
+                    cell = candidate;
+                    break;
+                }
+            }
+        }
+        if (cell != -1) {
+            auto yog = std::make_unique<Yog>();
+            yog->place(cell);
+            Actor::occupyCell(yog.get());
+            Actor::add(yog.get(), 1.0f);
+            mobs.push_back(std::move(yog));
+        }
         return;
     }
 

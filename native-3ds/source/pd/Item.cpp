@@ -3004,6 +3004,7 @@ std::unique_ptr<Item> Torch::clone(int qty) const {
 Key::Key() : Key(Dungeon::depth) {}
 
 Key::Key(int d) : depth(d) {
+    level = d;
     name = "Key";
     image = ItemSpriteSheet::IRON_KEY;
     identified = true;
@@ -3053,6 +3054,24 @@ std::string IronKey::info() const {
 
 std::unique_ptr<Item> IronKey::clone(int qty) const {
     auto k = std::make_unique<IronKey>(depth);
+    k->quantity = qty;
+    return k;
+}
+
+SkeletonKey::SkeletonKey() : SkeletonKey(Dungeon::depth) {}
+
+SkeletonKey::SkeletonKey(int d) : Key(d) {
+    name = "Skeleton Key";
+    image = ItemSpriteSheet::SKELETON_KEY;
+}
+
+std::string SkeletonKey::info() const {
+    return "This key looks serious: its head is shaped like a skull. "
+           "Probably it can open some serious door.";
+}
+
+std::unique_ptr<Item> SkeletonKey::clone(int qty) const {
+    auto k = std::make_unique<SkeletonKey>(depth);
     k->quantity = qty;
     return k;
 }
@@ -3502,6 +3521,97 @@ std::unique_ptr<Item> TomeOfMastery::clone(int qty) const {
     auto t = std::make_unique<TomeOfMastery>();
     t->quantity = qty;
     return t;
+}
+
+// =============================================================================
+// ArmorKit Implementation
+// =============================================================================
+ArmorKit::ArmorKit() {
+    name = "Armor Kit";
+    image = ItemSpriteSheet::KIT;
+    identified = true;
+    levelKnown = true;
+}
+
+std::vector<std::string> ArmorKit::actions(Hero* hero) {
+    (void)hero;
+    return { "APPLY", "DROP" };
+}
+
+bool ArmorKit::execute(Hero* hero, const std::string& action) {
+    if (!hero) return false;
+    if (action == "APPLY") {
+        if (!hero->belongings.equippedArmor) {
+            GLog::w("You must have armor equipped to use the armor kit!");
+            return false;
+        }
+        Armor* armor = hero->belongings.equippedArmor;
+        armor->level++;
+        armor->STR = std::max(1, armor->STR - 1);
+        Sample::play(Assets::SND_EVOKE);
+        FX::burst(hero->pos, 0x55ff55FF, 12);
+        GLog::p("You applied the armor kit to upgrade your " + armor->name + "! (Defense increased, STR requirement reduced)");
+
+        // Remove kit from inventory
+        for (auto it = hero->belongings.backpack.begin(); it != hero->belongings.backpack.end(); ++it) {
+            if (it->get() == this) {
+                quantity--;
+                if (quantity <= 0) {
+                    hero->belongings.backpack.erase(it);
+                }
+                break;
+            }
+        }
+        hero->spend(1.0f);
+        hero->next();
+        return true;
+    }
+    return Item::execute(hero, action);
+}
+
+std::string ArmorKit::info() const {
+    return "This kit contains various materials and tools that allow you to modify and reinforce your armor.";
+}
+
+std::unique_ptr<Item> ArmorKit::clone(int qty) const {
+    auto k = std::make_unique<ArmorKit>();
+    k->quantity = qty;
+    return k;
+}
+
+// =============================================================================
+// Amulet Implementation
+// =============================================================================
+Amulet::Amulet() {
+    name = "Amulet of Yendor";
+    image = ItemSpriteSheet::AMULET;
+    identified = true;
+    levelKnown = true;
+}
+
+std::vector<std::string> Amulet::actions(Hero* hero) {
+    (void)hero;
+    return { "END GAME", "DROP" };
+}
+
+bool Amulet::execute(Hero* hero, const std::string& action) {
+    if (!hero) return false;
+    if (action == "END GAME") {
+        GLog::h("You hold the Amulet of Yendor high! You have conquered the dungeon!");
+        Sample::play(Assets::SND_BADGE);
+        return true;
+    }
+    return Item::execute(hero, action);
+}
+
+std::string Amulet::info() const {
+    return "The Amulet of Yendor is the most powerful known artifact. "
+           "You can end the game now, or challenge yourself to ascend back to the surface!";
+}
+
+std::unique_ptr<Item> Amulet::clone(int qty) const {
+    (void)qty;
+    return std::make_unique<Amulet>();
 }
 
 // =============================================================================

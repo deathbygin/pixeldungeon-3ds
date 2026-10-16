@@ -90,24 +90,28 @@ std::unique_ptr<Item> Belongings::drop(Item* item) {
 }
 
 Item* Belongings::getKey(const std::string& keyName, int depth) {
-    (void)depth;
     for (auto& it : backpack) {
         if (it && it->name == keyName) {
-            return it.get();
+            Key* k = it->asKey();
+            if (!k || depth <= 0 || k->depth == depth) {
+                return it.get();
+            }
         }
     }
     return nullptr;
 }
 
 bool Belongings::consumeKey(const std::string& keyName, int depth) {
-    (void)depth;
     for (auto it = backpack.begin(); it != backpack.end(); ++it) {
         if (*it && (*it)->name == keyName) {
-            (*it)->quantity--;
-            if ((*it)->quantity <= 0) {
-                backpack.erase(it);
+            Key* k = (*it)->asKey();
+            if (!k || depth <= 0 || k->depth == depth) {
+                (*it)->quantity--;
+                if ((*it)->quantity <= 0) {
+                    backpack.erase(it);
+                }
+                return true;
             }
-            return true;
         }
     }
     return false;

@@ -137,6 +137,8 @@ public:
     static constexpr int BOMB               = 124;
     static constexpr int HONEYPOT           = 125;
     static constexpr int MASTERY            = 82;
+    static constexpr int KIT                = 86;
+    static constexpr int AMULET             = 87;
 };
 
 } // namespace pd

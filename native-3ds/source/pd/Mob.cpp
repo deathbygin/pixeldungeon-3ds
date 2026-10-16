@@ -15,10 +15,35 @@
 #include "pd/Sample.h"
 #include "pd/Debug.h"
 #include "noosa/Audio.h"
+#include "noosa/Music.h"
 #include <cmath>
 #include <algorithm>
 
 namespace pd {
+
+static int getSafeDropCell(Level* level, int origin) {
+    if (!level) return origin;
+    if (origin >= 0 && origin < Level::LENGTH && level->isPassable(origin) && !level->pit[origin]) {
+        return origin;
+    }
+    // Search in expanding rings for the nearest passable non-pit cell
+    for (int dist = 1; dist < 8; ++dist) {
+        for (int dy = -dist; dy <= dist; ++dy) {
+            for (int dx = -dist; dx <= dist; ++dx) {
+                if (std::abs(dx) != dist && std::abs(dy) != dist) continue;
+                int x = (origin % Level::WIDTH) + dx;
+                int y = (origin / Level::WIDTH) + dy;
+                if (x >= 0 && x < Level::WIDTH && y >= 0 && y < Level::HEIGHT) {
+                    int c = y * Level::WIDTH + x;
+                    if (level->isPassable(c) && !level->pit[c]) {
+                        return c;
+                    }
+                }
+            }
+        }
+    }
+    return origin;
+}
 
 bool Mob::s_mobFov[1024] = { false };
 
@@ -1183,6 +1208,17 @@ void Goo::aiStep(Hero* hero, Level* currentLevel) {
 void Goo::die(Actor* src) {
     GLog::h("The black ooze disperses! Goo has been defeated!");
     Badges::validateBossSlain(1);
+    Sample::play(Assets::SND_BOSS);
+    noosa::Music::play(Assets::TUNE, true);
+
+    if (Dungeon::level) {
+        int dropCell = getSafeDropCell(Dungeon::level.get(), pos);
+        Dungeon::level->drop(std::make_unique<SkeletonKey>(5), dropCell);
+        Dungeon::level->drop(std::make_unique<Potion>(Potion::PotionType::HEALING), dropCell);
+        Dungeon::level->drop(std::make_unique<PlantSeed>(static_cast<PlantSeed::PlantType>(Random::Int(8))), dropCell);
+        Dungeon::level->drop(std::make_unique<Dewdrop>(), dropCell);
+    }
+
     Mob::die(src);
 }
 
@@ -1274,6 +1310,15 @@ void Tengu::aiStep(Hero* hero, Level* currentLevel) {
 void Tengu::die(Actor* src) {
     GLog::h("Tengu yells: 'Free at last...'");
     Badges::validateBossSlain(2);
+    Sample::play(Assets::SND_BOSS);
+    noosa::Music::play(Assets::TUNE, true);
+
+    if (Dungeon::level) {
+        int dropCell = getSafeDropCell(Dungeon::level.get(), pos);
+        Dungeon::level->drop(std::make_unique<SkeletonKey>(10), dropCell);
+        Dungeon::level->drop(std::make_unique<TomeOfMastery>(), dropCell);
+    }
+
     Mob::die(src);
 }
 
@@ -1322,6 +1367,15 @@ void DM300::move(int step) {
 void DM300::die(Actor* src) {
     GLog::h("The machine collapses into a heap of scrap metal!");
     Badges::validateBossSlain(3);
+    Sample::play(Assets::SND_BOSS);
+    noosa::Music::play(Assets::TUNE, true);
+
+    if (Dungeon::level) {
+        int dropCell = getSafeDropCell(Dungeon::level.get(), pos);
+        Dungeon::level->drop(std::make_unique<SkeletonKey>(15), dropCell);
+        Dungeon::level->drop(std::make_unique<ArmorKit>(), dropCell);
+    }
+
     Mob::die(src);
 }
 
@@ -1389,6 +1443,15 @@ void King::aiStep(Hero* hero, Level* currentLevel) {
 void King::die(Actor* src) {
     GLog::h("The King of Dwarves falls! The throne is empty.");
     Badges::validateBossSlain(4);
+    Sample::play(Assets::SND_BOSS);
+    noosa::Music::play(Assets::TUNE, true);
+
+    if (Dungeon::level) {
+        int dropCell = getSafeDropCell(Dungeon::level.get(), pos);
+        Dungeon::level->drop(std::make_unique<SkeletonKey>(20), dropCell);
+        Dungeon::level->drop(std::make_unique<ArmorKit>(), dropCell);
+    }
+
     Mob::die(src);
 }
 
@@ -1442,6 +1505,15 @@ void Yog::aiStep(Hero* hero, Level* currentLevel) {
 void Yog::die(Actor* src) {
     GLog::h("Yog-Dzewa dissolves into cosmic dust! You have banished the Old God!");
     Badges::validateBossSlain(5);
+    Sample::play(Assets::SND_BOSS);
+    noosa::Music::play(Assets::HAPPY, true);
+
+    if (Dungeon::level) {
+        int dropCell = getSafeDropCell(Dungeon::level.get(), pos);
+        Dungeon::level->drop(std::make_unique<Amulet>(), dropCell);
+        Dungeon::level->drop(std::make_unique<SkeletonKey>(25), dropCell);
+    }
+
     Mob::die(src);
 }
 

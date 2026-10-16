@@ -708,6 +708,14 @@ bool SaveManager::loadGame(const std::string& customPath) {
                 item = std::make_unique<GoldenKey>();
             } else if (iName == "Iron Key") {
                 item = std::make_unique<IronKey>();
+            } else if (iName == "Skeleton Key") {
+                item = std::make_unique<SkeletonKey>();
+            } else if (iName == "Armor Kit") {
+                item = std::make_unique<ArmorKit>();
+            } else if (iName == "Tome of Mastery" || iName == "Tome of Remastery") {
+                item = std::make_unique<TomeOfMastery>();
+            } else if (iName == "Amulet of Yendor") {
+                item = std::make_unique<Amulet>();
             } else {
                 item = std::make_unique<Item>();
             }
@@ -725,6 +733,9 @@ bool SaveManager::loadGame(const std::string& customPath) {
             } else {
                 item->levelKnown = item->identified;
                 item->cursedKnown = item->identified;
+            }
+            if (Key* k = item->asKey()) {
+                k->depth = (iLvl > 0) ? iLvl : Dungeon::depth;
             }
             if (item->category() == ItemCategory::Potion) {
                 static_cast<Potion*>(item.get())->updatePerception();
@@ -879,6 +890,14 @@ bool SaveManager::loadGame(const std::string& customPath) {
                         item = std::make_unique<GoldenKey>();
                     } else if (iName == "Iron Key") {
                         item = std::make_unique<IronKey>();
+                    } else if (iName == "Skeleton Key") {
+                        item = std::make_unique<SkeletonKey>();
+                    } else if (iName == "Armor Kit") {
+                        item = std::make_unique<ArmorKit>();
+                    } else if (iName == "Tome of Mastery" || iName == "Tome of Remastery") {
+                        item = std::make_unique<TomeOfMastery>();
+                    } else if (iName == "Amulet of Yendor") {
+                        item = std::make_unique<Amulet>();
                     } else {
                         item = std::make_unique<Item>();
                     }
@@ -896,6 +915,9 @@ bool SaveManager::loadGame(const std::string& customPath) {
                     } else {
                         item->levelKnown = item->identified;
                         item->cursedKnown = item->identified;
+                    }
+                    if (Key* k = item->asKey()) {
+                        k->depth = (iLvl > 0) ? iLvl : Dungeon::depth;
                     }
                     if (item->category() == ItemCategory::Potion) {
                         static_cast<Potion*>(item.get())->updatePerception();
