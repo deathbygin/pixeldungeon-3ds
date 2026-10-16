@@ -1752,29 +1752,17 @@ Dewdrop::Dewdrop() {
 
 std::vector<std::string> Dewdrop::actions(Hero* hero) {
     (void)hero;
-    return { "DRINK", "DROP" };
+    return {};
 }
 
 bool Dewdrop::execute(Hero* hero, const std::string& action) {
-    if (!hero) return false;
-    if (action == "DRINK") {
-        int heal = 1 + (Dungeon::depth - 1) / 5;
-        if (hero->heroClass == Hero::HeroClass::Huntress) {
-            heal++;
-        }
-        hero->HP = std::min(hero->HT, hero->HP + heal);
-        FX::floatingText(hero->pos, "+" + std::to_string(heal), 0x38b764FF);
-        quantity--;
-        hero->spendAndNext(Actor::TICK);
-        return true;
-    } else if (action == "DROP") {
-        return doDropItem(hero, this);
-    }
+    (void)hero;
+    (void)action;
     return false;
 }
 
 std::string Dewdrop::info() const {
-    return "A fresh drop of crystalline dew gathered from trampled tall grass.";
+    return "A crystal clear dewdrop.";
 }
 
 std::unique_ptr<Item> Dewdrop::clone(int qty) const {

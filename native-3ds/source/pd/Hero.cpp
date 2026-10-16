@@ -339,6 +339,8 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
         return true;
     }
 
+    bool wasHighGrass = (currentLevel->get(nextCell) == Terrain::HIGH_GRASS);
+
     if (currentLevel->isPassable(nextCell)) {
         move(nextCell);
         spend(TICK / speed());
@@ -375,13 +377,16 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
                 }
             }
 
-            if (!hasAggroEnemy) {
+            Item* item = heap->peek();
+            bool canAutoPick = !hasAggroEnemy && !wasHighGrass;
+            if (canAutoPick && item && item->name == "Dewdrop" && HP >= HT) {
+                canAutoPick = false; // Don't waste dew if already at full health
+            }
+
+            if (canAutoPick) {
                 pickUp(currentLevel, false);
-            } else {
-                Item* item = heap->peek();
-                if (item) {
-                    GLog::i("You see " + item->displayName() + " lying here.");
-                }
+            } else if (item) {
+                GLog::i("You see " + item->displayName() + " lying here.");
             }
         }
 
@@ -433,9 +438,19 @@ bool Hero::pickUp(Level* currentLevel, bool spendTurn) {
 
     std::string itemName = item->displayName();
     if (item->name == "Dewdrop") {
-        HP = std::min(HT, HP + 2);
-        FX::floatingText(pos, "+2", 0x38b764FF);
-        GLog::p("You drank a dewdrop (+2 HP)");
+        int value = 1 + (Dungeon::depth - 1) / 5;
+        if (heroClass == HeroClass::Huntress) {
+            value++;
+        }
+        int effect = std::min(HT - HP, value * item->quantity);
+        if (effect > 0) {
+            HP += effect;
+            FX::floatingText(pos, "+" + std::to_string(effect), 0x38b764FF);
+            FX::burst(pos, 0x38b764FF, 4);
+            GLog::p("You drank a dewdrop (+" + std::to_string(effect) + " HP)");
+        } else {
+            GLog::i("You drank a fresh dewdrop.");
+        }
         noosa::Audio::play(noosa::Audio::getSample(Assets::SND_DEWDROP).get());
     } else if (item->name == "Gold") {
         int g = item->quantity;

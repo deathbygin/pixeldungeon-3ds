@@ -837,6 +837,13 @@ bool Eye::doAttack(Char* enemyChar) {
     return true;
 }
 
+void Eye::die(Actor* src) {
+    if (Dungeon::level) {
+        Dungeon::level->drop(std::make_unique<Dewdrop>(), pos);
+    }
+    Mob::die(src);
+}
+
 // Scorpio
 Scorpio::Scorpio() {
     name = "Scorpio";

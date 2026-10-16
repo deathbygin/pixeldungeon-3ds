@@ -141,37 +141,27 @@ void Level::trample(int cell, Char* ch) {
     if (cell < 0 || cell >= LENGTH) return;
     if (map[cell] == Terrain::HIGH_GRASS) {
         set(cell, Terrain::GRASS);
-        FX::burst(cell, 0x44aa33FF, 6);
 
+        int leaves = 4;
         // Warden's barkskin perk
         if (ch && ch == Dungeon::hero.get() && Dungeon::hero->subClass == HeroSubClass::Warden) {
             Barkskin* b = ch->affect<Barkskin>();
             if (b) {
                 b->setLevel(ch->HT / 3);
             }
-            FX::burst(cell, 0x55aa22FF, 8);
+            leaves = 8;
+        }
+        FX::burst(cell, 0x44aa33FF, leaves);
+
+        int herbalismLevel = 0;
+        // Seed drop: Random.Int(18) <= Random.Int(herbalismLevel + 1)
+        if (herbalismLevel >= 0 && Random::Int(18) <= Random::Int(herbalismLevel + 1)) {
+            drop(std::make_unique<PlantSeed>(static_cast<PlantSeed::PlantType>(Random::Int(8))), cell);
         }
 
-        // Authentic dewdrop drop / collection chance
-        int dewChance = 6;
-        if (ch && ch == Dungeon::hero.get() && Dungeon::hero->subClass == HeroSubClass::Warden) {
-            dewChance = 3; // Much higher chance for Warden
-        }
-        if (Random::Int(dewChance) == 0) {
-            if (ch && ch == Dungeon::hero.get()) {
-                int heal = 1 + (Dungeon::depth - 1) / 5 + (Dungeon::hero->heroClass == Hero::HeroClass::Huntress ? 1 : 0);
-                ch->HP = std::min(ch->HT, ch->HP + heal);
-                FX::floatingText(cell, "+" + std::to_string(heal), 0x38b764FF);
-            } else {
-                drop(std::make_unique<Dewdrop>(), cell);
-            }
-        }
-
-        // Warden seed harvest bonus
-        if (ch && ch == Dungeon::hero.get() && Dungeon::hero->subClass == HeroSubClass::Warden) {
-            if (Random::Int(5) == 0) {
-                drop(std::make_unique<PlantSeed>(static_cast<PlantSeed::PlantType>(Random::Int(8))), cell);
-            }
+        // Dewdrop drop: Random.Int(6) <= Random.Int(herbalismLevel + 1)
+        if (herbalismLevel >= 0 && Random::Int(6) <= Random::Int(herbalismLevel + 1)) {
+            drop(std::make_unique<Dewdrop>(), cell);
         }
 
         Dungeon::observe();

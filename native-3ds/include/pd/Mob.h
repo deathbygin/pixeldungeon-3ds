@@ -249,6 +249,7 @@ public:
     int dr() override;
     bool canAttack(Char* enemy) override;
     bool doAttack(Char* enemy) override;
+    void die(Actor* src) override;
 };
 
 class Scorpio : public Mob {
