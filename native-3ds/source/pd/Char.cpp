@@ -257,6 +257,12 @@ void Char::removeBuff(Buff* b) {
     }
 }
 
+void Char::removeBuff(BuffType type) {
+    while (Buff* b = buff(type)) {
+        b->detach();
+    }
+}
+
 Buff* Char::buff(BuffType type) const {
     for (Buff* b : buffs) {
         if (b && b->type() == type) {

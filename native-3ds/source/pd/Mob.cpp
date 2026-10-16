@@ -37,6 +37,12 @@ void Mob::damage(int dmg, Actor* src) {
     if (state == State::SLEEPING) {
         state = State::WANDERING;
     }
+    removeBuff(BuffType::Sleep);
+    Terror* t = getBuff<Terror>();
+    if (t) {
+        t->detach();
+        state = State::HUNTING;
+    }
     alerted = true;
     Char::damage(dmg, src);
 }
@@ -145,7 +151,20 @@ void Mob::aiStep(Hero* hero, Level* currentLevel) {
             enemy = hero;
         }
     } else {
-        enemy = hero;
+        Char* chosenTarget = hero;
+        if (mobType() != MobType::MirrorImage) {
+            int bestDist = hero ? PathFinder::distanceChebyshev(pos, hero->pos) : 999;
+            for (const auto& otherMob : Dungeon::mobs) {
+                if (otherMob && otherMob->isAlive() && otherMob->mobType() == MobType::MirrorImage && s_mobFov[otherMob->pos]) {
+                    int d = PathFinder::distanceChebyshev(pos, otherMob->pos);
+                    if (d < bestDist) {
+                        bestDist = d;
+                        chosenTarget = otherMob.get();
+                    }
+                }
+            }
+        }
+        enemy = chosenTarget;
     }
 
     // Terror: Force FLEEING state
@@ -1453,6 +1472,79 @@ std::string King::description() const {
 
 std::string Yog::description() const {
     return "The Old God of the deep subterranean hells. Surrounded by burning and rotting fists, its dormant eye exudes pure madness.";
+}
+
+// -----------------------------------------------------------------------------
+// MirrorImage
+// -----------------------------------------------------------------------------
+MirrorImage::MirrorImage() {
+    name = "mirror image";
+    HP = 1;
+    HT = 1;
+    expAward = 0;
+    state = State::HUNTING;
+}
+
+std::string MirrorImage::description() const {
+    return "This illusion bears a close resemblance to you, shimmering with ethereal light.";
+}
+
+int MirrorImage::attackSkill(Char* target) {
+    if (Dungeon::hero) return Dungeon::hero->attackSkill(target);
+    return 10;
+}
+
+int MirrorImage::defenseSkill(Char* attacker) {
+    (void)attacker;
+    return 15;
+}
+
+void MirrorImage::damage(int dmg, Actor* src) {
+    (void)dmg;
+    FX::burst(pos, 0x66ccffFF, 8);
+    die(src);
+}
+
+void MirrorImage::aiStep(Hero* hero, Level* currentLevel) {
+    if (!hero || !currentLevel) {
+        spend(TICK);
+        return;
+    }
+
+    Char* closestEnemy = nullptr;
+    int minDist = 999;
+    for (const auto& otherMob : Dungeon::mobs) {
+        if (otherMob.get() != this && otherMob && otherMob->isAlive() && otherMob->mobType() != MobType::MirrorImage) {
+            int d = PathFinder::distanceChebyshev(pos, otherMob->pos);
+            if (d < minDist && d <= 8) {
+                minDist = d;
+                closestEnemy = otherMob.get();
+            }
+        }
+    }
+
+    if (closestEnemy) {
+        enemy = closestEnemy;
+        target = closestEnemy->pos;
+        if (canAttack(closestEnemy)) {
+            int dmg = hero->damageRoll();
+            closestEnemy->damage(dmg, this);
+            FX::floatingText(closestEnemy->pos, std::to_string(dmg), 0xe43b44FF);
+            FX::burst(pos, 0x66ccffFF, 8);
+            die(this);
+            return;
+        } else {
+            getCloser(target);
+            spend(TICK);
+            return;
+        }
+    } else {
+        target = hero->pos;
+        if (PathFinder::distanceChebyshev(pos, hero->pos) > 1) {
+            getCloser(target);
+        }
+        spend(TICK);
+    }
 }
 
 } // namespace pd

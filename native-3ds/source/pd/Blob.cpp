@@ -158,6 +158,9 @@ void Blob::evolve(const Level* level) {
             if (cur[i] > 0) {
                 Char* ch = Actor::findChar(i);
                 if (ch && ch->isAlive()) {
+                    if (ch->buff(BuffType::GasesImmunity) != nullptr) {
+                        continue;
+                    }
                     if (type == BlobType::TOXIC_GAS) {
                         int levelDamage = 5 + Dungeon::depth * 5;
                         int dmg = (ch->HT + levelDamage) / 40;

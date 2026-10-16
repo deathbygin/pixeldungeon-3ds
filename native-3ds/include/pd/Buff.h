@@ -37,7 +37,9 @@ enum class BuffType {
     MindVision,
     Awareness,
     Weakness,
-    SoulMark
+    SoulMark,
+    GasesImmunity,
+    Rage
 };
 
 class Combo;
@@ -308,6 +310,19 @@ public:
     void attachTo(Char* ch) override;
 };
 
+class Rage : public FlavourBuff {
+public:
+    static constexpr BuffType STATIC_TYPE = BuffType::Rage;
+    static constexpr float DURATION = 10.0f;
+
+    BuffType type() const override { return STATIC_TYPE; }
+    std::string name() const override { return "Blinded with rage"; }
+    int icon() const override { return 20; }
+    std::string desc() const override;
+
+    void attachTo(Char* ch) override;
+};
+
 class Terror : public FlavourBuff {
 public:
     static constexpr BuffType STATIC_TYPE = BuffType::Terror;
@@ -436,6 +451,19 @@ public:
     BuffType type() const override { return STATIC_TYPE; }
     std::string name() const override { return "Awareness"; }
     int icon() const override { return -1; }
+    std::string desc() const override;
+
+    void attachTo(Char* ch) override;
+};
+
+class GasesImmunity : public FlavourBuff {
+public:
+    static constexpr BuffType STATIC_TYPE = BuffType::GasesImmunity;
+    static constexpr float DURATION = 20.0f;
+
+    BuffType type() const override { return STATIC_TYPE; }
+    std::string name() const override { return "Gas Immunity"; }
+    int icon() const override { return 30; }
     std::string desc() const override;
 
     void attachTo(Char* ch) override;

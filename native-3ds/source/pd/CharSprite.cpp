@@ -3,6 +3,7 @@
 #include "pd/Hero.h"
 #include "pd/Mob.h"
 #include "pd/Level.h"
+#include "pd/Dungeon.h"
 #include "pd/Assets.h"
 #include "noosa/Texture.h"
 #include <algorithm>
@@ -452,6 +453,24 @@ std::unique_ptr<CharSprite> CharSprite::createForMob(Mob* mob) {
             sprite->m_attack = noosa::Animation(1.0f / 12.0f, { 0 }, false);
             sprite->m_die = noosa::Animation(1.0f / 10.0f, { 0, 7, 8, 9 }, false);
             break;
+
+        case Mob::MobType::MirrorImage: {
+            std::string texPath = Assets::WARRIOR;
+            if (Dungeon::hero) {
+                switch (Dungeon::hero->heroClass) {
+                    case Hero::HeroClass::Warrior:  texPath = Assets::WARRIOR; break;
+                    case Hero::HeroClass::Mage:     texPath = Assets::MAGE; break;
+                    case Hero::HeroClass::Rogue:    texPath = Assets::ROGUE; break;
+                    case Hero::HeroClass::Huntress: texPath = Assets::HUNTRESS; break;
+                }
+            }
+            sprite->init(texPath, 12, 15);
+            sprite->m_idle = noosa::Animation(1.0f / 2.0f, { 0, 0, 0, 1 }, true);
+            sprite->m_run = noosa::Animation(1.0f / 10.0f, { 2, 3, 4, 5, 6, 7 }, true);
+            sprite->m_attack = noosa::Animation(1.0f / 15.0f, { 8, 9, 10, 0 }, false);
+            sprite->m_die = noosa::Animation(1.0f / 12.0f, { 11, 12, 13, 14 }, false);
+            break;
+        }
 
         default:
             sprite->init(Assets::RAT, 16, 15);

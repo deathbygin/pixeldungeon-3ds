@@ -466,6 +466,21 @@ void Amok::attachTo(Char* ch) {
 }
 
 // -----------------------------------------------------------------------------
+// Rage
+// -----------------------------------------------------------------------------
+std::string Rage::desc() const {
+    return "Blinded with rage, this creature will recklessly pursue and attack.";
+}
+
+void Rage::attachTo(Char* ch) {
+    target = ch;
+    Actor::add(this, DURATION);
+    if (target) {
+        FX::floatingText(target->pos, "rage", 0xff3333FF);
+    }
+}
+
+// -----------------------------------------------------------------------------
 // Terror
 // -----------------------------------------------------------------------------
 std::string Terror::desc() const {
@@ -661,6 +676,21 @@ void Awareness::attachTo(Char* ch) {
     Actor::add(this, DURATION);
     if (target) {
         FX::floatingText(target->pos, "aware", 0x56bb77FF);
+    }
+}
+
+// -----------------------------------------------------------------------------
+// GasesImmunity
+// -----------------------------------------------------------------------------
+std::string GasesImmunity::desc() const {
+    return "You are immune to toxic gas, paralytic vapors, and suffocating fumes.";
+}
+
+void GasesImmunity::attachTo(Char* ch) {
+    target = ch;
+    Actor::add(this, DURATION);
+    if (target) {
+        FX::floatingText(target->pos, "immune to gas", 0xffffffFF);
     }
 }
 

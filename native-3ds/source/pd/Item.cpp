@@ -1,5 +1,6 @@
 #include "pd/Item.h"
 #include "pd/Hero.h"
+#include "pd/Mob.h"
 #include "pd/CharSprite.h"
 #include "pd/Random.h"
 #include "pd/ItemSpriteSheet.h"
@@ -972,6 +973,10 @@ bool Potion::execute(Hero* hero, const std::string& action) {
         switch (type) {
             case PotionType::HEALING: {
                 hero->HP = hero->HT;
+                hero->removeBuff(BuffType::Poison);
+                hero->removeBuff(BuffType::Cripple);
+                hero->removeBuff(BuffType::Weakness);
+                hero->removeBuff(BuffType::Bleeding);
                 FX::floatingText(hero->pos, "HEALED", 0x38b764FF);
                 FX::burst(hero->pos, 0x38b764FF, 12);
                 GLog::p("Your wounds heal completely.");
@@ -981,71 +986,54 @@ bool Potion::execute(Hero* hero, const std::string& action) {
                 hero->STR += 1;
                 FX::floatingText(hero->pos, "+1 STR", 0xe4a672FF);
                 FX::burst(hero->pos, 0xe4a672FF, 8);
-                GLog::p("You feel stronger now!");
+                GLog::p("Newfound strength surges through your body.");
                 break;
             case PotionType::INVISIBILITY:
-                hero->invisible = 15;
+                hero->affect<Invisibility>();
                 FX::floatingText(hero->pos, "INVISIBLE", 0xa5cde4FF);
-                GLog::i("You vanish from sight!");
+                FX::burst(hero->pos, 0xa5cde4FF, 10);
+                GLog::i("You see your hands turn invisible!");
                 break;
             case PotionType::EXPERIENCE:
                 hero->earnExp(hero->maxExp - hero->exp);
                 FX::burst(hero->pos, 0xffd700FF, 10);
                 GLog::p("You feel more experienced!");
                 break;
-            case PotionType::TOXIC_GAS: {
-                FX::burst(hero->pos, 0x00ff00FF, 16);
-                hero->damage(Random::IntRange(3, 8), hero);
-                GLog::n("You choke on the noxious fumes!");
+            case PotionType::TOXIC_GAS:
+                shatter(hero->pos);
                 break;
-            }
-            case PotionType::LIQUID_FLAME: {
-                FX::burst(hero->pos, 0xff4500FF, 16);
-                hero->damage(Random::IntRange(4, 10), hero);
-                GLog::n("The liquid burns your throat and sets you ablaze!");
+            case PotionType::LIQUID_FLAME:
+                shatter(hero->pos);
                 break;
-            }
-            case PotionType::PARALYTIC_GAS: {
-                FX::burst(hero->pos, 0xffff00FF, 12);
-                hero->spend(5.0f * Actor::TICK);
-                GLog::n("You are paralyzed and unable to move!");
+            case PotionType::PARALYTIC_GAS:
+                shatter(hero->pos);
                 break;
-            }
-            case PotionType::FROST: {
-                FX::burst(hero->pos, 0x00ffffff, 12);
-                hero->damage(Random::IntRange(2, 6), hero);
-                GLog::n("Ice crystals freeze your innards!");
+            case PotionType::FROST:
+                shatter(hero->pos);
                 break;
-            }
-            case PotionType::LEVITATION: {
+            case PotionType::LEVITATION:
+                hero->affect<Levitation>();
                 FX::burst(hero->pos, 0xdda0ddFF, 8);
-                GLog::p("You begin floating gently in the air!");
+                GLog::p("You float into the air!");
                 break;
-            }
-            case PotionType::MIND_VISION: {
-                FX::burst(hero->pos, 0x9955ffFF, 12);
-                for (const auto& m : Dungeon::mobs) {
-                    if (m && m->isAlive()) {
-                        Dungeon::visible[m->pos] = true;
-                    }
-                }
+            case PotionType::MIND_VISION:
+                hero->affect<MindVision>();
                 Dungeon::observe();
+                FX::burst(hero->pos, 0x9955ffFF, 12);
                 GLog::p("You can sense the minds of creatures on this floor!");
                 break;
-            }
-            case PotionType::PURITY: {
+            case PotionType::PURITY:
+                hero->affect<GasesImmunity>();
                 FX::burst(hero->pos, 0xffffffFF, 12);
-                GLog::p("A pure aura washes away all impurities.");
+                GLog::w("You've stopped sensing any smells!");
                 break;
-            }
-            case PotionType::MIGHT: {
+            case PotionType::MIGHT:
                 hero->STR += 1;
                 hero->HT += 5;
                 hero->HP = std::min(hero->HT, hero->HP + 5);
                 FX::burst(hero->pos, 0xffd700FF, 12);
-                GLog::p("You feel a surge of extraordinary might!");
+                GLog::p("Newfound strength surges through your body.");
                 break;
-            }
         }
 
         quantity--;
@@ -1097,6 +1085,9 @@ void Potion::shatter(int cell) {
             if (Dungeon::visible[cell]) setKnown(type);
             FX::burst(cell, 0xff4500FF, 16);
             FX::seedBlob(cell, Blob::BlobType::FIRE, 4);
+            if (targetChar) {
+                targetChar->affect<Burning>();
+            }
             if (Dungeon::visible[cell]) {
                 GLog::i("The flask shatters and liquid flame bursts into a roaring inferno!");
             }
@@ -1113,28 +1104,82 @@ void Potion::shatter(int cell) {
         }
         case PotionType::FROST: {
             if (Dungeon::visible[cell]) setKnown(type);
-            FX::burst(cell, 0x00ffffff, 16);
-            if (Dungeon::visible[cell]) {
-                GLog::i("The flask shatters and freezing frost encases the area!");
-            }
-            // Freeze target and adjacent cells
-            for (int dy = -1; dy <= 1; ++dy) {
-                for (int dx = -1; dx <= 1; ++dx) {
-                    int c = cell + dy * Level::WIDTH + dx;
-                    if (c >= 0 && c < Level::LENGTH) {
+            Blob* fire = FX::getBlob(Blob::BlobType::FIRE);
+            int cx = cell % Level::WIDTH;
+            int cy = cell / Level::WIDTH;
+            for (int dy = -2; dy <= 2; ++dy) {
+                for (int dx = -2; dx <= 2; ++dx) {
+                    if (std::abs(dx) + std::abs(dy) > 3) continue;
+                    int nx = cx + dx;
+                    int ny = cy + dy;
+                    if (nx >= 0 && nx < Level::WIDTH && ny >= 0 && ny < Level::HEIGHT) {
+                        int c = ny * Level::WIDTH + nx;
+                        if (fire && fire->cur[c] > 0) {
+                            fire->volume -= fire->cur[c];
+                            fire->cur[c] = 0;
+                        }
                         Char* ch = Actor::findChar(c);
                         if (ch) {
                             ch->affect<Frost>();
-                            ch->damage(Random::IntRange(3, 8), Dungeon::hero.get());
+                        }
+                        if (Dungeon::visible[c]) {
+                            FX::burst(c, 0x00ffffff, 4);
                         }
                     }
                 }
+            }
+            if (Dungeon::visible[cell]) {
+                GLog::i("The flask shatters and freezing frost encases the area!");
+            }
+            break;
+        }
+        case PotionType::PURITY: {
+            Blob* toxic = FX::getBlob(Blob::BlobType::TOXIC_GAS);
+            Blob* para = FX::getBlob(Blob::BlobType::PARALYTIC_GAS);
+            int cx = cell % Level::WIDTH;
+            int cy = cell / Level::WIDTH;
+            bool procd = false;
+            for (int dy = -2; dy <= 2; ++dy) {
+                for (int dx = -2; dx <= 2; ++dx) {
+                    if (std::abs(dx) + std::abs(dy) > 3) continue;
+                    int nx = cx + dx;
+                    int ny = cy + dy;
+                    if (nx >= 0 && nx < Level::WIDTH && ny >= 0 && ny < Level::HEIGHT) {
+                        int c = ny * Level::WIDTH + nx;
+                        if (toxic && toxic->cur[c] > 0) {
+                            toxic->volume -= toxic->cur[c];
+                            toxic->cur[c] = 0;
+                            procd = true;
+                        }
+                        if (para && para->cur[c] > 0) {
+                            para->volume -= para->cur[c];
+                            para->cur[c] = 0;
+                            procd = true;
+                        }
+                        if (Dungeon::visible[c]) {
+                            FX::burst(c, 0xffffffFF, 2);
+                        }
+                    }
+                }
+            }
+            if (Dungeon::visible[cell] || procd) {
+                setKnown(type);
+            }
+            int hx = Dungeon::hero->pos % Level::WIDTH;
+            int hy = Dungeon::hero->pos / Level::WIDTH;
+            if (std::abs(hx - cx) <= 2 && std::abs(hy - cy) <= 2) {
+                GLog::p("You feel uncommon freshness in the air.");
+                setKnown(type);
             }
             break;
         }
         case PotionType::HEALING: {
             if (targetChar) {
                 targetChar->HP = targetChar->HT;
+                targetChar->removeBuff(BuffType::Poison);
+                targetChar->removeBuff(BuffType::Cripple);
+                targetChar->removeBuff(BuffType::Weakness);
+                targetChar->removeBuff(BuffType::Bleeding);
                 FX::burst(cell, 0x38b764FF, 12);
                 FX::floatingText(cell, "HEALED", 0x38b764FF);
                 if (Dungeon::visible[cell]) setKnown(type);
@@ -1351,20 +1396,48 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
         updatePerception();
 
         switch (type) {
-            case ScrollType::IDENTIFY:
+            case ScrollType::IDENTIFY: {
+                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_READ).get());
+                FX::burst(hero->pos, 0x00ffffFFu, 12);
+                bool found = false;
+                for (auto& item : hero->belongings.backpack) {
+                    if (item && !item->isIdentified()) {
+                        item->identify();
+                        FX::floatingText(hero->pos, "IDENTIFIED", 0x00ffffFFu);
+                        GLog::i("It is " + item->displayName() + "!");
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    if (hero->belongings.equippedWeapon && !hero->belongings.equippedWeapon->isIdentified()) {
+                        hero->belongings.equippedWeapon->identify();
+                        GLog::i("It is " + hero->belongings.equippedWeapon->displayName() + "!");
+                    } else if (hero->belongings.equippedArmor && !hero->belongings.equippedArmor->isIdentified()) {
+                        hero->belongings.equippedArmor->identify();
+                        GLog::i("It is " + hero->belongings.equippedArmor->displayName() + "!");
+                    } else {
+                        GLog::i("You have nothing to identify.");
+                    }
+                }
                 break;
+            }
             case ScrollType::UPGRADE:
+                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_READ).get());
                 if (hero->belongings.equippedWeapon) {
                     hero->belongings.equippedWeapon->upgrade();
                     FX::burst(hero->pos, 0xffd700FF, 10);
                     FX::floatingText(hero->pos, "+1 LVL", 0xffd700FF);
+                    GLog::p("Your weapon glows and grows sharper!");
                 } else if (hero->belongings.equippedArmor) {
                     hero->belongings.equippedArmor->upgrade();
                     FX::burst(hero->pos, 0xffd700FF, 10);
                     FX::floatingText(hero->pos, "+1 LVL", 0xffd700FF);
+                    GLog::p("Your armor glows and reinforces!");
                 }
                 break;
             case ScrollType::TELEPORTATION: {
+                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_READ).get());
                 if (Dungeon::level) {
                     for (int tries = 0; tries < 100; ++tries) {
                         int cell = Random::Int(Level::LENGTH);
@@ -1373,6 +1446,7 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
                             hero->place(cell);
                             FX::burst(hero->pos, 0x9955ffFF, 8);
                             Dungeon::observe();
+                            GLog::p("You feel a sudden shift in space!");
                             break;
                         }
                     }
@@ -1380,6 +1454,7 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
                 break;
             }
             case ScrollType::MAGIC_MAPPING: {
+                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_READ).get());
                 if (Dungeon::level) {
                     for (int i = 0; i < Level::LENGTH; ++i) {
                         if (Dungeon::level->map[i] != Terrain::WALL) {
@@ -1403,12 +1478,21 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
                     hero->belongings.equippedArmor->cursed = false;
                     procced = true;
                 }
+                if (hero->belongings.equippedRing1 && hero->belongings.equippedRing1->cursed) {
+                    hero->belongings.equippedRing1->cursed = false;
+                    procced = true;
+                }
+                if (hero->belongings.equippedRing2 && hero->belongings.equippedRing2->cursed) {
+                    hero->belongings.equippedRing2->cursed = false;
+                    procced = true;
+                }
                 for (auto& item : hero->belongings.backpack) {
                     if (item && item->cursed) {
                         item->cursed = false;
                         procced = true;
                     }
                 }
+                hero->removeBuff(BuffType::Weakness);
                 noosa::Audio::play(noosa::Audio::getSample(Assets::SND_READ).get());
                 FX::burst(hero->pos, 0xdda0ddFFu, 16);
                 if (procced) {
@@ -1418,51 +1502,144 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
                 }
                 break;
             }
-            case ScrollType::RECHARGING:
-                FX::burst(hero->pos, 0x55ffaaFF, 8);
-                GLog::p("A surge of magical energy courses through your belongings!");
+            case ScrollType::RECHARGING: {
+                int count = 0;
+                if (hero->belongings.equippedWeapon) {
+                    if (auto* w = hero->belongings.equippedWeapon->asWand()) {
+                        if (w->curCharges < w->maxCharges) {
+                            w->curCharges = w->maxCharges;
+                            count++;
+                        }
+                    }
+                }
+                for (auto& item : hero->belongings.backpack) {
+                    if (item) {
+                        if (auto* w = item->asWand()) {
+                            if (w->curCharges < w->maxCharges) {
+                                w->curCharges = w->maxCharges;
+                                count++;
+                            }
+                        }
+                    }
+                }
+                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_READ).get());
+                FX::burst(hero->pos, 0x55ffaaFF, 15);
+                if (count > 0) {
+                    GLog::i("A surge of energy courses through your pack, recharging your wand" + std::string(count > 1 ? "s" : "") + "!");
+                } else {
+                    GLog::i("A surge of energy courses through your pack, but nothing happens.");
+                }
                 break;
-            case ScrollType::CHALLENGE:
+            }
+            case ScrollType::CHALLENGE: {
+                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CHALLENGE).get());
                 FX::burst(hero->pos, 0xff0000FF, 16);
-                GLog::w("A deafening roar echoes through the dungeon!");
+                GLog::w("The scroll emits a challenging roar that echoes throughout the dungeon!");
                 for (auto& m : Dungeon::mobs) {
                     if (m && m->isAlive()) {
-                        m->state = Mob::State::HUNTING;
+                        m->removeBuff(BuffType::Sleep);
+                        m->beckon(hero->pos);
+                        if (Dungeon::visible[m->pos]) {
+                            m->affect<Rage>();
+                        }
                     }
                 }
                 break;
-            case ScrollType::TERROR:
-                FX::burst(hero->pos, 0x550055FF, 16);
-                GLog::w("Creatures flee in terror from your terrifying presence!");
+            }
+            case ScrollType::TERROR: {
+                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_READ).get());
+                FX::burst(hero->pos, 0xff0000FF, 16);
+                int count = 0;
+                std::string affectedName = "";
                 for (auto& m : Dungeon::mobs) {
                     if (m && m->isAlive() && Dungeon::visible[m->pos]) {
-                        m->state = Mob::State::FLEEING;
+                        m->affect<Terror>();
+                        count++;
+                        affectedName = m->name;
                     }
                 }
+                if (count == 0) {
+                    GLog::i("The scroll emits a brilliant flash of red light.");
+                } else if (count == 1) {
+                    GLog::i("The scroll emits a brilliant flash of red light and the " + affectedName + " flees!");
+                } else {
+                    GLog::i("The scroll emits a brilliant flash of red light and the monsters flee!");
+                }
                 break;
-            case ScrollType::LULLABY:
+            }
+            case ScrollType::LULLABY: {
+                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_LULLABY).get());
                 FX::burst(hero->pos, 0x6699ffFF, 12);
-                GLog::i("A soothing melody lulls nearby creatures to sleep.");
+                int count = 0;
+                std::string affectedName = "";
                 for (auto& m : Dungeon::mobs) {
                     if (m && m->isAlive() && Dungeon::visible[m->pos]) {
-                        m->state = Mob::State::SLEEPING;
+                        m->affect<Sleep>();
+                        count++;
+                        affectedName = m->name;
                     }
                 }
+                if (count == 0) {
+                    GLog::i("The scroll utters a soothing melody.");
+                } else if (count == 1) {
+                    GLog::i("The scroll utters a soothing melody and the " + affectedName + " falls asleep!");
+                } else {
+                    GLog::i("The scroll utters a soothing melody and the monsters fall asleep!");
+                }
                 break;
-            case ScrollType::PSIONIC_BLAST:
+            }
+            case ScrollType::PSIONIC_BLAST: {
+                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_BLAST).get());
                 FX::burst(hero->pos, 0xffffffFF, 20);
                 GLog::w("A burst of psychic energy explodes around you!");
                 for (auto& m : Dungeon::mobs) {
                     if (m && m->isAlive() && Dungeon::visible[m->pos]) {
-                        m->damage(Random::IntRange(10, 25), hero);
+                        m->affect<Blindness>();
+                        m->damage(Random::IntRange(1, std::max(1, m->HT * 2 / 3)), hero);
                     }
                 }
+                hero->affect<Blindness>();
+                Dungeon::observe();
                 break;
-            case ScrollType::MIRROR_IMAGE:
+            }
+            case ScrollType::MIRROR_IMAGE: {
+                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_READ).get());
                 FX::burst(hero->pos, 0x00ffffFF, 12);
                 GLog::p("Illusory mirror images appear to aid you!");
+
+                std::vector<int> respawnPoints;
+                static const int NEIGHBOURS8[] = {
+                    -1 - Level::WIDTH, 0 - Level::WIDTH, 1 - Level::WIDTH,
+                    -1,                                  1,
+                    -1 + Level::WIDTH, 0 + Level::WIDTH, 1 + Level::WIDTH
+                };
+                for (int d : NEIGHBOURS8) {
+                    int p = hero->pos + d;
+                    if (p >= 0 && p < Level::LENGTH && Dungeon::level && Dungeon::level->isPassable(p) && !Actor::findChar(p)) {
+                        respawnPoints.push_back(p);
+                    }
+                }
+
+                int nImages = 3;
+                while (nImages > 0 && !respawnPoints.empty()) {
+                    int idx = Random::Int(static_cast<int>(respawnPoints.size()));
+                    int p = respawnPoints[idx];
+                    respawnPoints.erase(respawnPoints.begin() + idx);
+
+                    auto img = std::make_unique<MirrorImage>();
+                    img->HP = img->HT = 1;
+                    img->move(p);
+                    img->state = Mob::State::HUNTING;
+                    Actor::occupyCell(img.get());
+                    Actor::add(img.get(), 1.0f);
+                    FX::burst(p, 0x00ffffff, 8);
+                    Dungeon::mobs.push_back(std::move(img));
+                    nImages--;
+                }
                 break;
+            }
             case ScrollType::ENCHANTMENT:
+                noosa::Audio::play(noosa::Audio::getSample(Assets::SND_READ).get());
                 if (hero->belongings.equippedWeapon) {
                     hero->belongings.equippedWeapon->upgrade();
                     FX::burst(hero->pos, 0xff00ffFF, 16);

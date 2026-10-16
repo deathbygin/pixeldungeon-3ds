@@ -42,7 +42,8 @@ public:
         Tengu,
         DM300,
         King,
-        Yog
+        Yog,
+        MirrorImage
     };
 
     State state = State::SLEEPING;
@@ -380,6 +381,17 @@ public:
     void damage(int dmg, Actor* src) override;
     void aiStep(Hero* hero, Level* currentLevel) override;
     void die(Actor* src) override;
+};
+
+class MirrorImage : public Mob {
+public:
+    MirrorImage();
+    MobType mobType() const override { return MobType::MirrorImage; }
+    std::string description() const override;
+    void aiStep(Hero* hero, Level* currentLevel) override;
+    void damage(int dmg, Actor* src) override;
+    int attackSkill(Char* target) override;
+    int defenseSkill(Char* attacker) override;
 };
 
 } // namespace pd

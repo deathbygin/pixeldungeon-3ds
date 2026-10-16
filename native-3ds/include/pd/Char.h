@@ -62,6 +62,12 @@ public:
 
     void addBuff(Buff* b);
     void removeBuff(Buff* b);
+    void removeBuff(BuffType type);
+
+    template<typename T>
+    void removeBuff() {
+        removeBuff(T::STATIC_TYPE);
+    }
 
     Buff* buff(BuffType type) const;
 
