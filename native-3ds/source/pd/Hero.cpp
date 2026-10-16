@@ -360,6 +360,11 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
     }
 
     if (currentLevel->isPassable(nextCell)) {
+        int fromCell = pos;
+        if (nextCell != fromCell) {
+            enableAutoPick(fromCell);
+        }
+
         move(nextCell);
         spend(TICK / speed());
         next();
@@ -388,7 +393,11 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
         Heap* heap = currentLevel->getHeap(nextCell);
         if (heap && !heap->isEmpty() && heap->type == Heap::Type::HEAP) {
             Item* item = heap->peek();
-            if (pickUp(currentLevel, false)) {
+            if (isAutoPickDisabled(nextCell)) {
+                if (item) {
+                    GLog::i("You see " + item->displayName() + " lying here.");
+                }
+            } else if (pickUp(currentLevel, false)) {
                 m_lastStepPickedUp = true;
             } else if (item) {
                 GLog::i("You see " + item->displayName() + " lying here.");
@@ -499,6 +508,7 @@ bool Hero::pickUp(Level* currentLevel, bool spendTurn) {
 
     if (heap->isEmpty()) {
         currentLevel->removeHeap(heap);
+        enableAutoPick(pos);
     } else {
         GLog::i("There is something else lying here.");
     }

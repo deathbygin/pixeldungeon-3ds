@@ -63,6 +63,12 @@ public:
     bool search(Level* currentLevel, bool intentional = true);
 
     bool m_lastStepPickedUp = false;
+    int m_autoPickDisabledCell = -1;
+
+    void disableAutoPick(int cell) { m_autoPickDisabledCell = cell; }
+    void enableAutoPick(int cell) { if (m_autoPickDisabledCell == cell) m_autoPickDisabledCell = -1; }
+    bool isAutoPickDisabled(int cell) const { return m_autoPickDisabledCell == cell; }
+    void clearAutoPickDisabled() { m_autoPickDisabledCell = -1; }
 
     bool shoot(Char* enemy, MissileWeapon* wep);
 

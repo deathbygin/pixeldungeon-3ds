@@ -5,6 +5,7 @@
 #include "pd/Random.h"
 #include "pd/FX.h"
 #include "pd/Dungeon.h"
+#include "pd/Hero.h"
 #include "pd/Char.h"
 #include "pd/Mob.h"
 #include "pd/Traps.h"
@@ -540,6 +541,10 @@ Heap* Level::drop(std::unique_ptr<Item> item, int cell) {
         heaps.push_back(std::move(newHeap));
     }
     h->drop(std::move(item));
+
+    if (Dungeon::hero && cell == Dungeon::hero->pos) {
+        Dungeon::hero->disableAutoPick(cell);
+    }
 
     press(cell, nullptr);
 

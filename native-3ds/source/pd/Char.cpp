@@ -67,6 +67,8 @@ void Char::place(int cell) {
     }
     if (this != Dungeon::hero.get()) {
         spriteVisible = (pos >= 0 && pos < Level::LENGTH) ? Dungeon::visible[pos] : false;
+    } else if (Dungeon::hero) {
+        Dungeon::hero->clearAutoPickDisabled();
     }
 }
 
