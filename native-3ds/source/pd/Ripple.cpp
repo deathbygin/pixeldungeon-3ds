@@ -22,6 +22,7 @@ void Ripple::reset(int cell) {
     sprite->scale.x = 0.0f;
     sprite->scale.y = 0.0f;
     sprite->alpha = 1.0f;
+    sprite->z = 0.27f;
     sprite->visible = true;
 }
 

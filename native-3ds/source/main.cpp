@@ -952,6 +952,9 @@ int main(int argc, char* argv[]) {
                 }
             }
 
+            // Render Ground FX (Water ripples & search checked cell highlights)
+            FX::drawGround(&topCamera);
+
             // Render Mobs (strictly visible in hero's field of view / line of sight)
             for (const auto& mob : Dungeon::mobs) {
                 if (mob) {

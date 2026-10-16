@@ -22,6 +22,7 @@ void Wound::reset(int cell) {
     sprite->scale.x = 2.0f;
     sprite->scale.y = 1.0f;
     sprite->alpha = 1.0f;
+    sprite->z = 0.76f;
     sprite->visible = true;
 }
 

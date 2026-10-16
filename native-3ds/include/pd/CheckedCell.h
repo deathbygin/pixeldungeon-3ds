@@ -11,6 +11,7 @@ public:
 
     bool active = false;
     float time = 0.0f;
+    int cell = -1;
     float cx = 0.0f;
     float cy = 0.0f;
 

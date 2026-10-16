@@ -28,6 +28,7 @@ public:
     static void clear();
     static void update(float dt);
     static void draw(const noosa::Camera* camera, C2D_TextBuf textBuf);
+    static void drawGround(const noosa::Camera* camera);
 
     // Spawners
     static void splash(int cell, uint32_t color = 0x73eff7FF, int count = 8);

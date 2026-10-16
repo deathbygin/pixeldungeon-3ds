@@ -4,11 +4,12 @@
 
 namespace pd {
 
-void CheckedCell::reset(int cell) {
+void CheckedCell::reset(int c) {
     active = true;
     time = LIFESPAN;
-    cx = (cell % Level::WIDTH) * 16.0f + 8.0f;
-    cy = (cell / Level::WIDTH) * 16.0f + 8.0f;
+    cell = c;
+    cx = (c % Level::WIDTH) * 16.0f + 8.0f;
+    cy = (c / Level::WIDTH) * 16.0f + 8.0f;
 }
 
 void CheckedCell::update(float dt) {
@@ -17,32 +18,34 @@ void CheckedCell::update(float dt) {
     time -= dt;
     if (time <= 0.0f) {
         active = false;
+        cell = -1;
     }
 }
 
 void CheckedCell::draw(const noosa::Camera* camera) const {
     if (!active || time <= 0.0f) return;
 
-    float p = time / LIFESPAN;
-    float currentSize = 16.0f * p;
+    // Authentic Pixel Dungeon visual parity:
+    // Solid 0xFF55AAFF quad, scale = 16.0f * alpha, alpha fading from 0.8f down to 0.0f over LIFESPAN (0.8s)
+    float currentSize = 16.0f * time;
     float half = currentSize * 0.5f;
 
     float drawX = cx - half;
     float drawY = cy - half;
+    float scrSize = currentSize;
 
     if (camera) {
         float scrCX, scrCY;
         camera->worldToScreen(cx, cy, scrCX, scrCY);
         float zoom = camera->getZoom();
-        currentSize *= zoom;
-        half = currentSize * 0.5f;
-        drawX = scrCX - half;
-        drawY = scrCY - half;
+        scrSize = currentSize * zoom;
+        drawX = scrCX - scrSize * 0.5f;
+        drawY = scrCY - scrSize * 0.5f;
     }
 
-    uint8_t a = static_cast<uint8_t>(std::clamp(p * 200.0f, 0.0f, 255.0f));
+    uint8_t a = static_cast<uint8_t>(std::clamp(time * 255.0f, 0.0f, 255.0f));
     u32 color = C2D_Color32(0x55, 0xaa, 0xff, a);
-    C2D_DrawRectSolid(drawX, drawY, 0.4f, currentSize, currentSize, color);
+    C2D_DrawRectSolid(drawX, drawY, 0.28f, scrSize, scrSize, color);
 }
 
 } // namespace pd

@@ -91,11 +91,13 @@ void FX::update(float dt) {
     }
 }
 
-void FX::draw(const noosa::Camera* camera, C2D_TextBuf textBuf) {
-    // 1. Water ripples & search highlights (drawn under characters)
+void FX::drawGround(const noosa::Camera* camera) {
+    // Ground FX: Water ripples & search checked cell highlights (drawn between tiles/heaps and characters)
     for (auto& r : s_ripples) if (r.active) r.draw(camera);
     for (auto& c : s_checked) if (c.active) c.draw(camera);
+}
 
+void FX::draw(const noosa::Camera* camera, C2D_TextBuf textBuf) {
     // 2. Melee wound slashes
     for (auto& w : s_wounds)  if (w.active) w.draw(camera);
 
@@ -150,11 +152,24 @@ void FX::ripple(int cell) {
 void FX::searchCell(int cell) {
     if (cell < 0 || cell >= Level::LENGTH) return;
     for (auto& c : s_checked) {
+        if (c.active && c.cell == cell) {
+            c.reset(cell);
+            return;
+        }
+    }
+    for (auto& c : s_checked) {
         if (!c.active) {
             c.reset(cell);
             return;
         }
     }
+    CheckedCell* oldest = &s_checked[0];
+    for (auto& c : s_checked) {
+        if (c.time < oldest->time) {
+            oldest = &c;
+        }
+    }
+    oldest->reset(cell);
 }
 
 void FX::floatingText(int cell, const std::string& str, uint32_t color) {
