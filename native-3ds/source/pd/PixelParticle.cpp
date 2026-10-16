@@ -39,7 +39,7 @@ void PixelParticle::draw(const noosa::Camera* camera) const {
 
     float p = left / lifespan;
     float curSize = shrinking ? (size * p) : size;
-    if (curSize < 0.5f) curSize = 0.5f;
+    if (curSize < 1.0f) curSize = 1.0f;
 
     float drawX = pos.x;
     float drawY = pos.y;
@@ -51,14 +51,16 @@ void PixelParticle::draw(const noosa::Camera* camera) const {
         curSize *= zoom;
     }
 
-    // Extract RGB from color and modulate alpha with p
-    uint8_t a = static_cast<uint8_t>(std::clamp(p * 255.0f, 0.0f, 255.0f));
+    // Authentic Pixel Dungeon alpha envelope: rapid fade in, sustained bright body, gentle fade out
+    float alphaFactor = (p > 0.85f) ? ((1.0f - p) * 6.67f) : ((p < 0.20f) ? (p * 5.0f) : 1.0f);
+    uint8_t a = static_cast<uint8_t>(std::clamp(alphaFactor * 255.0f, 0.0f, 255.0f));
     uint8_t r = static_cast<uint8_t>((color >> 24) & 0xFF);
     uint8_t g = static_cast<uint8_t>((color >> 16) & 0xFF);
     uint8_t b = static_cast<uint8_t>((color >> 8) & 0xFF);
 
     u32 finalColor = C2D_Color32(r, g, b, a);
-    C2D_DrawRectSolid(drawX, drawY, 0.5f, curSize, curSize, finalColor);
+    // Depth 0.78f ensures particles render in front of characters (0.60f) and Fog of War (0.65f)
+    C2D_DrawRectSolid(drawX - curSize * 0.5f, drawY - curSize * 0.5f, 0.78f, curSize, curSize, finalColor);
 }
 
 } // namespace pd

@@ -18,7 +18,7 @@ class Level;
 
 class FX {
 public:
-    static constexpr size_t MAX_PARTICLES = 256;
+    static constexpr size_t MAX_PARTICLES = 512;
     static constexpr size_t MAX_RIPPLES   = 16;
     static constexpr size_t MAX_CHECKED   = 64;
     static constexpr size_t MAX_WOUNDS    = 16;

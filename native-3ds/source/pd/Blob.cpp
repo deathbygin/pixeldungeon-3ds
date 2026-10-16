@@ -377,7 +377,8 @@ bool Freezing::affect(int cell, Blob* fire) {
     }
 
     if (Dungeon::visible[cell]) {
-        FX::burst(cell, 0xd0f0ffFF, 6, 20.0f, 50.0f, 20.0f);
+        FX::burst(cell, 0xd0f0ffFF, 6, 20.0f, 50.0f, 30.0f);
+        FX::burst(cell, 0xffffffff, 4, 15.0f, 40.0f, 25.0f);
         return true;
     }
     return false;

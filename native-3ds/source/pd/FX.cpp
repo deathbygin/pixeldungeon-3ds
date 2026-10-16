@@ -2,6 +2,7 @@
 #include "pd/Dungeon.h"
 #include "pd/Random.h"
 #include "pd/MissileSprite.h"
+#include "pd/Buff.h"
 #include <cmath>
 
 namespace pd {
@@ -65,109 +66,170 @@ void FX::update(float dt) {
 
     // Periodic ambient particle emission for active blobs in player FOV (matching BlobEmitter)
     s_blobEmitTimer += dt;
-    if (s_blobEmitTimer >= 0.05f) {
+    if (s_blobEmitTimer >= 0.03f) {
         s_blobEmitTimer = 0.0f;
 
-        auto emitBlobParticles = [](const Blob& blob) {
+        auto spawnParticle = [](float wx, float wy, uint32_t col, float sz, float life,
+                                float vx, float vy, float ax, float ay, bool shrink) {
+            for (auto& p : s_particles) {
+                if (!p.active) {
+                    p.reset(wx, wy, col, sz, life, vx, vy, ax, ay, shrink);
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        // 1. FIRE: 1:1 with Java Fire.use(BlobEmitter) and FlameParticle
+        // In original Pixel Dungeon, every visible burning tile emits particles each tick.
+        // If cur[i] >= 3, emit 2 particles for an extra-dense core body matching original graphics.
+        if (s_fire.volume > 0) {
+            static const uint32_t flameCols[] = {
+                0xFFFFFFFF, // Brilliant incandescent white core
+                0xFFFF66FF, // Electric hot yellow
+                0xFFEE22FF, // Golden amber
+                0xFF9911FF, // Vibrant fiery orange
+                0xEE4411FF, // Deep flame red-orange
+                0xFF7711FF  // Pure flame orange
+            };
+            for (int i = 0; i < Level::LENGTH; ++i) {
+                if (s_fire.cur[i] > 0 && Dungeon::visible[i]) {
+                    int count = (s_fire.cur[i] >= 3) ? 2 : 1;
+                    for (int c = 0; c < count; ++c) {
+                        float wx = (i % Level::WIDTH) * 16.0f + Random::Float(1.0f, 15.0f);
+                        float wy = (i / Level::WIDTH) * 16.0f + Random::Float(1.0f, 15.0f);
+                        uint32_t col = flameCols[Random::Int(6)];
+                        float sz = Random::Float(3.0f, 4.5f);
+                        float life = Random::Float(0.45f, 0.65f);
+                        float vx = Random::Float(-5.0f, 5.0f);
+                        float vy = Random::Float(-35.0f, -65.0f);
+                        float ay = -80.0f; // Rapid buoyant upward acceleration matching FlameParticle
+                        if (!spawnParticle(wx, wy, col, sz, life, vx, vy, 0.0f, ay, true)) {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. GAS BLOBS: 1:1 with Java ToxicGas/ParalyticGas/ConfusionGas pour(Speck)
+        // Gases use steady density-scaled emission of billowing specks that drift and fade.
+        auto emitGasBlob = [&](const Blob& blob) {
             if (blob.volume <= 0) return;
             for (int i = 0; i < Level::LENGTH; ++i) {
                 if (blob.cur[i] > 0 && Dungeon::visible[i]) {
-                    // Density-scaled emission probability:
-                    // Dense blobs emit frequently, dissipating blobs emit occasionally
-                    float prob = std::clamp(static_cast<float>(blob.cur[i]) / 25.0f, 0.08f, 0.45f);
+                    float prob = (blob.cur[i] >= 100) ? 0.35f : std::clamp(static_cast<float>(blob.cur[i]) / 100.0f, 0.08f, 0.35f);
                     if (Random::Float() < prob) {
                         float wx = (i % Level::WIDTH) * 16.0f + Random::Float(1.0f, 15.0f);
                         float wy = (i / Level::WIDTH) * 16.0f + Random::Float(1.0f, 15.0f);
 
-                        uint32_t col = blob.getParticleColor();
-                        float sz = 3.5f;
-                        float life = 0.6f;
-                        float vx = Random::Float(-6.0f, 6.0f);
-                        float vy = Random::Float(-10.0f, 0.0f);
-                        float ax = 0.0f;
-                        float ay = 0.0f;
+                        uint32_t col = 0xFFFFFFFF;
+                        float sz = 4.0f;
+                        float life = 1.0f;
+                        float vx = 0.0f, vy = 0.0f, ax = 0.0f, ay = 0.0f;
+                        bool shrink = false;
 
                         switch (blob.type) {
-                        case Blob::BlobType::FIRE: {
-                            static const uint32_t flameCols[] = { 0xee7722FF, 0xff9922FF, 0xffcc22FF, 0xff5511FF };
-                            col = flameCols[Random::Int(4)];
-                            sz = Random::Float(3.0f, 5.0f);
-                            life = Random::Float(0.40f, 0.65f);
-                            vx = Random::Float(-5.0f, 5.0f);
-                            vy = Random::Float(-30.0f, -55.0f);
-                            ay = -80.0f; // Rapid upward acceleration
-                            break;
-                        }
                         case Blob::BlobType::TOXIC_GAS: {
-                            static const uint32_t toxicCols[] = { 0x50ff60FF, 0x38b764FF, 0x66ff88FF };
-                            col = toxicCols[Random::Int(3)];
+                            static const uint32_t toxicCols[] = { 0x50FF60FF, 0x38B764FF, 0x66FF88FF, 0x88FF66FF };
+                            col = toxicCols[Random::Int(4)];
                             sz = Random::Float(3.5f, 5.5f);
-                            life = Random::Float(0.7f, 1.3f);
-                            vx = Random::Float(-6.0f, 6.0f);
+                            life = Random::Float(0.9f, 1.6f);
+                            vx = Random::Float(-5.0f, 5.0f);
                             vy = Random::Float(-6.0f, 2.0f);
                             ay = -3.0f;
                             break;
                         }
                         case Blob::BlobType::PARALYTIC_GAS: {
-                            static const uint32_t paraCols[] = { 0xffff66FF, 0xe4d83bFF, 0xffee88FF };
-                            col = paraCols[Random::Int(3)];
+                            static const uint32_t paraCols[] = { 0xFFFF66FF, 0xE4D83BFF, 0xFFEE88FF, 0xFFF899FF };
+                            col = paraCols[Random::Int(4)];
                             sz = Random::Float(3.5f, 5.5f);
-                            life = Random::Float(0.7f, 1.3f);
-                            vx = Random::Float(-5.0f, 5.0f);
+                            life = Random::Float(0.9f, 1.6f);
+                            vx = Random::Float(-4.0f, 4.0f);
                             vy = Random::Float(-5.0f, 2.0f);
                             ay = -2.0f;
                             break;
                         }
                         case Blob::BlobType::CONFUSION_GAS: {
-                            static const uint32_t confCols[] = { 0xbf55ecFF, 0x33ccffFF, 0xff66ccFF, 0xee82eeFF };
-                            col = confCols[Random::Int(4)];
-                            sz = Random::Float(3.0f, 5.0f);
-                            life = Random::Float(0.6f, 1.1f);
-                            vx = Random::Float(-8.0f, 8.0f);
-                            vy = Random::Float(-8.0f, 3.0f);
+                            static const uint32_t confCols[] = { 0xBF55ECFF, 0x33CCFFFF, 0xFF66CCFF, 0xEE82EEFF, 0xFFAAFFFF };
+                            col = confCols[Random::Int(5)];
+                            sz = Random::Float(3.5f, 5.5f);
+                            life = Random::Float(0.8f, 1.4f);
+                            vx = Random::Float(-6.0f, 6.0f);
+                            vy = Random::Float(-6.0f, 3.0f);
+                            ay = 0.0f;
                             break;
                         }
                         case Blob::BlobType::CORROSIVE_GAS: {
-                            static const uint32_t corrCols[] = { 0x22aa44FF, 0x88bb22FF, 0x448822FF, 0x55aa33FF };
+                            static const uint32_t corrCols[] = { 0x22AA44FF, 0x88BB22FF, 0x448822FF, 0x55AA33FF };
                             col = corrCols[Random::Int(4)];
                             sz = Random::Float(3.0f, 5.0f);
-                            life = Random::Float(0.6f, 1.0f);
-                            vx = Random::Float(-6.0f, 6.0f);
+                            life = Random::Float(0.7f, 1.2f);
+                            vx = Random::Float(-5.0f, 5.0f);
                             vy = Random::Float(-8.0f, -2.0f);
-                            ay = -8.0f;
+                            ay = -6.0f;
                             break;
                         }
                         case Blob::BlobType::REGROWTH: {
-                            static const uint32_t leafCols[] = { 0x44aa33FF, 0x66bb44FF, 0x227711FF };
+                            static const uint32_t leafCols[] = { 0x44AA33FF, 0x66BB44FF, 0x227711FF };
                             col = leafCols[Random::Int(3)];
                             sz = Random::Float(2.5f, 3.5f);
                             life = Random::Float(0.7f, 1.1f);
-                            vx = Random::Float(-8.0f, 8.0f);
-                            vy = Random::Float(-12.0f, -4.0f);
-                            ay = 25.0f; // Flutter downwards
+                            vx = Random::Float(-6.0f, 6.0f);
+                            vy = Random::Float(-10.0f, -3.0f);
+                            ay = 20.0f;
+                            shrink = true;
                             break;
                         }
                         default:
                             break;
                         }
 
-                        for (auto& p : s_particles) {
-                            if (!p.active) {
-                                p.reset(wx, wy, col, sz, life, vx, vy, ax, ay, true);
-                                break;
-                            }
-                        }
+                        spawnParticle(wx, wy, col, sz, life, vx, vy, ax, ay, shrink);
                     }
                 }
             }
         };
 
-        emitBlobParticles(s_fire);
-        emitBlobParticles(s_toxicGas);
-        emitBlobParticles(s_paralyticGas);
-        emitBlobParticles(s_confusionGas);
-        emitBlobParticles(s_corrosiveGas);
-        emitBlobParticles(s_regrowth);
+        emitGasBlob(s_toxicGas);
+        emitGasBlob(s_paralyticGas);
+        emitGasBlob(s_confusionGas);
+        emitGasBlob(s_corrosiveGas);
+        emitGasBlob(s_regrowth);
+
+        // 3. Status Effect Particles on Characters (Burning flame particles & Frost snow motes)
+        auto emitCharBuffFX = [&](Char* ch) {
+            if (!ch || !ch->isAlive()) return;
+            if (!Dungeon::visible[ch->pos] && (!Dungeon::hero || ch != Dungeon::hero.get())) return;
+
+            float cx = (ch->pos % Level::WIDTH) * 16.0f + 8.0f;
+            float cy = (ch->pos / Level::WIDTH) * 16.0f + 8.0f;
+
+            if (ch->buff(BuffType::Burning)) {
+                static const uint32_t flameCols[] = { 0xFFFFFFFF, 0xFFFF66FF, 0xFF9911FF, 0xEE4411FF };
+                float wx = cx + Random::Float(-6.0f, 6.0f);
+                float wy = cy + Random::Float(-4.0f, 6.0f);
+                spawnParticle(wx, wy, flameCols[Random::Int(4)], Random::Float(3.0f, 4.5f),
+                              Random::Float(0.35f, 0.55f), Random::Float(-4.0f, 4.0f),
+                              Random::Float(-35.0f, -60.0f), 0.0f, -80.0f, true);
+            }
+
+            if (ch->buff(BuffType::Frost)) {
+                if (Random::Float() < 0.35f) {
+                    float wx = cx + Random::Float(-6.0f, 6.0f);
+                    float wy = cy + Random::Float(-8.0f, 0.0f);
+                    uint32_t frostCol = (Random::Int(2) == 0) ? 0xD0F0FFFF : 0xFFFFFFFF;
+                    spawnParticle(wx, wy, frostCol, Random::Float(2.0f, 3.5f),
+                                  Random::Float(0.8f, 1.3f), Random::Float(-2.0f, 2.0f),
+                                  Random::Float(6.0f, 14.0f), 0.0f, 5.0f, false);
+                }
+            }
+        };
+
+        emitCharBuffFX(Dungeon::hero.get());
+        for (const auto& mob : Dungeon::mobs) {
+            emitCharBuffFX(mob.get());
+        }
     }
 }
 
