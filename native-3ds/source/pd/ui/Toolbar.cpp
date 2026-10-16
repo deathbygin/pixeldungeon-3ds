@@ -96,7 +96,7 @@ Toolbar::Action Toolbar::update(const TouchController& touch, u32 kDown, pd::Her
     return Action::NONE;
 }
 
-void Toolbar::draw(const pd::Hero* hero, C2D_TextBuf textBuf, bool isTargeting, const pd::Item* targetItem) const {
+void Toolbar::draw(const pd::Hero* hero, C2D_TextBuf textBuf, bool isTargeting, const pd::Item* targetItem, bool isExamining) const {
     (void)hero;
     (void)textBuf;
     if (!m_texToolbar || !m_texToolbar->isLoaded()) return;
@@ -142,7 +142,24 @@ void Toolbar::draw(const pd::Hero* hero, C2D_TextBuf textBuf, bool isTargeting, 
     // -------------------------------------------------------------
     drawTool(m_subWait,   0, 7, 20, 25,  4.0f, Y_POS, 0);
     drawTool(m_subSearch, 20, 7, 20, 25, 24.0f, Y_POS, 1);
-    drawTool(m_subInfo,   40, 7, 21, 25, 44.0f, Y_POS, 2);
+
+    if (isExamining) {
+        setupSubTex(m_subInfo, potW, potH, 40, 7, 21, 25);
+        C2D_Image img = { tex, &m_subInfo };
+        C2D_DrawParams p;
+        p.pos.x = 44.0f;
+        p.pos.y = Y_POS + 1.0f;
+        p.pos.w = 21.0f;
+        p.pos.h = 25.0f;
+        p.center.x = p.center.y = 0.0f;
+        p.depth = zBar;
+        p.angle = 0.0f;
+        C2D_ImageTint tint;
+        C2D_PlainImageTint(&tint, C2D_Color32(0xFF, 0xEE, 0x88, 0xFF), 0.40f);
+        C2D_DrawImage(img, &p, &tint);
+    } else {
+        drawTool(m_subInfo,   40, 7, 21, 25, 44.0f, Y_POS, 2);
+    }
 
     // -------------------------------------------------------------
     // RIGHT CLUSTER: Continuous Quickslot Strip (Bag, Q1, Q2)

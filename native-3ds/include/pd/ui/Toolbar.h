@@ -33,7 +33,7 @@ public:
     ~Toolbar() = default;
 
     Action update(const TouchController& touch, u32 kDown, pd::Hero* hero);
-    void draw(const pd::Hero* hero, C2D_TextBuf textBuf, bool isTargeting = false, const pd::Item* targetItem = nullptr) const;
+    void draw(const pd::Hero* hero, C2D_TextBuf textBuf, bool isTargeting = false, const pd::Item* targetItem = nullptr, bool isExamining = false) const;
 
     void setQuickItem1(pd::Item* it) { m_quickItem1 = it; }
     void setQuickItem2(pd::Item* it) { m_quickItem2 = it; }

@@ -1304,4 +1304,120 @@ void Yog::die(Actor* src) {
     Mob::die(src);
 }
 
+std::string Mob::description() const {
+    return "A creature of the dungeon depths.";
+}
+
+std::string Mob::status() const {
+    switch (state) {
+        case State::SLEEPING:  return "This " + name + " is sleeping.";
+        case State::WANDERING: return "This " + name + " is wandering.";
+        case State::HUNTING:   return "This " + name + " is hunting.";
+        case State::FLEEING:   return "This " + name + " is fleeing.";
+    }
+    return "This " + name + " is passive.";
+}
+
+std::string Mob::statePreview() const {
+    switch (state) {
+        case State::SLEEPING:  return "Sleeping";
+        case State::WANDERING: return "Wandering";
+        case State::HUNTING:   return "Hunting";
+        case State::FLEEING:   return "Fleeing";
+    }
+    return "Passive";
+}
+
+std::string Rat::description() const {
+    return "Enormous and vicious, rats of the sewers become quite bold in their search for food. They often attack lone adventurers who are not alert.";
+}
+
+std::string Gnoll::description() const {
+    return "Gnolls are hyena-headed humanoid creatures. They are generally cowards, but become dangerous when in groups. Gnoll scouts are common in the upper sewers.";
+}
+
+std::string Crab::description() const {
+    return "These oversized sewer crabs have thick shells and vicious claws. They scuttle across the damp stone tiles with terrifying speed.";
+}
+
+std::string Skeleton::description() const {
+    return "The animated remains of former adventurers. Even in death, their bony fists hit hard, and their bones violently shatter upon defeat, damaging all nearby.";
+}
+
+std::string Swarm::description() const {
+    return "A buzzing swarm of dungeon flies. When struck, they scatter and divide into two smaller swarms.";
+}
+
+std::string Thief::description() const {
+    return "Fast and nimble, bandit thieves will snatch an item straight from your pack and attempt to flee up the stairs.";
+}
+
+std::string Shaman::description() const {
+    return "Gnoll shamans channel lightning through their totems, electrocuting their targets from afar.";
+}
+
+std::string Bat::description() const {
+    return "Large vampire bats swooping from the cavern ceiling. Their bites heal them for the damage dealt to you.";
+}
+
+std::string Brute::description() const {
+    return "Towering gnoll brutes with muscular frames. When brought to death's door, they enter an unstoppable berserk rage.";
+}
+
+std::string Monk::description() const {
+    return "Disciplined dwarf brawlers who attack with flurry strikes and can knock weapons right out of your hands.";
+}
+
+std::string Warlock::description() const {
+    return "Dwarf necromancers who fire dark bolts that wither your flesh and leave you weakened with hunger.";
+}
+
+std::string Golem::description() const {
+    return "Heavy automatons forged of stone and dwarven steel. They are slow, but hit like a battering ram.";
+}
+
+std::string Succubus::description() const {
+    return "Demonic temptresses that leap from the shadows and charm adventurers into lowering their weapons.";
+}
+
+std::string Eye::description() const {
+    return "Floating demonic eyes that charge a devastating death gaze through walls and across rooms.";
+}
+
+std::string Scorpio::description() const {
+    return "Giant chitinous arachnids that pelt darts from a distance and scuttle away whenever you close the gap.";
+}
+
+std::string Piranha::description() const {
+    return "Razor-toothed piranhas that aggressively patrol flooded chambers. Out of water, they quickly perish.";
+}
+
+std::string Wraith::description() const {
+    return "Vengeful ethereal spirits that evade most attacks. Magical weapons or surprise attacks are needed to strike them down.";
+}
+
+std::string Statue::description() const {
+    return "An animated stone sentry wielding an enchanted weapon. It will fight to the death if disturbed.";
+}
+
+std::string Goo::description() const {
+    return "A foul, caustic agglomeration of slime and dark energy lurking in the depths of the sewers. It pumps itself up before unleashing massive damage!";
+}
+
+std::string Tengu::description() const {
+    return "A swift and cunning assassin who throws shurikens and disappears into smoke bombs when cornered.";
+}
+
+std::string DM300::description() const {
+    return "A massive mining machine gone rogue. In the depths of the caves, it emits clouds of poisonous gas and sparks across electric conductors.";
+}
+
+std::string King::description() const {
+    return "The mad Dwarven King of the underground metropolis. He sits upon his throne, summoning infinite waves of undead subjects.";
+}
+
+std::string Yog::description() const {
+    return "The Old God of the deep subterranean hells. Surrounded by burning and rotting fists, its dormant eye exudes pure madness.";
+}
+
 } // namespace pd

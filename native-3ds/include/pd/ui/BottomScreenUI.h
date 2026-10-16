@@ -81,6 +81,13 @@ public:
                      std::function<void(int)> onSelect);
     void inspectCell(int cell, pd::Level* level);
 
+    // Top-Screen Examine mode
+    bool isExamineMode() const { return m_isExamining; }
+    void startExamine(int startCell = -1);
+    void cancelExamine();
+    int getExamineCell() const { return m_examineCell; }
+    std::string getHoverPreviewText(int cell, const pd::Level* level) const;
+
     // Ranged targeting mode
     bool isTargeting() const { return m_isTargeting; }
     void startTargeting(Item* item);
@@ -104,6 +111,13 @@ private:
     pd::windows::GameAction m_pendingGameAction = pd::windows::GameAction::NONE;
     LevelTransition m_pendingTransition = LevelTransition::NONE;
     bool m_isInspecting = false;
+
+    // Top-Screen Examine State
+    bool m_isExamining = false;
+    int m_examineCell = 0;
+    int m_examineHoldTimer = 0;
+    int m_examineLastDirX = 0;
+    int m_examineLastDirY = 0;
 
     // Ranged Targeting State
     bool m_isTargeting = false;

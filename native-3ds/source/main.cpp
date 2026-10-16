@@ -763,7 +763,7 @@ int main(int argc, char* argv[]) {
             // -----------------------------------------------------------------
             // 2. D-pad & Circle Pad Movement (Supports 8-directional analog movement)
             // -----------------------------------------------------------------
-            if (!actionConsumed && !bottomUI.isModalOpen() && !bottomUI.isInventoryOpen() && !bottomUI.isTargeting() && !bottomUI.isPauseMenuOpen() && !bottomUI.isWndHeroOpen() && !FX::isMissileActive() && hero && hero->isAlive() && !hero->restoreHealth) {
+            if (!actionConsumed && !bottomUI.isModalOpen() && !bottomUI.isInventoryOpen() && !bottomUI.isTargeting() && !bottomUI.isExamineMode() && !bottomUI.isPauseMenuOpen() && !bottomUI.isWndHeroOpen() && !FX::isMissileActive() && hero && hero->isAlive() && !hero->restoreHealth) {
                 int heroX = hero->pos % Level::WIDTH;
                 int heroY = hero->pos / Level::WIDTH;
                 int targetCell = -1;
@@ -862,7 +862,12 @@ int main(int argc, char* argv[]) {
             float hy = hspr ? (hspr->getY() + hspr->getHeight() * 0.5f) : ((hero->pos / Level::WIDTH) * 16.0f + 8.0f);
             float cx = topCamera.getCenter().x;
             float cy = topCamera.getCenter().y;
-            if (bottomUI.isTargeting()) {
+            if (bottomUI.isExamineMode()) {
+                int ec = bottomUI.getExamineCell();
+                float ex = (ec % Level::WIDTH) * 16.0f + 8.0f;
+                float ey = (ec / Level::WIDTH) * 16.0f + 8.0f;
+                topCamera.setCenter(cx + (ex - cx) * 0.25f, cy + (ey - cy) * 0.25f);
+            } else if (bottomUI.isTargeting()) {
                 int tc = bottomUI.getTargetCell();
                 float tx = (tc % Level::WIDTH) * 16.0f + 8.0f;
                 float ty = (tc / Level::WIDTH) * 16.0f + 8.0f;
@@ -1052,6 +1057,44 @@ int main(int argc, char* argv[]) {
                     topCamera.worldToScreen(cx, cy, csx, csy);
                     C2D_DrawCircleSolid(csx, csy, 0.79f, 3.5f * topCamera.getZoom(), C2D_Color32(0xff, 0x22, 0x22, 0xDD));
                 }
+            }
+
+            // Top-Screen Examine Mode Reticle Overlay (pulsing gold/white brackets)
+            if (bottomUI.isExamineMode()) {
+                int examineCell = bottomUI.getExamineCell();
+                float rx = (examineCell % Level::WIDTH) * 16.0f;
+                float ry = (examineCell / Level::WIDTH) * 16.0f;
+                float sx1, sy1, sx2, sy2;
+                topCamera.worldToScreen(rx, ry, sx1, sy1);
+                topCamera.worldToScreen(rx + 16.0f, ry + 16.0f, sx2, sy2);
+
+                // Pulsing white and gold color animation
+                static float examinePulse = 0.0f;
+                examinePulse += dt * 4.0f;
+                float p = 0.5f + 0.5f * std::sin(examinePulse);
+                u8 r = static_cast<u8>(255 * p + 255 * (1.0f - p));
+                u8 g = static_cast<u8>(215 * p + 255 * (1.0f - p));
+                u8 b = static_cast<u8>(0 * p + 255 * (1.0f - p));
+                u32 reticleCol = C2D_Color32(r, g, b, 0xFF);
+                u32 innerTint = C2D_Color32(r, g, b, 0x25);
+
+                // Faint inner tile fill
+                C2D_DrawRectSolid(sx1, sy1, 0.78f, sx2 - sx1, sy2 - sy1, innerTint);
+
+                float thick = 2.0f;
+                float clen = 5.0f * topCamera.getZoom();
+                // Top-Left corner
+                C2D_DrawRectSolid(sx1, sy1, 0.79f, clen, thick, reticleCol);
+                C2D_DrawRectSolid(sx1, sy1, 0.79f, thick, clen, reticleCol);
+                // Top-Right corner
+                C2D_DrawRectSolid(sx2 - clen, sy1, 0.79f, clen, thick, reticleCol);
+                C2D_DrawRectSolid(sx2 - thick, sy1, 0.79f, thick, clen, reticleCol);
+                // Bottom-Left corner
+                C2D_DrawRectSolid(sx1, sy2 - thick, 0.79f, clen, thick, reticleCol);
+                C2D_DrawRectSolid(sx1, sy2 - clen, 0.79f, thick, clen, reticleCol);
+                // Bottom-Right corner
+                C2D_DrawRectSolid(sx2 - clen, sy2 - thick, 0.79f, clen, thick, reticleCol);
+                C2D_DrawRectSolid(sx2 - thick, sy2 - clen, 0.79f, thick, clen, reticleCol);
             }
 
             // Render Core Visual Effects & Particles

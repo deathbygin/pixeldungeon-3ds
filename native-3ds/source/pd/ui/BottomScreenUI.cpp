@@ -42,6 +42,11 @@ BottomScreenUI& BottomScreenUI::operator=(BottomScreenUI&& other) noexcept {
         m_pendingGameAction = other.m_pendingGameAction;
         m_pendingTransition = other.m_pendingTransition;
         m_isInspecting = other.m_isInspecting;
+        m_isExamining = other.m_isExamining;
+        m_examineCell = other.m_examineCell;
+        m_examineHoldTimer = other.m_examineHoldTimer;
+        m_examineLastDirX = other.m_examineLastDirX;
+        m_examineLastDirY = other.m_examineLastDirY;
         m_isTargeting = other.m_isTargeting;
         m_targetCell = other.m_targetCell;
         m_targetItem = other.m_targetItem;
@@ -66,6 +71,7 @@ void BottomScreenUI::initLogger() {
 void BottomScreenUI::reset() {
     m_logConsole.clear();
     cancelTargeting();
+    cancelExamine();
     if (m_wndBag.isOpen) m_wndBag.close();
     if (m_wndHero.isOpen()) m_wndHero.hide();
     m_wndGame.hide();
@@ -154,6 +160,114 @@ void BottomScreenUI::cancelTargeting() {
     m_targetHoldTimer = 0;
     m_targetLastDirX = 0;
     m_targetLastDirY = 0;
+}
+
+void BottomScreenUI::startExamine(int startCell) {
+    m_isExamining = true;
+    m_examineHoldTimer = 0;
+    m_examineLastDirX = 0;
+    m_examineLastDirY = 0;
+
+    if (startCell >= 0 && startCell < Level::LENGTH) {
+        m_examineCell = startCell;
+    } else if (Dungeon::hero) {
+        m_examineCell = Dungeon::hero->pos;
+    } else {
+        m_examineCell = 0;
+    }
+
+    log("Examine Mode: [D-Pad/CPad] Move  [A] Inspect  [B] Cancel", C2D_Color32(0xFF, 0xEE, 0x88, 0xFF));
+}
+
+void BottomScreenUI::cancelExamine() {
+    if (m_isExamining) {
+        m_isExamining = false;
+        m_examineHoldTimer = 0;
+        m_examineLastDirX = 0;
+        m_examineLastDirY = 0;
+        log("Examine mode cancelled.", C2D_Color32(0xA5, 0xCD, 0xE4, 0xFF));
+    }
+}
+
+std::string BottomScreenUI::getHoverPreviewText(int cell, const pd::Level* level) const {
+    if (!level || cell < 0 || cell >= Level::LENGTH) return "";
+
+    if (!Dungeon::visible[cell] && !level->visited[cell] && !level->mapped[cell]) {
+        return "Unexplored Area";
+    }
+
+    // 1. Hero
+    if (Dungeon::hero && Dungeon::hero->pos == cell) {
+        return Dungeon::hero->name + " (Hero, HP: " + std::to_string(Dungeon::hero->HP) + "/" + std::to_string(Dungeon::hero->HT) + ")";
+    }
+
+    // 2. Mob
+    if (Dungeon::visible[cell]) {
+        for (const auto& m : Dungeon::mobs) {
+            if (m && m->isAlive() && m->pos == cell) {
+                return m->name + " (" + m->statePreview() + ", HP: " + std::to_string(m->HP) + "/" + std::to_string(m->HT) + ")";
+            }
+        }
+    }
+
+    // 3. Item Heap
+    Heap* heap = level->getHeap(cell);
+    if (heap && (level->visited[cell] || Dungeon::visible[cell])) {
+        if (heap->type == Heap::Type::CHEST) return "Chest (unlocked)";
+        if (heap->type == Heap::Type::LOCKED_CHEST) return "Locked Chest";
+        if (heap->type == Heap::Type::CRYSTAL_CHEST) return "Crystal Chest";
+        if (heap->type == Heap::Type::TOMB) return "Tomb";
+        if (heap->type == Heap::Type::SKELETON) return "Skeletal Remains";
+        if (!heap->isEmpty() && heap->peek()) {
+            return heap->peek()->displayName();
+        }
+    }
+
+    // 4. Terrain & Traps
+    int terr = level->map[cell];
+    switch (terr) {
+        case Terrain::SIGN:           return "Signpost";
+        case Terrain::ENTRANCE:       return "Stairs Up";
+        case Terrain::EXIT:           return "Stairs Down";
+        case Terrain::DOOR:           return "Closed Door";
+        case Terrain::OPEN_DOOR:      return "Open Door";
+        case Terrain::LOCKED_DOOR:    return "Locked Door";
+        case Terrain::WATER:          return "Water";
+        case Terrain::HIGH_GRASS:     return "High Grass";
+        case Terrain::GRASS:          return "Grass";
+        case Terrain::STATUE:         return "Statue";
+        case Terrain::ALCHEMY:        return "Alchemy Pot";
+        case Terrain::CHASM:          return "Chasm";
+        case Terrain::PEDESTAL:       return "Pedestal";
+        case Terrain::BARRICADE:      return "Wood Barricade";
+        case Terrain::BOOKSHELF:      return "Bookshelf";
+        case Terrain::EMBERS:         return "Glowing Embers";
+        case Terrain::TOXIC_TRAP:     return "Toxic Gas Trap";
+        case Terrain::FIRE_TRAP:      return "Fire Trap";
+        case Terrain::PARALYTIC_TRAP: return "Paralytic Gas Trap";
+        case Terrain::POISON_TRAP:    return "Poison Dart Trap";
+        case Terrain::ALARM_TRAP:     return "Alarm Trap";
+        case Terrain::LIGHTNING_TRAP: return "Lightning Trap";
+        case Terrain::GRIPPING_TRAP:  return "Gripping Trap";
+        case Terrain::SUMMONING_TRAP: return "Summoning Trap";
+        case Terrain::SECRET_DOOR:    return "Wall";
+        case Terrain::SECRET_TOXIC_TRAP:
+        case Terrain::SECRET_FIRE_TRAP:
+        case Terrain::SECRET_PARALYTIC_TRAP:
+        case Terrain::SECRET_POISON_TRAP:
+        case Terrain::SECRET_ALARM_TRAP:
+        case Terrain::SECRET_LIGHTNING_TRAP:
+        case Terrain::SECRET_GRIPPING_TRAP:
+        case Terrain::SECRET_SUMMONING_TRAP:
+        case Terrain::SECRET_TELEPORTATION_TRAP:
+            return "Floor";
+        case Terrain::WALL:           return "Wall";
+        case Terrain::WALL_DECO:      return "Wall";
+        case Terrain::EMPTY:          return "Floor";
+        case Terrain::EMPTY_DECO:     return "Floor";
+        case Terrain::EMPTY_SP:       return "Floor";
+        default:                      return Level::tileName(terr);
+    }
 }
 
 void BottomScreenUI::toggleInventory() {
@@ -400,6 +514,114 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
         return false;
     }
 
+    // 3.5. Top-Screen Examine Mode
+    if (m_isExamining) {
+        // Cancel via B
+        if (kDown & KEY_B) {
+            cancelExamine();
+            return false;
+        }
+
+        // Toggle / Cancel via SELECT
+        if (kDown & KEY_SELECT) {
+            cancelExamine();
+            return false;
+        }
+
+        // Detailed Inspect via A
+        if (kDown & KEY_A) {
+            inspectCell(m_examineCell, level);
+            return false;
+        }
+
+        // D-Pad and Circle Pad tile-by-tile navigation with debouncing and autorepeat
+        circlePosition cpad;
+        hidCircleRead(&cpad);
+        int curDirX = 0;
+        int curDirY = 0;
+
+        if ((kHeld & KEY_DLEFT) || cpad.dx < -55) curDirX = -1;
+        else if ((kHeld & KEY_DRIGHT) || cpad.dx > 55) curDirX = 1;
+
+        if ((kHeld & KEY_DUP) || cpad.dy > 55) curDirY = -1;
+        else if ((kHeld & KEY_DDOWN) || cpad.dy < -55) curDirY = 1;
+
+        bool shouldStep = false;
+        if (curDirX == 0 && curDirY == 0) {
+            m_examineHoldTimer = 0;
+            m_examineLastDirX = 0;
+            m_examineLastDirY = 0;
+        } else {
+            bool newDir = (curDirX != m_examineLastDirX || curDirY != m_examineLastDirY);
+            bool dpadTap = (kDown & (KEY_DLEFT | KEY_DRIGHT | KEY_DUP | KEY_DDOWN)) != 0;
+            if (newDir || dpadTap) {
+                shouldStep = true;
+                m_examineHoldTimer = 1;
+                m_examineLastDirX = curDirX;
+                m_examineLastDirY = curDirY;
+            } else {
+                m_examineHoldTimer++;
+                // Initial delay: 18 frames (~300ms), repeat every 5 frames (~12 tiles/s)
+                if (m_examineHoldTimer >= 18 && ((m_examineHoldTimer - 18) % 5 == 0)) {
+                    shouldStep = true;
+                }
+            }
+        }
+
+        if (shouldStep) {
+            int ex = m_examineCell % Level::WIDTH + curDirX;
+            int ey = m_examineCell / Level::WIDTH + curDirY;
+            if (ex >= 0 && ex < Level::WIDTH && ey >= 0 && ey < Level::HEIGHT) {
+                int nextCell = ey * Level::WIDTH + ex;
+                // Bounds clamping: strictly to visible or previously visited/mapped tiles
+                if (Dungeon::visible[nextCell] || (level && (level->visited[nextCell] || level->mapped[nextCell]))) {
+                    m_examineCell = nextCell;
+                }
+            }
+        }
+
+        // Stylus minimap tap jumping to tile
+        if (level && hero) {
+            float vpX = 10.0f;
+            float vpY = 42.0f;
+            float vpW = 142.0f;
+            float vpH = 106.0f;
+            noosa::RectF minimapRect(vpX, vpY, vpW, vpH);
+            if (m_touch.justReleased() && minimapRect.contains(static_cast<float>(m_touch.x()), static_cast<float>(m_touch.y()))) {
+                float cellSize = 3.0f;
+                int cols = static_cast<int>(vpW / cellSize);
+                int rows = static_cast<int>(vpH / cellSize);
+                int startX = (hero->pos % Level::WIDTH) - (cols / 2);
+                int startY = (hero->pos / Level::WIDTH) - (rows / 2);
+
+                int clickedX = startX + static_cast<int>((m_touch.x() - vpX) / cellSize);
+                int clickedY = startY + static_cast<int>((m_touch.y() - vpY) / cellSize);
+                if (clickedX >= 0 && clickedX < Level::WIDTH && clickedY >= 0 && clickedY < Level::HEIGHT) {
+                    int cell = clickedY * Level::WIDTH + clickedX;
+                    if (Dungeon::visible[cell] || level->visited[cell] || level->mapped[cell]) {
+                        m_examineCell = cell;
+                    }
+                }
+            }
+        }
+
+        // Tap on the Bottom Screen Examine HUD bar to inspect
+        noosa::RectF barRect(4.0f, 158.0f, 312.0f, 48.0f);
+        if (m_touch.justReleased() && barRect.contains(static_cast<float>(m_touch.x()), static_cast<float>(m_touch.y()))) {
+            inspectCell(m_examineCell, level);
+            return false;
+        }
+
+        // Toolbar check (e.g. tapping '?' button again cancels examine)
+        Toolbar::Action tbAction = m_toolbar.update(m_touch, kDown, hero);
+        if (tbAction == Toolbar::Action::INFO) {
+            cancelExamine();
+            return false;
+        }
+
+        return false;
+    }
+
     // 4. Status Pane Touch & Menu Handling
     int statusAction = m_statusPane.update(m_touch, kDown);
     if (statusAction == 1) {
@@ -421,8 +643,23 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
         return false;
     }
 
+    // Hardware shortcuts to enter Examine Mode:
+    // 1. SELECT button
+    // 2. Double-tap X button
+    static u64 lastTapXTick = 0;
+    if (kDown & KEY_X) {
+        u64 now = svcGetSystemTick();
+        u64 dtTicks = now - lastTapXTick;
+        lastTapXTick = now;
+        if (dtTicks < 85000000ULL) { // within ~300ms
+            if (m_wndBag.isOpen) m_wndBag.close();
+            startExamine(hero ? hero->pos : 0);
+            return false;
+        }
+    }
+
     if (kDown & KEY_SELECT) {
-        toggleWndHero();
+        startExamine(hero ? hero->pos : 0);
         return false;
     }
 
@@ -488,11 +725,10 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
         }
 
         case Toolbar::Action::INFO: {
-            m_isInspecting = !m_isInspecting;
-            if (m_isInspecting) {
-                log("Examine mode: tap a tile on the minimap.", C2D_Color32(0xff, 0xcc, 0x66, 0xFF));
+            if (m_isExamining) {
+                cancelExamine();
             } else {
-                log("Examine mode cancelled.", C2D_Color32(0xa5, 0xcd, 0xe4, 0xFF));
+                startExamine(hero ? hero->pos : 0);
             }
             break;
         }
@@ -633,7 +869,26 @@ void BottomScreenUI::drawMinimap(const pd::Level* level, const pd::Hero* hero) c
         }
     }
 
-    // 6. Depth indicator tag on upper-left border
+    // 6. Examine cursor on minimap (pulsing gold/white)
+    if (m_isExamining) {
+        int ex = m_examineCell % Level::WIDTH;
+        int ey = m_examineCell / Level::WIDTH;
+        if (ex >= startX && ex < endX && ey >= startY && ey < endY) {
+            float epx = vpX + (ex - startX) * cellSize;
+            float epy = vpY + (ey - startY) * cellSize;
+            if (epx >= vpX && epx <= vpX + vpW - cellSize && epy >= vpY && epy <= vpY + vpH - cellSize) {
+                static float minimapPulse = 0.0f;
+                minimapPulse += 0.08f;
+                float p = 0.5f + 0.5f * std::sin(minimapPulse);
+                u8 r = static_cast<u8>(255 * p + 255 * (1.0f - p));
+                u8 g = static_cast<u8>(215 * p + 255 * (1.0f - p));
+                u8 b = static_cast<u8>(0 * p + 255 * (1.0f - p));
+                C2D_DrawRectSolid(epx - 1.0f, epy - 1.0f, zMap + 0.07f, cellSize + 2.0f, cellSize + 2.0f, C2D_Color32(r, g, b, 0xFF));
+            }
+        }
+    }
+
+    // 7. Depth indicator tag on upper-left border
     std::string depthTag = std::to_string(Dungeon::depth) + "F";
     BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, depthTag, frameX + 8.0f, frameY + 2.0f, zMap + 0.10f, 0xCACFC2FF, 0x000000FF);
 }
@@ -652,10 +907,14 @@ void BottomScreenUI::drawRightGlanceCard(const pd::Hero* hero, C2D_TextBuf textB
     // Outer frame with authentic Chrome::TOAST
     Chrome::get(Chrome::Type::TOAST).draw(cardX, cardY, cardW, cardH, zCard);
 
-    // Check if an enemy is targeted or visible
+    // Check if an entity or enemy is targeted, examined, or visible
     Char* targetChar = nullptr;
     if (m_isTargeting) {
         targetChar = Actor::findChar(m_targetCell);
+    } else if (m_isExamining) {
+        if (Dungeon::visible[m_examineCell]) {
+            targetChar = Actor::findChar(m_examineCell);
+        }
     } else {
         float minDist = 999.0f;
         for (const auto& m : Dungeon::mobs) {
@@ -666,6 +925,37 @@ void BottomScreenUI::drawRightGlanceCard(const pd::Hero* hero, C2D_TextBuf textB
                     targetChar = m.get();
                 }
             }
+        }
+    }
+
+    if (m_isExamining && (!targetChar || targetChar == hero)) {
+        int cell = m_examineCell;
+        const Level* level = Dungeon::level.get();
+        if (cell != hero->pos) {
+            // --- MODE C: EXAMINE TILE / ITEM / FEATURE ---
+            std::string previewTitle = getHoverPreviewText(cell, level);
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, previewTitle, cardX + 8.0f, cardY + 8.0f, zText, 0xFFEBA4FF, 0x000000FF);
+
+            int dist = PathFinder::distanceChebyshev(hero->pos, cell);
+            std::string distStr = "Distance: " + std::to_string(dist) + " tiles";
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, distStr, cardX + 8.0f, cardY + 22.0f, zText, 0xCACFC2FF, 0x000000FF);
+
+            std::string visStr = Dungeon::visible[cell] ? "Visible (in LOS)" : "Remembered";
+            u32 visCol = Dungeon::visible[cell] ? 0x56BB77FF : 0x888899FF;
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, visStr, cardX + 8.0f, cardY + 36.0f, zText, visCol, 0x000000FF);
+
+            Heap* heap = level ? level->getHeap(cell) : nullptr;
+            if (heap && (level->visited[cell] || Dungeon::visible[cell])) {
+                BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "Contains Item", cardX + 8.0f, cardY + 52.0f, zText, 0xE4A672FF, 0x000000FF);
+            } else if (level) {
+                std::string attr = level->isPassable(cell) ? "Passable" : "Impassable";
+                if (level->avoid[cell]) attr += " (Hazard)";
+                BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, attr, cardX + 8.0f, cardY + 52.0f, zText, 0xCACFC2FF, 0x000000FF);
+            }
+
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "[A] View Details", cardX + 8.0f, cardY + 74.0f, zText, 0x56BB77FF, 0x000000FF);
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "[B] Exit Examine", cardX + 8.0f, cardY + 88.0f, zText, 0xA5CDE4FF, 0x000000FF);
+            return;
         }
     }
 
@@ -701,6 +991,13 @@ void BottomScreenUI::drawRightGlanceCard(const pd::Hero* hero, C2D_TextBuf textB
         // Mob State / Awareness
         std::string statusStr = "Status: Hunting";
         u32 statusCol = C2D_Color32(0xEE, 0x44, 0x44, 0xFF);
+        Mob* mobTarget = static_cast<Mob*>(targetChar);
+        if (mobTarget) {
+            statusStr = "Status: " + mobTarget->statePreview();
+            if (mobTarget->state == Mob::State::SLEEPING) statusCol = C2D_Color32(0x88, 0xAA, 0xEE, 0xFF);
+            else if (mobTarget->state == Mob::State::WANDERING) statusCol = C2D_Color32(0xEE, 0xCC, 0x22, 0xFF);
+            else if (mobTarget->state == Mob::State::FLEEING) statusCol = C2D_Color32(0xCC, 0x88, 0xEE, 0xFF);
+        }
         if (targetChar->buff(BuffType::Paralysis)) {
             statusStr = "Status: Paralyzed";
             statusCol = C2D_Color32(0xEE, 0xCC, 0x22, 0xFF);
@@ -710,8 +1007,13 @@ void BottomScreenUI::drawRightGlanceCard(const pd::Hero* hero, C2D_TextBuf textB
         }
         BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, statusStr, cardX + 8.0f, cardY + 52.0f, zText, statusCol, 0x000000FF);
 
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "Melee Hostile", cardX + 8.0f, cardY + 68.0f, zText, 0xCACFC2FF, 0x000000FF);
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "Tap to target/shoot", cardX + 8.0f, cardY + 84.0f, zText, 0x888899FF, 0x000000FF);
+        if (m_isExamining) {
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "[A] View Lore & Stats", cardX + 8.0f, cardY + 68.0f, zText, 0x56BB77FF, 0x000000FF);
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "[B] Exit Examine", cardX + 8.0f, cardY + 84.0f, zText, 0xA5CDE4FF, 0x000000FF);
+        } else {
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "Melee Hostile", cardX + 8.0f, cardY + 68.0f, zText, 0xCACFC2FF, 0x000000FF);
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "Tap to target/shoot", cardX + 8.0f, cardY + 84.0f, zText, 0x888899FF, 0x000000FF);
+        }
     } else {
         // --- MODE B: HERO QUICK STATS (EXPLORATION) ---
         std::string titleStr = hero->name + " (" + hero->className() + ")";
@@ -766,11 +1068,40 @@ void BottomScreenUI::draw(const pd::Hero* hero, int depth, C2D_TextBuf textBuf) 
     if (!m_wndBag.isOpen && !m_wndHero.isOpen()) {
         drawMinimap(Dungeon::level.get(), hero);
         drawRightGlanceCard(hero, textBuf);
-        m_logConsole.draw(textBuf);
+        if (m_isExamining) {
+            // Examine Mode Banner / HUD Bar
+            float barX = 4.0f;
+            float barY = 158.0f;
+            float barW = 312.0f;
+            float barH = 48.0f;
+            float zBar = 0.35f;
+            float zText = zBar + 0.05f;
+
+            Chrome::get(Chrome::Type::TOAST).draw(barX, barY, barW, barH, zBar);
+
+            // Pulsing gold title
+            static float bannerPulse = 0.0f;
+            bannerPulse += 0.05f;
+            float p = 0.5f + 0.5f * std::sin(bannerPulse);
+            u8 r = static_cast<u8>(255 * p + 255 * (1.0f - p));
+            u8 g = static_cast<u8>(215 * p + 255 * (1.0f - p));
+            u8 b = static_cast<u8>(0 * p + 255 * (1.0f - p));
+            u32 titleCol = C2D_Color32(r, g, b, 0xFF);
+
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "EXAMINE MODE", barX + 8.0f, barY + 6.0f, zText, titleCol, 0x000000FF);
+
+            std::string preview = getHoverPreviewText(m_examineCell, Dungeon::level.get());
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, preview, barX + 8.0f, barY + 20.0f, zText, 0xFFFFFFFF, 0x000000FF);
+
+            std::string hint = "[A] Inspect Details    [B] Cancel Examine";
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, hint, barX + 8.0f, barY + 34.0f, zText, 0x56BB77FF, 0x000000FF);
+        } else {
+            m_logConsole.draw(textBuf);
+        }
     }
 
     // 4. Persistent Bottom Action Toolbar (320x25, y=210..235)
-    m_toolbar.draw(hero, textBuf, m_isTargeting, m_targetItem);
+    m_toolbar.draw(hero, textBuf, m_isTargeting, m_targetItem, m_isExamining);
 
     // 5. Stylus Touch Indicator
     if (m_touch.isDown()) {
@@ -873,15 +1204,29 @@ void BottomScreenUI::inspectCell(int cell, pd::Level* level) {
         return;
     }
 
-    // Check for mob at cell
+    // 1. Check for mob at cell
     for (const auto& m : Dungeon::mobs) {
         if (m && m->isAlive() && m->pos == cell && Dungeon::visible[cell]) {
-            showMessage(m->name + " (HP: " + std::to_string(m->HP) + "/" + std::to_string(m->HT) + ")");
+            std::string fullMobInfo = m->name + "\n";
+            fullMobInfo += "Health: " + m->status() + " (" + std::to_string(m->HP) + "/" + std::to_string(m->HT) + ")\n";
+            fullMobInfo += "Status: " + m->statePreview() + "\n\n";
+            fullMobInfo += m->description();
+            showMessage(fullMobInfo);
             return;
         }
     }
 
-    // Check for item heap
+    // 2. Check for hero at cell
+    if (Dungeon::hero && Dungeon::hero->pos == cell) {
+        std::string heroInfo = Dungeon::hero->name + " (" + Dungeon::hero->className() + ")\n";
+        heroInfo += "Level " + std::to_string(Dungeon::hero->level) + " (" + std::to_string(Dungeon::hero->exp) + "/" + std::to_string(Dungeon::hero->maxExp) + " EXP)\n";
+        heroInfo += "Health: " + std::to_string(Dungeon::hero->HP) + "/" + std::to_string(Dungeon::hero->HT) + "   Strength: " + std::to_string(Dungeon::hero->STR) + "\n\n";
+        heroInfo += "A brave adventurer seeking the legendary Amulet of Yendor in the deepest recesses of the dungeon.";
+        showMessage(heroInfo);
+        return;
+    }
+
+    // 3. Check for item heap
     Heap* heap = level->getHeap(cell);
     if (heap && (level->visited[cell] || Dungeon::visible[cell])) {
         if (heap->type == Heap::Type::CHEST) {
@@ -911,7 +1256,73 @@ void BottomScreenUI::inspectCell(int cell, pd::Level* level) {
         }
     }
 
+    // 4. Traps & Specialized Dungeon Terrain
     int tile = level->map[cell];
+    switch (tile) {
+        case Terrain::TOXIC_TRAP:
+            showMessage("Toxic Gas Trap\n\nA hidden trigger connected to canisters of concentrated toxic gas. Stepping on it fills the surrounding area with a deadly green cloud.");
+            return;
+        case Terrain::FIRE_TRAP:
+            showMessage("Fire Trap\n\nA pressure plate rigged with volatile liquid. Stepping on it ignites the tile into violent flames, spreading to any adjacent flammables.");
+            return;
+        case Terrain::PARALYTIC_TRAP:
+            showMessage("Paralytic Gas Trap\n\nA canister trap that releases thick yellow vapors upon triggering. Inhaling the gas completely paralyzes creatures for several turns.");
+            return;
+        case Terrain::POISON_TRAP:
+            showMessage("Poison Dart Trap\n\nConcealed spring-loaded mechanisms that fire venom-tipped darts at whoever steps on the plate.");
+            return;
+        case Terrain::ALARM_TRAP:
+            showMessage("Alarm Trap\n\nA resonant metal chime that rings with an ear-splitting noise when tripped, immediately awakening and alerting all monsters on this level.");
+            return;
+        case Terrain::LIGHTNING_TRAP:
+            showMessage("Lightning Trap\n\nA conductive rune plate that stores static electrical potential. Triggering it discharges a high-voltage arc that chains between nearby targets.");
+            return;
+        case Terrain::GRIPPING_TRAP:
+            showMessage("Gripping Trap\n\nA spring-loaded steel bear trap. Stepping on it painfully clamps shut on the victim's legs, inflicting heavy bleeding and crippling immobilization.");
+            return;
+        case Terrain::SUMMONING_TRAP:
+            showMessage("Summoning Trap\n\nA mystical glyph etched into the stone floor. When activated, it emits a planar beacon, instantly summoning hostile monsters to surround the intruder.");
+            return;
+        case Terrain::ENTRANCE:
+            showMessage("Stairs Up\n\nA flight of stone steps leading upward to the previous floor.");
+            return;
+        case Terrain::EXIT:
+            showMessage("Stairs Down\n\nA stone archway with steps descending into the dark unknown of the next depth.");
+            return;
+        case Terrain::WATER:
+            showMessage("Water\n\nDamp, cool water pools across the floor. Moving through water extinguishes burning and washes away caustic ooze.");
+            return;
+        case Terrain::DOOR:
+            showMessage("Closed Door\n\nA heavy wooden door. Walking into it opens the door, or you can surprise-attack enemies through doorways.");
+            return;
+        case Terrain::OPEN_DOOR:
+            showMessage("Open Door\n\nA wooden door that has been pushed open.");
+            return;
+        case Terrain::LOCKED_DOOR:
+            showMessage("Locked Door\n\nThis sturdy iron-banded door is locked tight. An iron key from this floor is required to unlock it.");
+            return;
+        case Terrain::HIGH_GRASS:
+            showMessage("High Grass\n\nThick, tall vegetation that blocks line of sight. Trampling high grass may yield dew drops or seeds.");
+            return;
+        case Terrain::STATUE:
+            showMessage("Statue\n\nA menacing carved stone guardian. Defeating an animated statue will reward you with the weapon it wields.");
+            return;
+        case Terrain::ALCHEMY:
+            showMessage("Alchemy Pot\n\nA large iron cauldron bubbling with alchemical broth. Throwing three seeds into the pot brews a random potion.");
+            return;
+        case Terrain::CHASM:
+            showMessage("Chasm\n\nA bottomless abyss. Leaping into the chasm will cause you to fall into the next floor, sustaining severe injury.");
+            return;
+        case Terrain::BARRICADE:
+            showMessage("Wood Barricade\n\nA sturdy wooden barricade blocking the passage. It can be burned down with fire (Liquid Flame potion or Wand of Firebolt).");
+            return;
+        case Terrain::BOOKSHELF:
+            showMessage("Bookshelf\n\nA wooden shelf holding old tomes and scrolls. Highly flammable.");
+            return;
+        default:
+            break;
+    }
+
     std::string tName = Level::tileName(tile);
     std::string tDesc = Level::tileDesc(tile);
 

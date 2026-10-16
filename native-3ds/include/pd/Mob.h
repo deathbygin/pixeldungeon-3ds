@@ -60,6 +60,9 @@ public:
     CharSprite* getSprite() override;
 
     virtual MobType mobType() const { return MobType::Rat; }
+    virtual std::string description() const;
+    std::string status() const;
+    std::string statePreview() const;
     bool act() override;
     void damage(int dmg, Actor* src) override;
     int defenseProc(Char* enemy, int damage) override;
@@ -83,6 +86,7 @@ class Rat : public Mob {
 public:
     Rat();
     MobType mobType() const override { return MobType::Rat; }
+    std::string description() const override;
     int damageRoll() override;
     int attackSkill(Char* target) override;
     int defenseSkill(Char* attacker) override;
@@ -92,6 +96,7 @@ class Gnoll : public Mob {
 public:
     Gnoll();
     MobType mobType() const override { return MobType::Gnoll; }
+    std::string description() const override;
     int damageRoll() override;
     int attackSkill(Char* target) override;
     int defenseSkill(Char* attacker) override;
@@ -101,6 +106,7 @@ class Crab : public Mob {
 public:
     Crab();
     MobType mobType() const override { return MobType::Crab; }
+    std::string description() const override;
     int damageRoll() override;
     int attackSkill(Char* target) override;
     int defenseSkill(Char* attacker) override;
@@ -110,6 +116,7 @@ class Skeleton : public Mob {
 public:
     Skeleton();
     MobType mobType() const override { return MobType::Skeleton; }
+    std::string description() const override;
     int damageRoll() override;
     int attackSkill(Char* target) override;
     int defenseSkill(Char* attacker) override;
@@ -121,6 +128,7 @@ public:
     int generation = 0;
     Swarm();
     MobType mobType() const override { return MobType::Swarm; }
+    std::string description() const override;
     int damageRoll() override;
     int attackSkill(Char* target) override;
     int defenseSkill(Char* attacker) override;
@@ -132,6 +140,7 @@ public:
     std::unique_ptr<Item> stolenItem;
     Thief();
     MobType mobType() const override { return MobType::Thief; }
+    std::string description() const override;
     int damageRoll() override;
     int attackSkill(Char* target) override;
     int defenseSkill(Char* attacker) override;
@@ -145,6 +154,7 @@ class Shaman : public Mob {
 public:
     Shaman();
     MobType mobType() const override { return MobType::Shaman; }
+    std::string description() const override;
     int damageRoll() override;
     int attackSkill(Char* target) override;
     int defenseSkill(Char* attacker) override;
@@ -157,6 +167,7 @@ class Bat : public Mob {
 public:
     Bat();
     MobType mobType() const override { return MobType::Bat; }
+    std::string description() const override;
     int damageRoll() override;
     int attackSkill(Char* target) override;
     int defenseSkill(Char* attacker) override;
@@ -169,6 +180,7 @@ public:
     bool enraged = false;
     Brute();
     MobType mobType() const override { return MobType::Brute; }
+    std::string description() const override;
     int damageRoll() override;
     int attackSkill(Char* target) override;
     int defenseSkill(Char* attacker) override;
@@ -180,6 +192,7 @@ class Monk : public Mob {
 public:
     Monk();
     MobType mobType() const override { return MobType::Monk; }
+    std::string description() const override;
     int damageRoll() override;
     int attackSkill(Char* target) override;
     int defenseSkill(Char* attacker) override;
@@ -191,6 +204,7 @@ class Warlock : public Mob {
 public:
     Warlock();
     MobType mobType() const override { return MobType::Warlock; }
+    std::string description() const override;
     int damageRoll() override;
     int attackSkill(Char* target) override;
     int defenseSkill(Char* attacker) override;
@@ -203,6 +217,7 @@ class Golem : public Mob {
 public:
     Golem();
     MobType mobType() const override { return MobType::Golem; }
+    std::string description() const override;
     int damageRoll() override;
     int attackSkill(Char* target) override;
     int defenseSkill(Char* attacker) override;
@@ -214,6 +229,7 @@ public:
     int blinkDelay = 0;
     Succubus();
     MobType mobType() const override { return MobType::Succubus; }
+    std::string description() const override;
     int damageRoll() override;
     int attackSkill(Char* target) override;
     int defenseSkill(Char* attacker) override;
@@ -225,6 +241,7 @@ class Eye : public Mob {
 public:
     Eye();
     MobType mobType() const override { return MobType::Eye; }
+    std::string description() const override;
     int attackSkill(Char* target) override;
     int defenseSkill(Char* attacker) override;
     int dr() override;
@@ -236,6 +253,7 @@ class Scorpio : public Mob {
 public:
     Scorpio();
     MobType mobType() const override { return MobType::Scorpio; }
+    std::string description() const override;
     int damageRoll() override;
     int attackSkill(Char* target) override;
     int defenseSkill(Char* attacker) override;
@@ -249,6 +267,7 @@ class Piranha : public Mob {
 public:
     Piranha();
     MobType mobType() const override { return MobType::Piranha; }
+    std::string description() const override;
     int damageRoll() override;
     int attackSkill(Char* target) override;
     int defenseSkill(Char* attacker) override;
@@ -263,6 +282,7 @@ public:
     int level = 1;
     Wraith();
     MobType mobType() const override { return MobType::Wraith; }
+    std::string description() const override;
     int damageRoll() override;
     int attackSkill(Char* target) override;
     int defenseSkill(Char* attacker) override;
@@ -275,6 +295,7 @@ public:
 
     Statue();
     MobType mobType() const override { return MobType::Statue; }
+    std::string description() const override;
     int damageRoll() override;
     int attackSkill(Char* target) override;
     int defenseSkill(Char* attacker) override;
@@ -290,6 +311,7 @@ public:
 
     Goo();
     MobType mobType() const override { return MobType::Goo; }
+    std::string description() const override;
     int damageRoll() override;
     int attackSkill(Char* target) override;
     int defenseSkill(Char* attacker) override;
@@ -306,6 +328,7 @@ public:
 
     Tengu();
     MobType mobType() const override { return MobType::Tengu; }
+    std::string description() const override;
     int damageRoll() override;
     int attackSkill(Char* target) override;
     int defenseSkill(Char* attacker) override;
@@ -319,6 +342,7 @@ class DM300 : public Mob {
 public:
     DM300();
     MobType mobType() const override { return MobType::DM300; }
+    std::string description() const override;
     int damageRoll() override;
     int attackSkill(Char* target) override;
     int defenseSkill(Char* attacker) override;
@@ -333,6 +357,7 @@ public:
     int summonCountdown = 3;
     King();
     MobType mobType() const override { return MobType::King; }
+    std::string description() const override;
     int damageRoll() override;
     int attackSkill(Char* target) override;
     int defenseSkill(Char* attacker) override;
@@ -346,6 +371,7 @@ public:
     int fistsAlive = 2;
     Yog();
     MobType mobType() const override { return MobType::Yog; }
+    std::string description() const override;
     int damageRoll() override;
     int attackSkill(Char* target) override;
     int defenseSkill(Char* attacker) override;
