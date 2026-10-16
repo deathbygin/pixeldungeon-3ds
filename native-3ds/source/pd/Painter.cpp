@@ -1098,7 +1098,7 @@ void Painter::paintVault(Level* level, Room* room) {
 
     auto makeVaultPrize = []() -> std::unique_ptr<Item> {
         if (Random::Int(2) == 0) {
-            auto w = std::make_unique<WandOfMagicMissile>();
+            auto w = Wand::randomWand();
             w->level = Random::Int(2);
             return w;
         } else {
@@ -1116,7 +1116,7 @@ void Painter::paintVault(Level* level, Room* room) {
         break;
     }
     case 1: {
-        auto w = std::make_unique<WandOfMagicMissile>();
+        auto w = Wand::randomWand();
         w->level = Random::Int(2);
         auto r = std::make_unique<Ring>();
         r->random();

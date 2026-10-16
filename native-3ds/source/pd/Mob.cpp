@@ -116,6 +116,10 @@ void Mob::beckon(int cell) {
     target = cell;
 }
 
+void Mob::yell(const std::string& str) {
+    GLog::n(name + ": \"" + str + "\"");
+}
+
 void Mob::aiStep(Hero* hero, Level* currentLevel) {
     if (!hero || !hero->isAlive() || !currentLevel) {
         spend(TICK);
@@ -1630,6 +1634,44 @@ void MirrorImage::aiStep(Hero* hero, Level* currentLevel) {
         }
         spend(TICK);
     }
+}
+
+// -----------------------------------------------------------------------------
+// Sheep (Summoned by Wand of Flock)
+// -----------------------------------------------------------------------------
+Sheep::Sheep(float life) : Mob(), lifespan(life) {
+    name = "sheep";
+    HP = HT = 1;
+    expAward = 0;
+    state = State::PASSIVE;
+}
+
+std::string Sheep::description() const {
+    return "This is a magic sheep. What's so magical about it? You can't kill it. "
+           "It will stand there until it magically fades away, all the while chewing cud with a blank stare.";
+}
+
+int Sheep::defenseSkill(Char* attacker) {
+    (void)attacker;
+    return 0;
+}
+
+bool Sheep::act() {
+    if (initialized) {
+        destroy();
+        CharSprite* spr = getSprite();
+        if (spr) spr->die();
+        FX::burst(pos, 0xEEEEEEFF, 8);
+    } else {
+        initialized = true;
+        spend(lifespan + Random::Float(2.0f));
+    }
+    return true;
+}
+
+void Sheep::interact() {
+    static const std::string quotes[] = { "Baa!", "Baa?", "Baa.", "Baa..." };
+    yell(quotes[Random::Int(4)]);
 }
 
 } // namespace pd

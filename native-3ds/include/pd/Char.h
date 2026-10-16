@@ -49,6 +49,7 @@ public:
     bool attack(Char* enemy);
     virtual void damage(int dmg, Actor* src);
     virtual void die(Actor* src);
+    virtual void destroy();
     virtual void interrupt();
 
     void spend(float time) override;

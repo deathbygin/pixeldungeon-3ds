@@ -788,11 +788,7 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
             pd::Item* qIt = m_toolbar.getQuickItem1();
             if (qIt) {
                 if (Wand* w = qIt->asWand()) {
-                    if (w->curCharges > 0) {
-                        startTargeting(w);
-                    } else {
-                        log("Wand is out of charges!", C2D_Color32(0xd6, 0x30, 0x30, 0xFF));
-                    }
+                    startTargeting(w);
                     return false;
                 } else if (qIt->asMissile()) {
                     startTargeting(qIt);
@@ -817,7 +813,7 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
             pd::Item* qIt = m_toolbar.getQuickItem2();
             if (qIt) {
                 if (Wand* w = qIt->asWand()) {
-                    if (w->curCharges > 0) startTargeting(w);
+                    startTargeting(w);
                     return false;
                 } else if (qIt->asMissile()) {
                     startTargeting(qIt);

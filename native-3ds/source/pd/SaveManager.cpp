@@ -185,6 +185,9 @@ bool SaveManager::getSaveSummary(int& outDepth, int& outLevel, int& outHeroClass
         // and scroll map (SCROLL_COUNT * (sizeof(int32_t) + sizeof(uint8_t)))
         long skipBytes = Potion::POTION_COUNT * (sizeof(int32_t) + sizeof(uint8_t)) +
                          Scroll::SCROLL_COUNT * (sizeof(int32_t) + sizeof(uint8_t));
+        if (version >= 5) {
+            skipBytes += 12 * (sizeof(int32_t) + sizeof(uint8_t));
+        }
         std::fseek(fp, skipBytes, SEEK_CUR);
     }
 
@@ -251,6 +254,14 @@ bool SaveManager::saveGame(const std::string& customPath) {
     for (size_t i = 0; i < Scroll::SCROLL_COUNT; ++i) {
         int32_t m = (i < scrMap.size()) ? scrMap[i] : static_cast<int32_t>(i);
         uint8_t k = (i < scrKnown.size() && scrKnown[i]) ? 1 : 0;
+        std::fwrite(&m, sizeof(int32_t), 1, fp);
+        std::fwrite(&k, sizeof(uint8_t), 1, fp);
+    }
+    const auto& wandMap = Wand::getWoodMapping();
+    const auto& wandKnown = Wand::getKnownTable();
+    for (size_t i = 0; i < 12; ++i) {
+        int32_t m = (i < wandMap.size()) ? wandMap[i] : static_cast<int32_t>(i);
+        uint8_t k = (i < wandKnown.size() && wandKnown[i]) ? 1 : 0;
         std::fwrite(&m, sizeof(int32_t), 1, fp);
         std::fwrite(&k, sizeof(uint8_t), 1, fp);
     }
@@ -535,9 +546,26 @@ bool SaveManager::loadGame(const std::string& customPath) {
             scrKnown[i] = (k != 0);
         }
         Scroll::restoreStatus(scrMap, scrKnown);
+
+        if (version >= 5) {
+            std::vector<int> wandMap(12);
+            std::vector<bool> wandKnown(12);
+            for (size_t i = 0; i < 12; ++i) {
+                int32_t m = 0;
+                uint8_t k = 0;
+                std::fread(&m, sizeof(int32_t), 1, fp);
+                std::fread(&k, sizeof(uint8_t), 1, fp);
+                wandMap[i] = m;
+                wandKnown[i] = (k != 0);
+            }
+            Wand::restoreStatus(wandMap, wandKnown);
+        } else {
+            Wand::initWoods();
+        }
     } else {
         Potion::initColors();
         Scroll::initLabels();
+        Wand::initWoods();
     }
 
     // 3. Hero State
@@ -637,10 +665,17 @@ bool SaveManager::loadGame(const std::string& customPath) {
             if (version >= 3) {
                 std::fread(&htk, sizeof(int32_t), 1, fp);
             }
-            auto weapon = std::make_unique<Weapon>(iName, minD, maxD, sReq);
-            weapon->hitsToKnow = htk;
-            if (isEquippedWeapon) equippedW = weapon.get();
-            item = std::move(weapon);
+            auto wand = Wand::createByName(iName);
+            if (wand) {
+                wand->hitsToKnow = htk;
+                if (isEquippedWeapon) equippedW = wand.get();
+                item = std::move(wand);
+            } else {
+                auto weapon = std::make_unique<Weapon>(iName, minD, maxD, sReq);
+                weapon->hitsToKnow = htk;
+                if (isEquippedWeapon) equippedW = weapon.get();
+                item = std::move(weapon);
+            }
         } else if (cat == ItemCategory::Armor) {
             int32_t tier = 1, sReq = 11, htk = 10;
             std::fread(&tier, sizeof(int32_t), 1, fp);
@@ -695,6 +730,8 @@ bool SaveManager::loadGame(const std::string& customPath) {
                 static_cast<Potion*>(item.get())->updatePerception();
             } else if (item->category() == ItemCategory::Scroll) {
                 static_cast<Scroll*>(item.get())->updatePerception();
+            } else if (item->asWand()) {
+                item->asWand()->updatePerception();
             }
             hero->belongings.backpack.push_back(std::move(item));
         }
@@ -802,9 +839,15 @@ bool SaveManager::loadGame(const std::string& customPath) {
                     if (version >= 3) {
                         std::fread(&htk, sizeof(int32_t), 1, fp);
                     }
-                    auto weapon = std::make_unique<Weapon>(iName, minD, maxD, sReq);
-                    weapon->hitsToKnow = htk;
-                    item = std::move(weapon);
+                    auto wand = Wand::createByName(iName);
+                    if (wand) {
+                        wand->hitsToKnow = htk;
+                        item = std::move(wand);
+                    } else {
+                        auto weapon = std::make_unique<Weapon>(iName, minD, maxD, sReq);
+                        weapon->hitsToKnow = htk;
+                        item = std::move(weapon);
+                    }
                 } else if (cat == ItemCategory::Armor) {
                     int32_t tier = 1, sReq = 11, htk = 10;
                     std::fread(&tier, sizeof(int32_t), 1, fp);
@@ -858,6 +901,8 @@ bool SaveManager::loadGame(const std::string& customPath) {
                         static_cast<Potion*>(item.get())->updatePerception();
                     } else if (item->category() == ItemCategory::Scroll) {
                         static_cast<Scroll*>(item.get())->updatePerception();
+                    } else if (item->asWand()) {
+                        item->asWand()->updatePerception();
                     }
                     heap->items.push_back(std::move(item));
                 }

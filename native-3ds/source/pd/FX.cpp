@@ -13,6 +13,9 @@ CheckedCell FX::s_checked[MAX_CHECKED];
 Wound FX::s_wounds[MAX_WOUNDS];
 FloatingText FX::s_texts[MAX_TEXTS];
 std::vector<std::unique_ptr<MissileSprite>> FX::s_missiles;
+FX::MagicMissileState FX::s_magicMissile;
+FX::LightningState FX::s_lightning;
+FX::DeathRayState FX::s_deathRay;
 
 Blob FX::s_toxicGas(Blob::BlobType::TOXIC_GAS);
 Blob FX::s_paralyticGas(Blob::BlobType::PARALYTIC_GAS);
@@ -38,6 +41,9 @@ void FX::clear() {
     for (auto& w : s_wounds)    w.active = false;
     for (auto& t : s_texts)     t.active = false;
     s_missiles.clear();
+    s_magicMissile = {};
+    s_lightning = {};
+    s_deathRay = {};
 
     s_toxicGas.clear();
     s_paralyticGas.clear();
@@ -69,6 +75,55 @@ void FX::update(float dt) {
                        [](const std::unique_ptr<MissileSprite>& m) { return !m || !m->active; }),
         s_missiles.end()
     );
+
+    if (s_magicMissile.active) {
+        s_magicMissile.elapsed += dt;
+        float t = s_magicMissile.elapsed / s_magicMissile.duration;
+        if (t >= 1.0f) {
+            s_magicMissile.active = false;
+            if (s_magicMissile.callback) {
+                auto cb = std::move(s_magicMissile.callback);
+                s_magicMissile.callback = nullptr;
+                cb();
+            }
+        } else {
+            s_magicMissile.curX = s_magicMissile.startX + (s_magicMissile.targetX - s_magicMissile.startX) * t;
+            s_magicMissile.curY = s_magicMissile.startY + (s_magicMissile.targetY - s_magicMissile.startY) * t;
+            for (auto& p : s_particles) {
+                if (!p.active) {
+                    float vx = Random::Float(-10.0f, 10.0f);
+                    float vy = Random::Float(-10.0f, 10.0f);
+                    p.reset(s_magicMissile.curX, s_magicMissile.curY, s_magicMissile.color,
+                            Random::Float(2.5f, 4.0f), 0.22f, vx, vy, 0.0f, 0.0f, true);
+                    break;
+                }
+            }
+        }
+    }
+
+    if (s_lightning.active) {
+        s_lightning.time -= dt;
+        if (s_lightning.time <= 0.0f) {
+            s_lightning.active = false;
+            if (s_lightning.callback) {
+                auto cb = std::move(s_lightning.callback);
+                s_lightning.callback = nullptr;
+                cb();
+            }
+        }
+    }
+
+    if (s_deathRay.active) {
+        s_deathRay.time -= dt;
+        if (s_deathRay.time <= 0.0f) {
+            s_deathRay.active = false;
+            if (s_deathRay.callback) {
+                auto cb = std::move(s_deathRay.callback);
+                s_deathRay.callback = nullptr;
+                cb();
+            }
+        }
+    }
 
     // Periodic ambient particle emission for active blobs in player FOV (matching BlobEmitter)
     s_blobEmitTimer += dt;
@@ -299,6 +354,54 @@ void FX::draw(const noosa::Camera* camera, C2D_TextBuf textBuf) {
     // 4. Flying missile sprites
     for (const auto& m : s_missiles) if (m && m->active) m->draw(camera);
 
+    // 4b. Death ray beam
+    if (s_deathRay.active) {
+        float x1 = (s_deathRay.fromCell % Level::WIDTH) * 16.0f + 8.0f;
+        float y1 = (s_deathRay.fromCell / Level::WIDTH) * 16.0f + 8.0f;
+        float x2 = (s_deathRay.toCell % Level::WIDTH) * 16.0f + 8.0f;
+        float y2 = (s_deathRay.toCell / Level::WIDTH) * 16.0f + 8.0f;
+        float sx1, sy1, sx2, sy2;
+        camera->worldToScreen(x1, y1, sx1, sy1);
+        camera->worldToScreen(x2, y2, sx2, sy2);
+        float p = std::clamp(s_deathRay.time / 0.5f, 0.0f, 1.0f);
+        u8 alpha = static_cast<u8>(p * 255.0f);
+        u32 beamCol = C2D_Color32(0xcc, 0x44, 0xff, alpha);
+        u32 coreCol = C2D_Color32(0xff, 0xff, 0xff, alpha);
+        C2D_DrawLine(sx1, sy1, beamCol, sx2, sy2, beamCol, 6.0f * p * camera->getZoom(), 0.77f);
+        C2D_DrawLine(sx1, sy1, coreCol, sx2, sy2, coreCol, 2.5f * p * camera->getZoom(), 0.78f);
+    }
+
+    // 4c. Lightning electric arcs
+    if (s_lightning.active) {
+        for (size_t i = 0; i + 1 < s_lightning.points.size(); ++i) {
+            int c1 = s_lightning.points[i];
+            int c2 = s_lightning.points[i + 1];
+            float x1 = (c1 % Level::WIDTH) * 16.0f + 8.0f;
+            float y1 = (c1 / Level::WIDTH) * 16.0f + 8.0f;
+            float x2 = (c2 % Level::WIDTH) * 16.0f + 8.0f;
+            float y2 = (c2 / Level::WIDTH) * 16.0f + 8.0f;
+            float mx = (x1 + x2) * 0.5f + Random::Float(-4.0f, 4.0f);
+            float my = (y1 + y2) * 0.5f + Random::Float(-4.0f, 4.0f);
+            float sx1, sy1, smx, smy, sx2, sy2;
+            camera->worldToScreen(x1, y1, sx1, sy1);
+            camera->worldToScreen(mx, my, smx, smy);
+            camera->worldToScreen(x2, y2, sx2, sy2);
+            u32 boltCol = C2D_Color32(0xff, 0xff, 0xaa, 0xFF);
+            u32 glowCol = C2D_Color32(0x55, 0xbb, 0xff, 0xAA);
+            C2D_DrawLine(sx1, sy1, glowCol, smx, smy, glowCol, 4.0f * camera->getZoom(), 0.77f);
+            C2D_DrawLine(smx, smy, glowCol, sx2, sy2, glowCol, 4.0f * camera->getZoom(), 0.77f);
+            C2D_DrawLine(sx1, sy1, boltCol, smx, smy, boltCol, 2.0f * camera->getZoom(), 0.78f);
+            C2D_DrawLine(smx, smy, boltCol, sx2, sy2, boltCol, 2.0f * camera->getZoom(), 0.78f);
+        }
+    }
+
+    // 4d. Magic missile glowing projectile
+    if (s_magicMissile.active) {
+        float msx, msy;
+        camera->worldToScreen(s_magicMissile.curX, s_magicMissile.curY, msx, msy);
+        C2D_DrawCircleSolid(msx, msy, 0.77f, 3.5f * camera->getZoom(), s_magicMissile.color);
+    }
+
     // 5. Floating damage / text indicators (drawn on top)
     for (const auto& t : s_texts) if (t.active) t.draw(camera, textBuf);
 }
@@ -439,8 +542,41 @@ void FX::missile(int fromCell, int toCell, int itemImage, std::function<void()> 
     s_missiles.push_back(std::move(m));
 }
 
+void FX::magicMissile(int fromCell, int toCell, uint32_t color, std::function<void()> callback) {
+    s_magicMissile.active = true;
+    s_magicMissile.startX = (fromCell % Level::WIDTH) * 16.0f + 8.0f;
+    s_magicMissile.startY = (fromCell / Level::WIDTH) * 16.0f + 8.0f;
+    s_magicMissile.targetX = (toCell % Level::WIDTH) * 16.0f + 8.0f;
+    s_magicMissile.targetY = (toCell / Level::WIDTH) * 16.0f + 8.0f;
+    s_magicMissile.curX = s_magicMissile.startX;
+    s_magicMissile.curY = s_magicMissile.startY;
+    float dx = s_magicMissile.targetX - s_magicMissile.startX;
+    float dy = s_magicMissile.targetY - s_magicMissile.startY;
+    float dist = std::sqrt(dx * dx + dy * dy);
+    s_magicMissile.duration = std::clamp(dist / 220.0f, 0.12f, 0.35f);
+    s_magicMissile.elapsed = 0.0f;
+    s_magicMissile.color = color;
+    s_magicMissile.callback = std::move(callback);
+}
+
+void FX::lightning(const std::vector<int>& points, std::function<void()> callback) {
+    s_lightning.active = true;
+    s_lightning.points = points;
+    s_lightning.time = 0.3f;
+    s_lightning.callback = std::move(callback);
+}
+
+void FX::deathRay(int fromCell, int toCell, std::function<void()> callback) {
+    s_deathRay.active = true;
+    s_deathRay.fromCell = fromCell;
+    s_deathRay.toCell = toCell;
+    s_deathRay.time = 0.5f;
+    s_deathRay.callback = nullptr;
+    if (callback) callback(); // DeathRay applies damage and affects terrain immediately matching Java
+}
+
 bool FX::isMissileActive() {
-    return !s_missiles.empty();
+    return !s_missiles.empty() || s_magicMissile.active || s_lightning.active;
 }
 
 } // namespace pd

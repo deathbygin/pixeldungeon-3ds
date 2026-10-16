@@ -61,6 +61,7 @@ void Dungeon::init() {
     Badges::init();
     Potion::initColors();
     Scroll::initLabels();
+    Wand::initWoods();
 }
 
 void Dungeon::announceLevelEntrance() {
@@ -109,6 +110,7 @@ void Dungeon::newGame() {
     deepestFloor = 1;
     Potion::initColors();
     Scroll::initLabels();
+    Wand::initWoods();
     hero = std::make_unique<Hero>();
     if (hero) {
         if (hero->heroClass == Hero::HeroClass::Warrior) {

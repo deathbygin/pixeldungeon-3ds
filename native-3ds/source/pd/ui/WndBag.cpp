@@ -142,7 +142,7 @@ bool WndBag::update(pd::Hero* hero, const TouchController& touch, u32 kDown, std
                     return false;
                 }
 
-                if (action == "THROW") {
+                if (action == "THROW" || action == "ZAP") {
                     outMessage = "START_TARGETING";
                     closeSubWindow();
                     close();

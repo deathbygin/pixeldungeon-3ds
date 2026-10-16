@@ -44,7 +44,8 @@ public:
         DM300,
         King,
         Yog,
-        MirrorImage
+        MirrorImage,
+        Sheep
     };
 
     State state = State::SLEEPING;
@@ -81,6 +82,7 @@ public:
 
     void notice();
     void beckon(int cell);
+    void yell(const std::string& str);
 
     static bool s_mobFov[1024];
 };
@@ -399,6 +401,21 @@ public:
     void damage(int dmg, Actor* src) override;
     int attackSkill(Char* target) override;
     int defenseSkill(Char* attacker) override;
+};
+
+class Sheep : public Mob {
+public:
+    float lifespan = 5.0f;
+    bool initialized = false;
+
+    explicit Sheep(float life = 5.0f);
+    MobType mobType() const override { return MobType::Sheep; }
+    std::string description() const override;
+    bool act() override;
+    void damage(int dmg, Actor* src) override { (void)dmg; (void)src; }
+    int defenseSkill(Char* attacker) override;
+    void aiStep(Hero* hero, Level* currentLevel) override { (void)hero; (void)currentLevel; }
+    void interact();
 };
 
 } // namespace pd

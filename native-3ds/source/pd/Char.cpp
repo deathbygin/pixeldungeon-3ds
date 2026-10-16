@@ -265,17 +265,21 @@ void Char::damage(int dmg, Actor* src) {
     }
 }
 
-void Char::die(Actor* src) {
-    (void)src;
+void Char::destroy() {
     HP = 0;
     if (pos >= 0 && pos < PathFinder::LENGTH && Actor::chars[pos] == this) {
         Actor::chars[pos] = nullptr;
     }
+    Actor::remove(this);
+}
+
+void Char::die(Actor* src) {
+    (void)src;
+    destroy();
     CharSprite* spr = getSprite();
     if (spr) {
         spr->die();
     }
-    Actor::remove(this);
 }
 
 void Char::addBuff(Buff* b) {

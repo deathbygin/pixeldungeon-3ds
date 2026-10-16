@@ -122,16 +122,19 @@ void WndItemSpawner::initCategories() {
         cat.name = "Wands";
         cat.items = {
             { "Magic Missile", ItemSpriteSheet::WAND_MAGIC_MISSILE, []() { return std::make_unique<WandOfMagicMissile>(); } },
-            { "Lightning", ItemSpriteSheet::WAND_HOLLY, []() { return std::make_unique<Wand>("Wand of Lightning", 4); } },
-            { "Firebolt", ItemSpriteSheet::WAND_YEW, []() { return std::make_unique<Wand>("Wand of Firebolt", 4); } },
-            { "Teleportation", ItemSpriteSheet::WAND_EBONY, []() { return std::make_unique<Wand>("Wand of Teleportation", 3); } },
-            { "Slowness", ItemSpriteSheet::WAND_CHERRY, []() { return std::make_unique<Wand>("Wand of Slowness", 3); } },
-            { "Poison", ItemSpriteSheet::WAND_TEAK, []() { return std::make_unique<Wand>("Wand of Poison", 3); } },
-            { "Blink", ItemSpriteSheet::WAND_ROWAN, []() { return std::make_unique<Wand>("Wand of Blink", 4); } },
-            { "Regrowth", ItemSpriteSheet::WAND_WILLOW, []() { return std::make_unique<Wand>("Wand of Regrowth", 3); } },
-            { "Amok", ItemSpriteSheet::WAND_MAHOGANY, []() { return std::make_unique<Wand>("Wand of Amok", 3); } },
-            { "Disintegrate", ItemSpriteSheet::WAND_BAMBOO, []() { return std::make_unique<Wand>("Wand of Disintegration", 4); } },
-            { "Avalanche", ItemSpriteSheet::WAND_PURPLEHEART, []() { return std::make_unique<Wand>("Wand of Avalanche", 4); } }
+            { "Lightning", ItemSpriteSheet::WAND_HOLLY, []() { return std::make_unique<WandOfLightning>(); } },
+            { "Firebolt", ItemSpriteSheet::WAND_YEW, []() { return std::make_unique<WandOfFirebolt>(); } },
+            { "Teleportation", ItemSpriteSheet::WAND_EBONY, []() { return std::make_unique<WandOfTeleportation>(); } },
+            { "Slowness", ItemSpriteSheet::WAND_CHERRY, []() { return std::make_unique<WandOfSlowness>(); } },
+            { "Poison", ItemSpriteSheet::WAND_TEAK, []() { return std::make_unique<WandOfPoison>(); } },
+            { "Blink", ItemSpriteSheet::WAND_ROWAN, []() { return std::make_unique<WandOfBlink>(); } },
+            { "Regrowth", ItemSpriteSheet::WAND_WILLOW, []() { return std::make_unique<WandOfRegrowth>(); } },
+            { "Amok", ItemSpriteSheet::WAND_MAHOGANY, []() { return std::make_unique<WandOfAmok>(); } },
+            { "Reach", ItemSpriteSheet::WAND_MAHOGANY, []() { return std::make_unique<WandOfReach>(); } },
+            { "Flock", ItemSpriteSheet::WAND_OAK, []() { return std::make_unique<WandOfFlock>(); } },
+            { "Disintegrate", ItemSpriteSheet::WAND_BAMBOO, []() { return std::make_unique<WandOfDisintegration>(); } },
+            { "Avalanche", ItemSpriteSheet::WAND_PURPLEHEART, []() { return std::make_unique<WandOfAvalanche>(); } },
+            { "Paralysis", ItemSpriteSheet::WAND_BIRCH, []() { return std::make_unique<WandOfParalysis>(); } }
         };
         m_categories.push_back(std::move(cat));
     }

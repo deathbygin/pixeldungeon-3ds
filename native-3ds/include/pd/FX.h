@@ -52,8 +52,11 @@ public:
     static void evolveBlobs(const Level* level);
     static Blob* getBlob(Blob::BlobType type);
 
-    // Missile Projectile
+    // Missile & Spell Trajectories
     static void missile(int fromCell, int toCell, int itemImage, std::function<void()> callback = nullptr);
+    static void magicMissile(int fromCell, int toCell, uint32_t color = 0x99ccffFF, std::function<void()> callback = nullptr);
+    static void lightning(const std::vector<int>& points, std::function<void()> callback = nullptr);
+    static void deathRay(int fromCell, int toCell, std::function<void()> callback = nullptr);
     static bool isMissileActive();
 
 private:
@@ -63,6 +66,33 @@ private:
     static Wound s_wounds[MAX_WOUNDS];
     static FloatingText s_texts[MAX_TEXTS];
     static std::vector<std::unique_ptr<class MissileSprite>> s_missiles;
+
+    struct MagicMissileState {
+        bool active = false;
+        float startX = 0.0f, startY = 0.0f;
+        float targetX = 0.0f, targetY = 0.0f;
+        float curX = 0.0f, curY = 0.0f;
+        float duration = 0.2f, elapsed = 0.0f;
+        uint32_t color = 0x99ccffFF;
+        std::function<void()> callback = nullptr;
+    };
+    static MagicMissileState s_magicMissile;
+
+    struct LightningState {
+        bool active = false;
+        std::vector<int> points;
+        float time = 0.3f;
+        std::function<void()> callback = nullptr;
+    };
+    static LightningState s_lightning;
+
+    struct DeathRayState {
+        bool active = false;
+        int fromCell = 0, toCell = 0;
+        float time = 0.5f;
+        std::function<void()> callback = nullptr;
+    };
+    static DeathRayState s_deathRay;
 
     static Blob s_toxicGas;
     static Blob s_paralyticGas;

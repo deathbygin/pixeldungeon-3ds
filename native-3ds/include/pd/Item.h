@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <functional>
 #include "pd/HeroSubClass.h"
 
 namespace pd {
@@ -146,37 +147,217 @@ public:
 
 class Wand : public Weapon {
 public:
+    enum class WandType {
+        Teleportation = 0,
+        Slowness,
+        Firebolt,
+        Poison,
+        Regrowth,
+        Blink,
+        Lightning,
+        Amok,
+        Reach,
+        Flock,
+        Disintegration,
+        Avalanche,
+        Paralysis,
+        MagicMissile,
+        COUNT = 12
+    };
+
+    static constexpr int USAGES_TO_KNOW = 40;
     static constexpr int INITIAL_CHARGES = 2;
+
     int maxCharges = INITIAL_CHARGES;
     int curCharges = INITIAL_CHARGES;
     float chargeTimer = 0.0f;
+    bool curChargeKnown = false;
+    int usagesToKnow = USAGES_TO_KNOW;
+    bool hitChars = true;
+    std::string wood;
+    int woodImage = 0;
+    WandType wandType = WandType::Teleportation;
 
-    explicit Wand(std::string n = "Wand", int initialC = 2);
+    static void initWoods();
+    static bool isKnown(WandType tp);
+    static void setKnown(WandType tp);
+    static bool allKnown();
+    static const std::vector<int>& getWoodMapping();
+    static const std::vector<bool>& getKnownTable();
+    static void restoreStatus(const std::vector<int>& mapping, const std::vector<bool>& known);
+    static std::unique_ptr<Wand> randomWand();
+    static std::unique_ptr<Wand> createByType(WandType tp);
+    static std::unique_ptr<Wand> createByName(const std::string& wandName);
+
+    explicit Wand(std::string n = "Wand", int initialC = 2, WandType tp = WandType::Teleportation);
     Wand* asWand() override { return this; }
     ItemCategory category() const override { return ItemCategory::Weapon; }
-    bool isEquippable() const override { return true; }
+    bool isEquippable() const override;
     bool isUpgradable() const override { return true; }
+    bool isIdentified() const override { return Weapon::isIdentified() && isKnown() && curChargeKnown; }
+    bool isKnown() const;
+    void setKnown();
+    bool hitsChars() const { return hitChars; }
+
     std::vector<std::string> actions(Hero* hero) override;
     bool execute(Hero* hero, const std::string& action) override;
     std::string info() const override;
     std::string displayName() const override;
+    std::string status() const;
+
+    virtual std::string desc() const;
+    virtual int initialCharges() const { return INITIAL_CHARGES; }
+    int power() const;
+    int minDamage() const;
+    int maxDamage() const;
+    int damageRoll(Hero* hero = nullptr) const override;
+    int typicalSTR() const override { return 10; }
 
     void updateCharge(float dt, Hero* hero);
     void restoreCharge(int count = 1);
     void upgrade() override;
     void degrade() override;
+    Item* identify() override;
+    void wandUsed(Hero* hero);
 
+    virtual void fx(int cell, std::function<void()> callback);
     virtual void onZap(int cell);
     void cast(Hero* hero, int targetCell) override;
-    int maxDistance(const Hero* hero = nullptr) const override { (void)hero; return 8; }
+    int maxDistance(const Hero* hero = nullptr) const override { (void)hero; return 32; }
+    Item* random() override;
+    int price() const;
+    void updatePerception();
 };
 
 class WandOfMagicMissile : public Wand {
 public:
     WandOfMagicMissile();
+    int initialCharges() const override { return 3; }
     std::vector<std::string> actions(Hero* hero) override;
     bool execute(Hero* hero, const std::string& action) override;
-    std::string info() const override;
+    std::string desc() const override;
+    void fx(int cell, std::function<void()> callback) override;
+    void onZap(int cell) override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class WandOfLightning : public Wand {
+public:
+    WandOfLightning();
+    std::string desc() const override;
+    void fx(int cell, std::function<void()> callback) override;
+    void onZap(int cell) override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+private:
+    void hit(Char* ch, int damage, std::vector<Char*>& affected, std::vector<int>& points);
+};
+
+class WandOfFirebolt : public Wand {
+public:
+    WandOfFirebolt();
+    std::string desc() const override;
+    void fx(int cell, std::function<void()> callback) override;
+    void onZap(int cell) override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class WandOfDisintegration : public Wand {
+public:
+    WandOfDisintegration();
+    std::string desc() const override;
+    void fx(int cell, std::function<void()> callback) override;
+    void onZap(int cell) override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class WandOfPoison : public Wand {
+public:
+    WandOfPoison();
+    std::string desc() const override;
+    void fx(int cell, std::function<void()> callback) override;
+    void onZap(int cell) override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class WandOfSlowness : public Wand {
+public:
+    WandOfSlowness();
+    std::string desc() const override;
+    void fx(int cell, std::function<void()> callback) override;
+    void onZap(int cell) override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+using WandOfSlow = WandOfSlowness;
+
+class WandOfParalysis : public Wand {
+public:
+    WandOfParalysis();
+    std::string desc() const override;
+    void fx(int cell, std::function<void()> callback) override;
+    void onZap(int cell) override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class WandOfFlock : public Wand {
+public:
+    WandOfFlock();
+    std::string desc() const override;
+    void fx(int cell, std::function<void()> callback) override;
+    void onZap(int cell) override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class WandOfAmok : public Wand {
+public:
+    WandOfAmok();
+    std::string desc() const override;
+    void fx(int cell, std::function<void()> callback) override;
+    void onZap(int cell) override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class WandOfTeleportation : public Wand {
+public:
+    WandOfTeleportation();
+    std::string desc() const override;
+    void fx(int cell, std::function<void()> callback) override;
+    void onZap(int cell) override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class WandOfBlink : public Wand {
+public:
+    WandOfBlink();
+    std::string desc() const override;
+    void fx(int cell, std::function<void()> callback) override;
+    void onZap(int cell) override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class WandOfRegrowth : public Wand {
+public:
+    WandOfRegrowth();
+    std::string desc() const override;
+    void fx(int cell, std::function<void()> callback) override;
+    void onZap(int cell) override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class WandOfReach : public Wand {
+public:
+    WandOfReach();
+    std::string desc() const override;
+    void fx(int cell, std::function<void()> callback) override;
+    void onZap(int cell) override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class WandOfAvalanche : public Wand {
+public:
+    WandOfAvalanche();
+    std::string desc() const override;
+    void fx(int cell, std::function<void()> callback) override;
     void onZap(int cell) override;
     std::unique_ptr<Item> clone(int qty = 1) const override;
 };

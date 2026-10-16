@@ -1037,7 +1037,16 @@ int main(int argc, char* argv[]) {
             // Ranged Targeting Trajectory & Reticle Overlay
             if (bottomUI.isTargeting() && hero) {
                 int targetCell = bottomUI.getTargetCell();
-                int collisionCell = Ballistica::cast(hero->pos, targetCell, false, true);
+                Item* targetItem = bottomUI.getTargetItem();
+                bool magic = false;
+                bool hitChars = true;
+                if (targetItem) {
+                    if (Wand* w = targetItem->asWand()) {
+                        magic = true;
+                        hitChars = w->hitsChars();
+                    }
+                }
+                int collisionCell = Ballistica::cast(hero->pos, targetCell, magic, hitChars);
 
                 // Draw trajectory line / dots along Ballistica::trace
                 for (int i = 1; i < Ballistica::distance; ++i) {

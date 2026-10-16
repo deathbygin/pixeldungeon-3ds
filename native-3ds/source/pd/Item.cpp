@@ -15,6 +15,7 @@
 #include "pd/Plant.h"
 #include "pd/Sample.h"
 #include "noosa/Audio.h"
+#include "noosa/Camera.h"
 #include <sstream>
 #include <algorithm>
 
@@ -500,16 +501,204 @@ std::unique_ptr<Item> ShortSword::clone(int qty) const {
 // -----------------------------------------------------------------------------
 // Wand
 // -----------------------------------------------------------------------------
-Wand::Wand(std::string n, int initialC)
-    : Weapon(std::move(n), 2, 7, 10), maxCharges(initialC), curCharges(initialC) {
-    image = ItemSpriteSheet::WAND_MAGIC_MISSILE;
+static const std::string s_wandWoods[12] = {
+    "holly", "yew", "ebony", "cherry", "teak", "rowan",
+    "willow", "mahogany", "bamboo", "purpleheart", "oak", "birch"
+};
+static const int s_wandImages[12] = {
+    ItemSpriteSheet::WAND_HOLLY,        // 48
+    ItemSpriteSheet::WAND_YEW,          // 49
+    ItemSpriteSheet::WAND_EBONY,        // 50
+    ItemSpriteSheet::WAND_CHERRY,       // 51
+    ItemSpriteSheet::WAND_TEAK,         // 52
+    ItemSpriteSheet::WAND_ROWAN,        // 53
+    ItemSpriteSheet::WAND_WILLOW,       // 54
+    ItemSpriteSheet::WAND_MAHOGANY,     // 55
+    ItemSpriteSheet::WAND_BAMBOO,       // 68
+    ItemSpriteSheet::WAND_PURPLEHEART,  // 69
+    ItemSpriteSheet::WAND_OAK,          // 70
+    ItemSpriteSheet::WAND_BIRCH         // 71
+};
+
+static std::vector<int> s_wandWoodMap = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 };
+static std::vector<bool> s_wandKnown(14, false);
+
+void Wand::initWoods() {
+    s_wandWoodMap = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 };
+    for (int i = 11; i > 0; --i) {
+        int j = Random::Int(i + 1);
+        std::swap(s_wandWoodMap[i], s_wandWoodMap[j]);
+    }
+    std::fill(s_wandKnown.begin(), s_wandKnown.end(), false);
+    s_wandKnown[static_cast<size_t>(WandType::MagicMissile)] = true;
+}
+
+bool Wand::isKnown(WandType tp) {
+    if (tp == WandType::MagicMissile) return true;
+    size_t idx = static_cast<size_t>(tp);
+    return idx < s_wandKnown.size() ? s_wandKnown[idx] : false;
+}
+
+void Wand::setKnown(WandType tp) {
+    size_t idx = static_cast<size_t>(tp);
+    if (idx >= s_wandKnown.size()) return;
+    s_wandKnown[idx] = true;
+
+    // 11 out of 12 deduction rule
+    int knownCount = 0;
+    int unknownIdx = -1;
+    for (size_t i = 0; i < 12; ++i) {
+        if (s_wandKnown[i]) {
+            knownCount++;
+        } else {
+            unknownIdx = static_cast<int>(i);
+        }
+    }
+    if (knownCount == 11 && unknownIdx >= 0) {
+        s_wandKnown[unknownIdx] = true;
+    }
+
+    // Refresh perception in backpack and ground heaps
+    if (Dungeon::hero) {
+        for (auto& it : Dungeon::hero->belongings.backpack) {
+            if (it && it->asWand()) {
+                it->asWand()->updatePerception();
+            }
+        }
+        if (Dungeon::hero->belongings.equippedWeapon && Dungeon::hero->belongings.equippedWeapon->asWand()) {
+            Dungeon::hero->belongings.equippedWeapon->asWand()->updatePerception();
+        }
+    }
+    if (Dungeon::level) {
+        for (auto& heap : Dungeon::level->heaps) {
+            if (heap) {
+                for (auto& it : heap->items) {
+                    if (it && it->asWand()) {
+                        it->asWand()->updatePerception();
+                    }
+                }
+            }
+        }
+    }
+}
+
+bool Wand::allKnown() {
+    for (size_t i = 0; i < 12; ++i) {
+        if (!s_wandKnown[i]) return false;
+    }
+    return true;
+}
+
+const std::vector<int>& Wand::getWoodMapping() {
+    return s_wandWoodMap;
+}
+
+const std::vector<bool>& Wand::getKnownTable() {
+    return s_wandKnown;
+}
+
+void Wand::restoreStatus(const std::vector<int>& mapping, const std::vector<bool>& known) {
+    if (mapping.size() == 12) {
+        s_wandWoodMap = mapping;
+    }
+    if (known.size() >= 12) {
+        s_wandKnown = known;
+    }
+}
+
+std::unique_ptr<Wand> Wand::createByType(WandType tp) {
+    switch (tp) {
+        case WandType::Teleportation:  return std::make_unique<WandOfTeleportation>();
+        case WandType::Slowness:       return std::make_unique<WandOfSlowness>();
+        case WandType::Firebolt:       return std::make_unique<WandOfFirebolt>();
+        case WandType::Poison:         return std::make_unique<WandOfPoison>();
+        case WandType::Regrowth:       return std::make_unique<WandOfRegrowth>();
+        case WandType::Blink:          return std::make_unique<WandOfBlink>();
+        case WandType::Lightning:      return std::make_unique<WandOfLightning>();
+        case WandType::Amok:           return std::make_unique<WandOfAmok>();
+        case WandType::Reach:          return std::make_unique<WandOfReach>();
+        case WandType::Flock:          return std::make_unique<WandOfFlock>();
+        case WandType::Disintegration: return std::make_unique<WandOfDisintegration>();
+        case WandType::Avalanche:      return std::make_unique<WandOfAvalanche>();
+        case WandType::Paralysis:      return std::make_unique<WandOfParalysis>();
+        case WandType::MagicMissile:
+        default:                       return std::make_unique<WandOfMagicMissile>();
+    }
+}
+
+std::unique_ptr<Wand> Wand::createByName(const std::string& wandName) {
+    if (wandName == "Wand of Magic Missile") return std::make_unique<WandOfMagicMissile>();
+    if (wandName == "Wand of Lightning")     return std::make_unique<WandOfLightning>();
+    if (wandName == "Wand of Firebolt")      return std::make_unique<WandOfFirebolt>();
+    if (wandName == "Wand of Disintegration")return std::make_unique<WandOfDisintegration>();
+    if (wandName == "Wand of Poison")        return std::make_unique<WandOfPoison>();
+    if (wandName == "Wand of Slowness" || wandName == "Wand of Slow") return std::make_unique<WandOfSlowness>();
+    if (wandName == "Wand of Paralysis")     return std::make_unique<WandOfParalysis>();
+    if (wandName == "Wand of Flock")         return std::make_unique<WandOfFlock>();
+    if (wandName == "Wand of Amok")          return std::make_unique<WandOfAmok>();
+    if (wandName == "Wand of Teleportation") return std::make_unique<WandOfTeleportation>();
+    if (wandName == "Wand of Blink")         return std::make_unique<WandOfBlink>();
+    if (wandName == "Wand of Regrowth")      return std::make_unique<WandOfRegrowth>();
+    if (wandName == "Wand of Reach")         return std::make_unique<WandOfReach>();
+    if (wandName == "Wand of Avalanche")     return std::make_unique<WandOfAvalanche>();
+    return nullptr;
+}
+
+std::unique_ptr<Wand> Wand::randomWand() {
+    int r = Random::Int(12);
+    auto w = createByType(static_cast<WandType>(r));
+    w->random();
+    return w;
+}
+
+Item* Wand::random() {
+    if (Random::Float() < 0.5f) {
+        upgrade();
+        if (Random::Float() < 0.15f) {
+            upgrade();
+        }
+    }
+    return this;
+}
+
+Wand::Wand(std::string n, int initialC, WandType tp)
+    : Weapon(std::move(n), 1, 6, 10), maxCharges(initialC), curCharges(initialC), wandType(tp) {
+    updatePerception();
+}
+
+void Wand::updatePerception() {
+    if (wandType == WandType::MagicMissile) {
+        wood = "magic missile";
+        woodImage = ItemSpriteSheet::WAND_MAGIC_MISSILE;
+        image = woodImage;
+        identified = true;
+        levelKnown = true;
+        curChargeKnown = true;
+    } else {
+        size_t idx = static_cast<size_t>(wandType);
+        int wIdx = (idx < 12) ? s_wandWoodMap[idx] : 0;
+        wood = s_wandWoods[wIdx];
+        woodImage = s_wandImages[wIdx];
+        image = woodImage;
+        identified = isKnown(wandType) && levelKnown && curChargeKnown;
+    }
+}
+
+bool Wand::isKnown() const {
+    return isKnown(wandType);
+}
+
+void Wand::setKnown() {
+    setKnown(wandType);
+}
+
+bool Wand::isEquippable() const {
+    return Dungeon::hero && Dungeon::hero->heroClass == Hero::HeroClass::Mage;
 }
 
 std::vector<std::string> Wand::actions(Hero* hero) {
     std::vector<std::string> acts;
-    if (curCharges > 0) {
-        acts.push_back("ZAP");
-    }
+    acts.push_back("ZAP");
     if (hero && hero->heroClass == Hero::HeroClass::Mage) {
         if (hero->belongings.equippedWeapon == this) {
             acts.push_back("UNEQUIP");
@@ -525,53 +714,102 @@ std::vector<std::string> Wand::actions(Hero* hero) {
 bool Wand::execute(Hero* hero, const std::string& action) {
     if (!hero) return false;
     if (action == "ZAP") {
-        if (curCharges <= 0) {
-            GLog::w("Your wand fizzles; it must be out of charges for now.");
-            hero->spendAndNext(Actor::TICK);
-            return true;
-        }
         int targetCell = hero->pos;
-        Char* nearestEnemy = nullptr;
         float minDist = 999.0f;
         for (const auto& m : Dungeon::mobs) {
             if (m && m->isAlive() && Dungeon::visible[m->pos]) {
                 float dist = static_cast<float>(PathFinder::distanceChebyshev(hero->pos, m->pos));
                 if (dist < minDist) {
                     minDist = dist;
-                    nearestEnemy = m.get();
+                    targetCell = m->pos;
                 }
             }
         }
-        if (nearestEnemy) {
-            targetCell = nearestEnemy->pos;
-        } else {
-            for (int i = 0; i < 8; ++i) {
-                int n = hero->pos + PathFinder::NEIGHBOURS8[i];
-                if (Dungeon::level && Dungeon::level->isPassable(n)) {
-                    targetCell = n;
-                    break;
-                }
-            }
-        }
-
         cast(hero, targetCell);
         return true;
     }
     return Weapon::execute(hero, action);
 }
 
-std::string Wand::info() const {
-    std::string s = "A magical wand. When zapped, it unleashes potent arcane energy.";
-    if (Dungeon::hero && Dungeon::hero->heroClass == Hero::HeroClass::Mage) {
-        s += "\n\nYou can also equip this wand as a melee weapon.";
+std::string Wand::status() const {
+    if (levelKnown) {
+        return (curChargeKnown ? std::to_string(curCharges) : "?") + "/" + std::to_string(maxCharges);
+    }
+    return "";
+}
+
+std::string Wand::displayName() const {
+    std::string s = isKnown() ? name : (wood + " wand");
+    if (levelKnown) {
+        if (cursed && cursedKnown) s = "cursed " + s;
+        if (level > 0) s += " +" + std::to_string(level);
+        else if (level < 0) s += " " + std::to_string(level);
+    } else if (cursed && cursedKnown) {
+        s = "cursed " + s;
+    }
+    std::string st = status();
+    if (!st.empty()) {
+        s += " (" + st + ")";
     }
     return s;
 }
 
-std::string Wand::displayName() const {
-    std::string s = Weapon::displayName();
-    s += " (" + std::to_string(curCharges) + "/" + std::to_string(maxCharges) + ")";
+std::string Wand::desc() const {
+    return "A magical wand that channels arcane energy.";
+}
+
+std::string Wand::info() const {
+    std::string s = isKnown() ? desc() : ("This thin " + wood + " wand is warm to the touch. Who knows what it will do when used?");
+    if (Dungeon::hero && Dungeon::hero->heroClass == Hero::HeroClass::Mage) {
+        s += "\n\n";
+        if (levelKnown) {
+            int mn = minDamage();
+            int mx = maxDamage();
+            int avg = mn + (mx - mn) / 2;
+            s += "When this wand is used as a melee weapon, its average damage is " + std::to_string(avg) + " points per hit.";
+        } else {
+            s += "You can use this wand as a melee weapon.";
+        }
+    }
     return s;
+}
+
+int Wand::power() const {
+    int p = level;
+    if (Dungeon::hero) {
+        if (Dungeon::hero->belongings.equippedRing1 && Dungeon::hero->belongings.equippedRing1->asRing()) {
+            Ring* r = Dungeon::hero->belongings.equippedRing1->asRing();
+            if (r->effect == "Power") p += r->level + 1;
+        }
+        if (Dungeon::hero->belongings.equippedRing2 && Dungeon::hero->belongings.equippedRing2->asRing()) {
+            Ring* r = Dungeon::hero->belongings.equippedRing2->asRing();
+            if (r->effect == "Power") p += r->level + 1;
+        }
+    }
+    return std::max(0, p);
+}
+
+int Wand::minDamage() const {
+    int tier = 1 + level / 3;
+    return tier;
+}
+
+int Wand::maxDamage() const {
+    int tier = 1 + level / 3;
+    return (tier * tier - tier + 10) / 2 + level;
+}
+
+int Wand::damageRoll(Hero* hero) const {
+    int mn = minDamage();
+    int mx = maxDamage();
+    int dmg = Random::IntRange(mn, mx);
+    if (hero && hero->heroClass != Hero::HeroClass::Huntress) {
+        int ex = hero->STR - 10;
+        if (ex > 0) {
+            dmg += Random::IntRange(0, ex);
+        }
+    }
+    return dmg;
 }
 
 void Wand::updateCharge(float dt, Hero* hero) {
@@ -582,7 +820,7 @@ void Wand::updateCharge(float dt, Hero* hero) {
     chargeTimer += dt;
     float timeToCharge = 40.0f;
     if (hero && hero->heroClass == Hero::HeroClass::Mage) {
-        timeToCharge = 40.0f / std::sqrt(1.0f + static_cast<float>(level));
+        timeToCharge = 40.0f / std::sqrt(1.0f + static_cast<float>(std::max(0, level)));
     }
     if (chargeTimer >= timeToCharge) {
         chargeTimer -= timeToCharge;
@@ -596,14 +834,47 @@ void Wand::restoreCharge(int count) {
 
 void Wand::upgrade() {
     Weapon::upgrade();
-    maxCharges = std::min(9, maxCharges + 1);
+    maxCharges = std::min(initialCharges() + level, 9);
     curCharges = std::min(maxCharges, curCharges + 1);
 }
 
 void Wand::degrade() {
     Weapon::degrade();
-    maxCharges = std::max(1, maxCharges - 1);
+    maxCharges = std::min(initialCharges() + level, 9);
     curCharges = std::min(maxCharges, curCharges);
+}
+
+Item* Wand::identify() {
+    setKnown();
+    curChargeKnown = true;
+    Weapon::identify();
+    return this;
+}
+
+void Wand::wandUsed(Hero* hero) {
+    if (!hero) hero = Dungeon::hero.get();
+    curCharges--;
+    if (!isIdentified() && --usagesToKnow <= 0) {
+        identify();
+        GLog::w("You are now familiar enough with your " + displayName() + ".");
+    }
+    if (hero) {
+        hero->spendAndNext(Actor::TICK);
+    }
+}
+
+int Wand::price() const {
+    int p = 50;
+    if (levelKnown) {
+        if (level > 0) p *= (level + 1);
+        else if (level < 0) p /= (1 - level);
+    }
+    return p;
+}
+
+void Wand::fx(int cell, std::function<void()> callback) {
+    FX::magicMissile(Dungeon::hero ? Dungeon::hero->pos : 0, cell, 0x99ccffFF, callback);
+    Sample::play(Assets::SND_ZAP);
 }
 
 void Wand::onZap(int cell) {
@@ -613,41 +884,52 @@ void Wand::onZap(int cell) {
 void Wand::cast(Hero* hero, int targetCell) {
     if (!hero) return;
 
-    if (curCharges <= 0) {
-        GLog::w("Your wand fizzles; it must be out of charges for now.");
-        hero->spendAndNext(Actor::TICK);
+    if (targetCell == hero->pos) {
+        GLog::i("You can't target yourself");
         return;
     }
 
-    int cell = Ballistica::cast(hero->pos, targetCell, true, true);
+    setKnown();
+
+    int cell = Ballistica::cast(hero->pos, targetCell, true, hitChars);
     if (hero->getSprite()) {
         hero->getSprite()->turnTo(hero->pos, cell);
         HeroSprite* hspr = hero->getSprite()->asHeroSprite();
         if (hspr) hspr->operate(cell);
     }
 
-    Sample::play(Assets::SND_ZAP);
-    curCharges--;
-    onZap(cell);
-    hero->spendAndNext(Actor::TICK);
-    Actor::process();
-    if (Dungeon::level) {
-        FX::evolveBlobs(Dungeon::level.get());
+    if (curCharges > 0) {
+        hero->removeBuff(BuffType::Invisibility);
+
+        fx(cell, [this, hero, cell]() {
+            onZap(cell);
+            wandUsed(hero);
+            Actor::process();
+            if (Dungeon::level) {
+                FX::evolveBlobs(Dungeon::level.get());
+            }
+            Dungeon::mobs.erase(
+                std::remove_if(Dungeon::mobs.begin(), Dungeon::mobs.end(),
+                               [](const std::unique_ptr<Mob>& m) { return !m || !m->isAlive(); }),
+                Dungeon::mobs.end()
+            );
+        });
+    } else {
+        hero->spendAndNext(Actor::TICK);
+        GLog::w("Your wand fizzles; it must be out of charges for now.");
+        levelKnown = true;
     }
-    Dungeon::mobs.erase(
-        std::remove_if(Dungeon::mobs.begin(), Dungeon::mobs.end(),
-                       [](const std::unique_ptr<Mob>& m) { return !m || !m->isAlive(); }),
-        Dungeon::mobs.end()
-    );
 }
 
 // -----------------------------------------------------------------------------
 // WandOfMagicMissile
 // -----------------------------------------------------------------------------
-WandOfMagicMissile::WandOfMagicMissile() : Wand("Wand of Magic Missile", 3) {
+WandOfMagicMissile::WandOfMagicMissile()
+    : Wand("Wand of Magic Missile", 3, WandType::MagicMissile) {
     image = ItemSpriteSheet::WAND_MAGIC_MISSILE;
     identified = true;
     levelKnown = true;
+    curChargeKnown = true;
 }
 
 std::vector<std::string> WandOfMagicMissile::actions(Hero* hero) {
@@ -690,25 +972,787 @@ bool WandOfMagicMissile::execute(Hero* hero, const std::string& action) {
     return Wand::execute(hero, action);
 }
 
+std::string WandOfMagicMissile::desc() const {
+    return "This wand launches missiles of pure magical energy, dealing moderate damage to a target creature.";
+}
+
+void WandOfMagicMissile::fx(int cell, std::function<void()> callback) {
+    FX::magicMissile(Dungeon::hero ? Dungeon::hero->pos : 0, cell, 0x99ccffFF, callback);
+    Sample::play(Assets::SND_ZAP);
+}
+
 void WandOfMagicMissile::onZap(int cell) {
     Char* ch = Actor::findChar(cell);
     if (ch) {
-        int dmg = Random::IntRange(1, 6 + level * 2);
+        int lvl = power();
+        int dmg = Random::IntRange(1, 6 + lvl * 2);
         ch->damage(dmg, Dungeon::hero.get());
-        FX::burst(cell, 0x99ccffFF, 8 + level);
+        FX::burst(cell, 0x99ccffFF, lvl / 2 + 2);
         FX::floatingText(cell, std::to_string(dmg), 0x99ccffFF);
         GLog::i("The magic missile strikes " + ch->name + " for " + std::to_string(dmg) + " damage!");
+        if (ch == Dungeon::hero.get() && !ch->isAlive()) {
+            GLog::n("You killed yourself with your own Wand of Magic Missile...");
+        }
     } else {
         FX::burst(cell, 0x99ccffFF, 6);
     }
 }
 
-std::string WandOfMagicMissile::info() const {
-    return "This wand launches missiles of pure magical energy, dealing moderate damage to a target creature.";
-}
-
 std::unique_ptr<Item> WandOfMagicMissile::clone(int qty) const {
     auto w = std::make_unique<WandOfMagicMissile>();
+    w->level = level;
+    w->curCharges = curCharges;
+    w->maxCharges = maxCharges;
+    w->quantity = qty;
+    return w;
+}
+
+// -----------------------------------------------------------------------------
+// WandOfLightning
+// -----------------------------------------------------------------------------
+WandOfLightning::WandOfLightning()
+    : Wand("Wand of Lightning", 2, WandType::Lightning) {}
+
+std::string WandOfLightning::desc() const {
+    return "This wand conjures forth deadly arcs of electricity, which deal damage to several creatures standing close to each other.";
+}
+
+void WandOfLightning::hit(Char* ch, int damage, std::vector<Char*>& affected, std::vector<int>& points) {
+    if (damage < 1 || !ch) return;
+
+    if (ch == Dungeon::hero.get() && noosa::Camera::main) {
+        noosa::Camera::main->shake(2.0f, 0.3f);
+    }
+
+    affected.push_back(ch);
+    points.push_back(ch->pos);
+
+    bool onWater = (Dungeon::level && Dungeon::level->water[ch->pos] && !ch->flying);
+    int finalDmg = onWater ? (damage * 2) : damage;
+    ch->damage(finalDmg, Dungeon::hero.get());
+
+    FX::burst(ch->pos, 0xffff66FF, 3);
+
+    std::vector<Char*> ns;
+    for (int off : Level::NEIGHBOURS8) {
+        int n = ch->pos + off;
+        if (n >= 0 && n < Level::LENGTH) {
+            Char* neighbor = Actor::findChar(n);
+            if (neighbor && std::find(affected.begin(), affected.end(), neighbor) == affected.end()) {
+                ns.push_back(neighbor);
+            }
+        }
+    }
+
+    if (!ns.empty()) {
+        int r = Random::Int(static_cast<int>(ns.size()));
+        hit(ns[r], Random::IntRange(damage / 2, damage), affected, points);
+    }
+}
+
+void WandOfLightning::fx(int cell, std::function<void()> callback) {
+    std::vector<int> points;
+    points.push_back(Dungeon::hero ? Dungeon::hero->pos : 0);
+
+    Char* ch = Actor::findChar(cell);
+    if (ch) {
+        std::vector<Char*> affected;
+        int lvl = power();
+        hit(ch, Random::IntRange(5 + lvl / 2, 10 + lvl), affected, points);
+    } else {
+        points.push_back(cell);
+        FX::burst(cell, 0xffff66FF, 3);
+    }
+
+    FX::lightning(points, callback);
+}
+
+void WandOfLightning::onZap(int cell) {
+    (void)cell;
+    if (Dungeon::hero && !Dungeon::hero->isAlive()) {
+        GLog::n("You killed yourself with your own Wand of Lightning...");
+    }
+}
+
+std::unique_ptr<Item> WandOfLightning::clone(int qty) const {
+    auto w = std::make_unique<WandOfLightning>();
+    w->level = level;
+    w->curCharges = curCharges;
+    w->maxCharges = maxCharges;
+    w->quantity = qty;
+    return w;
+}
+
+// -----------------------------------------------------------------------------
+// WandOfFirebolt
+// -----------------------------------------------------------------------------
+WandOfFirebolt::WandOfFirebolt()
+    : Wand("Wand of Firebolt", 2, WandType::Firebolt) {}
+
+std::string WandOfFirebolt::desc() const {
+    return "This wand unleashes bursts of magical fire. It will ignite flammable terrain, and will damage and burn a creature it hits.";
+}
+
+void WandOfFirebolt::fx(int cell, std::function<void()> callback) {
+    FX::magicMissile(Dungeon::hero ? Dungeon::hero->pos : 0, cell, 0xff6600FF, callback);
+    Sample::play(Assets::SND_ZAP);
+}
+
+void WandOfFirebolt::onZap(int cell) {
+    int lvl = power();
+
+    for (int i = 1; i < Ballistica::distance - 1; ++i) {
+        int c = Ballistica::trace[i];
+        if (Dungeon::level && Dungeon::level->isFlamable(c)) {
+            FX::seedBlob(c, Blob::BlobType::FIRE, 1);
+        }
+    }
+
+    FX::seedBlob(cell, Blob::BlobType::FIRE, 1);
+
+    Char* ch = Actor::findChar(cell);
+    if (ch) {
+        ch->damage(Random::IntRange(1, 8 + lvl * lvl), Dungeon::hero.get());
+        ch->affect<Burning>();
+        FX::burst(cell, 0xff6600FF, 5);
+
+        if (ch == Dungeon::hero.get() && !ch->isAlive()) {
+            GLog::n("You killed yourself with your own Wand of Firebolt...");
+        }
+    }
+}
+
+std::unique_ptr<Item> WandOfFirebolt::clone(int qty) const {
+    auto w = std::make_unique<WandOfFirebolt>();
+    w->level = level;
+    w->curCharges = curCharges;
+    w->maxCharges = maxCharges;
+    w->quantity = qty;
+    return w;
+}
+
+// -----------------------------------------------------------------------------
+// WandOfDisintegration
+// -----------------------------------------------------------------------------
+WandOfDisintegration::WandOfDisintegration()
+    : Wand("Wand of Disintegration", 2, WandType::Disintegration) {
+    hitChars = false;
+}
+
+std::string WandOfDisintegration::desc() const {
+    return "This wand emits a beam of destructive energy, which pierces all creatures in its way. The more targets it hits, the more damage it inflicts to each of them.";
+}
+
+void WandOfDisintegration::fx(int cell, std::function<void()> callback) {
+    (void)cell;
+    int dist = level + 4;
+    int endIdx = std::min(Ballistica::distance, dist) - 1;
+    if (endIdx < 0) endIdx = 0;
+    int target = Ballistica::trace[endIdx];
+    FX::deathRay(Dungeon::hero ? Dungeon::hero->pos : 0, target, callback);
+}
+
+void WandOfDisintegration::onZap(int cell) {
+    (void)cell;
+    int lvl = power();
+    int maxDist = level + 4;
+    int rayDist = std::min(Ballistica::distance, maxDist);
+
+    bool terrainAffected = false;
+    std::vector<Char*> chars;
+
+    for (int i = 1; i < rayDist; ++i) {
+        int c = Ballistica::trace[i];
+        Char* ch = Actor::findChar(c);
+        if (ch) {
+            chars.push_back(ch);
+        }
+
+        if (Dungeon::level) {
+            int terr = Dungeon::level->map[c];
+            if (terr == Terrain::DOOR || terr == Terrain::SIGN) {
+                Dungeon::level->destroy(c);
+                terrainAffected = true;
+            } else if (terr == Terrain::HIGH_GRASS) {
+                Dungeon::level->set(c, Terrain::GRASS);
+                terrainAffected = true;
+            }
+        }
+
+        FX::burst(c, 0xaa00aaFF, Random::IntRange(1, 2));
+    }
+
+    if (terrainAffected) {
+        Dungeon::observe();
+    }
+
+    int effLvl = lvl + static_cast<int>(chars.size());
+    int dmgMin = effLvl;
+    int dmgMax = 8 + (effLvl * effLvl) / 3;
+
+    for (Char* ch : chars) {
+        if (ch && ch->isAlive()) {
+            ch->damage(Random::NormalIntRange(dmgMin, dmgMax), Dungeon::hero.get());
+            FX::burst(ch->pos, 0xaa00aaFF, 3);
+        }
+    }
+}
+
+std::unique_ptr<Item> WandOfDisintegration::clone(int qty) const {
+    auto w = std::make_unique<WandOfDisintegration>();
+    w->level = level;
+    w->curCharges = curCharges;
+    w->maxCharges = maxCharges;
+    w->quantity = qty;
+    return w;
+}
+
+// -----------------------------------------------------------------------------
+// WandOfPoison
+// -----------------------------------------------------------------------------
+WandOfPoison::WandOfPoison()
+    : Wand("Wand of Poison", 2, WandType::Poison) {}
+
+std::string WandOfPoison::desc() const {
+    return "The vile blast of this twisted bit of wood will imbue its target with a deadly venom. A creature that is poisoned will suffer periodic damage until the effect ends. The duration of the effect increases with the level of the staff.";
+}
+
+void WandOfPoison::fx(int cell, std::function<void()> callback) {
+    FX::magicMissile(Dungeon::hero ? Dungeon::hero->pos : 0, cell, 0x00cc44FF, callback);
+    Sample::play(Assets::SND_ZAP);
+}
+
+void WandOfPoison::onZap(int cell) {
+    Char* ch = Actor::findChar(cell);
+    if (ch) {
+        ch->affect<Poison>();
+        FX::burst(cell, 0x00cc44FF, 6);
+    } else {
+        GLog::i("Nothing happened.");
+    }
+}
+
+std::unique_ptr<Item> WandOfPoison::clone(int qty) const {
+    auto w = std::make_unique<WandOfPoison>();
+    w->level = level;
+    w->curCharges = curCharges;
+    w->maxCharges = maxCharges;
+    w->quantity = qty;
+    return w;
+}
+
+// -----------------------------------------------------------------------------
+// WandOfSlowness
+// -----------------------------------------------------------------------------
+WandOfSlowness::WandOfSlowness()
+    : Wand("Wand of Slowness", 2, WandType::Slowness) {}
+
+std::string WandOfSlowness::desc() const {
+    return "This wand will cause a creature to move and attack at half its ordinary speed until the effect ends.";
+}
+
+void WandOfSlowness::fx(int cell, std::function<void()> callback) {
+    FX::magicMissile(Dungeon::hero ? Dungeon::hero->pos : 0, cell, 0x8844ffFF, callback);
+    Sample::play(Assets::SND_ZAP);
+}
+
+void WandOfSlowness::onZap(int cell) {
+    Char* ch = Actor::findChar(cell);
+    if (ch) {
+        ch->affect<Slow>();
+        FX::burst(cell, 0x8844ffFF, 6);
+    } else {
+        GLog::i("Nothing happened.");
+    }
+}
+
+std::unique_ptr<Item> WandOfSlowness::clone(int qty) const {
+    auto w = std::make_unique<WandOfSlowness>();
+    w->level = level;
+    w->curCharges = curCharges;
+    w->maxCharges = maxCharges;
+    w->quantity = qty;
+    return w;
+}
+
+// -----------------------------------------------------------------------------
+// WandOfParalysis
+// -----------------------------------------------------------------------------
+WandOfParalysis::WandOfParalysis()
+    : Wand("Wand of Paralysis", 2, WandType::Paralysis) {}
+
+std::string WandOfParalysis::desc() const {
+    return "A burst of paralyzing magic that will freeze the target in place, rendering them completely helpless for several turns.";
+}
+
+void WandOfParalysis::fx(int cell, std::function<void()> callback) {
+    FX::magicMissile(Dungeon::hero ? Dungeon::hero->pos : 0, cell, 0xcccc00FF, callback);
+    Sample::play(Assets::SND_ZAP);
+}
+
+void WandOfParalysis::onZap(int cell) {
+    Char* ch = Actor::findChar(cell);
+    if (ch) {
+        ch->affect<Paralysis>();
+        FX::burst(cell, 0xcccc00FF, 6);
+    }
+    FX::seedBlob(cell, Blob::BlobType::PARALYTIC_GAS, 100);
+}
+
+std::unique_ptr<Item> WandOfParalysis::clone(int qty) const {
+    auto w = std::make_unique<WandOfParalysis>();
+    w->level = level;
+    w->curCharges = curCharges;
+    w->maxCharges = maxCharges;
+    w->quantity = qty;
+    return w;
+}
+
+// -----------------------------------------------------------------------------
+// WandOfFlock
+// -----------------------------------------------------------------------------
+WandOfFlock::WandOfFlock()
+    : Wand("Wand of Flock", 2, WandType::Flock) {}
+
+std::string WandOfFlock::desc() const {
+    return "This wand summons a magical flock of woolly sheep that block passage and absorb attacks before vanishing in a puff of wool.";
+}
+
+void WandOfFlock::fx(int cell, std::function<void()> callback) {
+    FX::magicMissile(Dungeon::hero ? Dungeon::hero->pos : 0, cell, 0xeeeeeeFF, callback);
+    Sample::play(Assets::SND_ZAP);
+}
+
+void WandOfFlock::onZap(int cell) {
+    int lvl = power();
+    int n = lvl + 2;
+
+    if (Actor::findChar(cell) && Ballistica::distance > 2) {
+        cell = Ballistica::trace[Ballistica::distance - 2];
+    }
+
+    bool passable[Level::LENGTH];
+    for (int i = 0; i < Level::LENGTH; ++i) {
+        passable[i] = Dungeon::level ? (Dungeon::level->passable[i] || Dungeon::level->avoid[i]) : true;
+    }
+    for (int pos = 0; pos < Level::LENGTH; ++pos) {
+        if (Actor::findChar(pos)) {
+            passable[pos] = false;
+        }
+    }
+
+    PathFinder::buildDistanceMap(cell, passable, n);
+    int dist = 0;
+    if (Actor::findChar(cell)) {
+        PathFinder::distance[cell] = 999999;
+        dist = 1;
+    }
+
+    float lifespan = static_cast<float>(lvl + 3);
+
+    for (int i = 0; i < n; ++i) {
+        bool placed = false;
+        while (dist < n && !placed) {
+            for (int j = 0; j < Level::LENGTH; ++j) {
+                if (PathFinder::distance[j] == dist) {
+                    auto sheep = std::make_unique<Sheep>();
+                    sheep->lifespan = lifespan;
+                    sheep->pos = j;
+                    if (Dungeon::level) Dungeon::level->mobPress(sheep.get());
+                    Dungeon::mobs.push_back(std::move(sheep));
+                    FX::burst(j, 0xeeeeeeFF, 4);
+                    PathFinder::distance[j] = 999999;
+                    placed = true;
+                    break;
+                }
+            }
+            if (!placed) dist++;
+        }
+    }
+}
+
+std::unique_ptr<Item> WandOfFlock::clone(int qty) const {
+    auto w = std::make_unique<WandOfFlock>();
+    w->level = level;
+    w->curCharges = curCharges;
+    w->maxCharges = maxCharges;
+    w->quantity = qty;
+    return w;
+}
+
+// -----------------------------------------------------------------------------
+// WandOfAmok
+// -----------------------------------------------------------------------------
+WandOfAmok::WandOfAmok()
+    : Wand("Wand of Amok", 2, WandType::Amok) {}
+
+std::string WandOfAmok::desc() const {
+    return "The purple light from this wand will make the target run amok attacking random creatures in its vicinity.";
+}
+
+void WandOfAmok::fx(int cell, std::function<void()> callback) {
+    FX::magicMissile(Dungeon::hero ? Dungeon::hero->pos : 0, cell, 0x9933ccFF, callback);
+    Sample::play(Assets::SND_ZAP);
+}
+
+void WandOfAmok::onZap(int cell) {
+    Char* ch = Actor::findChar(cell);
+    if (ch) {
+        if (ch == Dungeon::hero.get()) {
+            ch->affect<Vertigo>();
+        } else {
+            ch->affect<Amok>();
+        }
+        FX::burst(cell, 0x9933ccFF, 6);
+    } else {
+        GLog::i("Nothing happened.");
+    }
+}
+
+std::unique_ptr<Item> WandOfAmok::clone(int qty) const {
+    auto w = std::make_unique<WandOfAmok>();
+    w->level = level;
+    w->curCharges = curCharges;
+    w->maxCharges = maxCharges;
+    w->quantity = qty;
+    return w;
+}
+
+// -----------------------------------------------------------------------------
+// WandOfTeleportation
+// -----------------------------------------------------------------------------
+WandOfTeleportation::WandOfTeleportation()
+    : Wand("Wand of Teleportation", 2, WandType::Teleportation) {}
+
+std::string WandOfTeleportation::desc() const {
+    return "A blast from this wand will teleport a creature against its will to a random place on the current level.";
+}
+
+void WandOfTeleportation::fx(int cell, std::function<void()> callback) {
+    FX::magicMissile(Dungeon::hero ? Dungeon::hero->pos : 0, cell, 0x33ccffFF, callback);
+    Sample::play(Assets::SND_ZAP);
+}
+
+void WandOfTeleportation::onZap(int cell) {
+    Char* ch = Actor::findChar(cell);
+    if (ch == Dungeon::hero.get()) {
+        setKnown();
+        if (Dungeon::level) {
+            for (int tries = 0; tries < 100; ++tries) {
+                int dest = Random::Int(Level::LENGTH);
+                if (Dungeon::level->isPassable(dest) && !Actor::findChar(dest)) {
+                    FX::burst(Dungeon::hero->pos, 0x9955ffFF, 8);
+                    Dungeon::hero->place(dest);
+                    FX::burst(Dungeon::hero->pos, 0x9955ffFF, 8);
+                    Dungeon::observe();
+                    GLog::p("You feel a sudden shift in space!");
+                    Sample::play(Assets::SND_TELEPORT);
+                    break;
+                }
+            }
+        }
+    } else if (ch) {
+        int pos = -1;
+        if (Dungeon::level) {
+            for (int tries = 0; tries < 100; ++tries) {
+                int dest = Random::Int(Level::LENGTH);
+                if (Dungeon::level->isPassable(dest) && !Actor::findChar(dest)) {
+                    pos = dest;
+                    break;
+                }
+            }
+        }
+        if (pos != -1) {
+            ch->pos = pos;
+            if (ch->getSprite()) {
+                ch->getSprite()->place(pos);
+            }
+            GLog::i("Teleported " + ch->name + " to somewhere!");
+            Sample::play(Assets::SND_TELEPORT);
+            FX::burst(pos, 0x33ccffFF, 8);
+        } else {
+            GLog::w("Nothing happened.");
+        }
+    } else {
+        GLog::i("Nothing happened.");
+    }
+}
+
+std::unique_ptr<Item> WandOfTeleportation::clone(int qty) const {
+    auto w = std::make_unique<WandOfTeleportation>();
+    w->level = level;
+    w->curCharges = curCharges;
+    w->maxCharges = maxCharges;
+    w->quantity = qty;
+    return w;
+}
+
+// -----------------------------------------------------------------------------
+// WandOfBlink
+// -----------------------------------------------------------------------------
+WandOfBlink::WandOfBlink()
+    : Wand("Wand of Blink", 2, WandType::Blink) {}
+
+std::string WandOfBlink::desc() const {
+    return "This wand will allow you to teleport in the chosen direction. Creatures and inanimate obstructions will block the teleportation.";
+}
+
+void WandOfBlink::fx(int cell, std::function<void()> callback) {
+    FX::magicMissile(Dungeon::hero ? Dungeon::hero->pos : 0, cell, 0xffffffFF, callback);
+    Sample::play(Assets::SND_ZAP);
+}
+
+void WandOfBlink::onZap(int cell) {
+    int lvl = power();
+    if (Ballistica::distance > lvl + 4) {
+        cell = Ballistica::trace[lvl + 3];
+    } else if (Actor::findChar(cell) && Ballistica::distance > 1) {
+        cell = Ballistica::trace[Ballistica::distance - 2];
+    }
+    if (Dungeon::hero) {
+        Dungeon::hero->move(cell);
+        if (Dungeon::hero->getSprite()) Dungeon::hero->getSprite()->place(cell);
+        Sample::play(Assets::SND_TELEPORT);
+        FX::burst(cell, 0xffffffFF, 8);
+        Dungeon::observe();
+    }
+}
+
+std::unique_ptr<Item> WandOfBlink::clone(int qty) const {
+    auto w = std::make_unique<WandOfBlink>();
+    w->level = level;
+    w->curCharges = curCharges;
+    w->maxCharges = maxCharges;
+    w->quantity = qty;
+    return w;
+}
+
+// -----------------------------------------------------------------------------
+// WandOfRegrowth
+// -----------------------------------------------------------------------------
+WandOfRegrowth::WandOfRegrowth()
+    : Wand("Wand of Regrowth", 2, WandType::Regrowth) {}
+
+std::string WandOfRegrowth::desc() const {
+    return "\"When life ceases new life always begins to grow... The eternal cycle always remains!\"";
+}
+
+void WandOfRegrowth::fx(int cell, std::function<void()> callback) {
+    FX::magicMissile(Dungeon::hero ? Dungeon::hero->pos : 0, cell, 0x44aa22FF, callback);
+    Sample::play(Assets::SND_ZAP);
+}
+
+void WandOfRegrowth::onZap(int cell) {
+    for (int i = 1; i < Ballistica::distance - 1; ++i) {
+        int p = Ballistica::trace[i];
+        if (Dungeon::level) {
+            int c = Dungeon::level->map[p];
+            if (c == Terrain::EMPTY || c == Terrain::EMBERS || c == Terrain::EMPTY_DECO) {
+                Dungeon::level->set(p, Terrain::GRASS);
+            }
+        }
+    }
+    if (Dungeon::level) {
+        int c = Dungeon::level->map[cell];
+        if (c == Terrain::EMPTY || c == Terrain::EMBERS || c == Terrain::EMPTY_DECO ||
+            c == Terrain::GRASS || c == Terrain::HIGH_GRASS) {
+            FX::seedBlob(cell, Blob::BlobType::REGROWTH, (power() + 2) * 20);
+        } else {
+            GLog::i("Nothing happened.");
+        }
+    }
+}
+
+std::unique_ptr<Item> WandOfRegrowth::clone(int qty) const {
+    auto w = std::make_unique<WandOfRegrowth>();
+    w->level = level;
+    w->curCharges = curCharges;
+    w->maxCharges = maxCharges;
+    w->quantity = qty;
+    return w;
+}
+
+// -----------------------------------------------------------------------------
+// WandOfReach
+// -----------------------------------------------------------------------------
+WandOfReach::WandOfReach()
+    : Wand("Wand of Reach", 2, WandType::Reach) {
+    hitChars = false;
+}
+
+std::string WandOfReach::desc() const {
+    return "This utility wand can be used to grab objects from a distance and to switch places with enemies. Waves of magic force radiated from it will affect all cells on their way triggering traps, trampling high vegetation, opening closed doors and closing open ones.";
+}
+
+void WandOfReach::fx(int cell, std::function<void()> callback) {
+    FX::magicMissile(Dungeon::hero ? Dungeon::hero->pos : 0, cell, 0xccccccFF, callback);
+    Sample::play(Assets::SND_ZAP);
+}
+
+void WandOfReach::onZap(int cell) {
+    (void)cell;
+    int reach = std::min(Ballistica::distance, power() + 4);
+    bool mapUpdated = false;
+
+    for (int i = 1; i < reach; ++i) {
+        int c = Ballistica::trace[i];
+
+        Char* ch = Actor::findChar(c);
+        if (ch && ch != Dungeon::hero.get()) {
+            int tmp = Dungeon::hero->pos;
+            Dungeon::hero->pos = ch->pos;
+            ch->pos = tmp;
+            if (Dungeon::hero->getSprite()) Dungeon::hero->getSprite()->place(Dungeon::hero->pos);
+            if (ch->getSprite()) ch->getSprite()->place(ch->pos);
+            Sample::play(Assets::SND_TELEPORT);
+            FX::burst(Dungeon::hero->pos, 0xccccccFF, 5);
+            FX::burst(ch->pos, 0xccccccFF, 5);
+            break;
+        }
+
+        Heap* heap = Dungeon::level ? Dungeon::level->getHeap(c) : nullptr;
+        if (heap) {
+            if (heap->type == Heap::Type::HEAP) {
+                auto it = heap->pickUp();
+                if (it) {
+                    std::string itName = it->displayName();
+                    if (it->name == "Dewdrop") {
+                        DewVial* vial = nullptr;
+                        for (auto& bIt : Dungeon::hero->belongings.backpack) {
+                            if (bIt && bIt->asDewVial()) { vial = bIt->asDewVial(); break; }
+                        }
+                        if (vial && !vial->isFull()) {
+                            vial->collectDew(it->quantity);
+                            Sample::play(Assets::SND_DEWDROP);
+                        } else {
+                            int value = 1 + (Dungeon::depth - 1) / 5;
+                            if (Dungeon::hero->heroClass == Hero::HeroClass::Huntress) value++;
+                            int effect = std::min(Dungeon::hero->HT - Dungeon::hero->HP, value * it->quantity);
+                            if (effect > 0) {
+                                Dungeon::hero->HP += effect;
+                                FX::floatingText(Dungeon::hero->pos, "+" + std::to_string(effect), 0x38b764FF);
+                                FX::burst(Dungeon::hero->pos, 0x38b764FF, 4);
+                            }
+                            Sample::play(Assets::SND_DEWDROP);
+                        }
+                    } else if (it->name == "Gold") {
+                        int g = it->quantity;
+                        Dungeon::hero->gold += g;
+                        Dungeon::gold += g;
+                        FX::floatingText(Dungeon::hero->pos, "+" + std::to_string(g), 0xffd700FF);
+                        GLog::p("You have magically transported " + std::to_string(g) + " gold into your backpack");
+                        Sample::play(Assets::SND_GOLD);
+                    } else if (Dungeon::hero->belongings.collect(std::move(it))) {
+                        GLog::p("You have magically transported " + itName + " into your backpack");
+                        Sample::play(Assets::SND_ITEM);
+                    } else {
+                        GLog::w("Your backpack is too full to transport " + itName);
+                        if (Dungeon::level) Dungeon::level->drop(std::move(it), Dungeon::hero->pos);
+                    }
+                    if (heap->isEmpty() && Dungeon::level) {
+                        Dungeon::level->removeHeap(heap);
+                    }
+                }
+            } else {
+                heap->open(Dungeon::hero.get());
+            }
+            break;
+        }
+
+        if (Dungeon::level) {
+            int terr = Dungeon::level->map[c];
+            Dungeon::level->press(c, nullptr);
+            if (terr == Terrain::OPEN_DOOR) {
+                Dungeon::level->set(c, Terrain::DOOR);
+                mapUpdated = true;
+            } else if (Dungeon::level->water[c]) {
+                FX::ripple(c);
+            }
+        }
+    }
+
+    if (mapUpdated) {
+        Dungeon::observe();
+    }
+}
+
+std::unique_ptr<Item> WandOfReach::clone(int qty) const {
+    auto w = std::make_unique<WandOfReach>();
+    w->level = level;
+    w->curCharges = curCharges;
+    w->maxCharges = maxCharges;
+    w->quantity = qty;
+    return w;
+}
+
+// -----------------------------------------------------------------------------
+// WandOfAvalanche
+// -----------------------------------------------------------------------------
+WandOfAvalanche::WandOfAvalanche()
+    : Wand("Wand of Avalanche", 2, WandType::Avalanche) {
+    hitChars = false;
+}
+
+std::string WandOfAvalanche::desc() const {
+    return "When a discharge of this wand hits a wall (or any other solid obstacle) it causes an avalanche of stones, damaging and stunning all creatures in the affected area.";
+}
+
+void WandOfAvalanche::fx(int cell, std::function<void()> callback) {
+    FX::magicMissile(Dungeon::hero ? Dungeon::hero->pos : 0, cell, 0x886633FF, callback);
+    Sample::play(Assets::SND_ZAP);
+}
+
+void WandOfAvalanche::onZap(int cell) {
+    Sample::play(Assets::SND_ROCKS);
+    int lvl = power();
+    int size = 1 + lvl / 3;
+
+    bool nonSolid[Level::LENGTH];
+    for (int i = 0; i < Level::LENGTH; ++i) {
+        nonSolid[i] = Dungeon::level ? !Terrain::isSolid(Dungeon::level->map[i]) : true;
+    }
+
+    PathFinder::buildDistanceMap(cell, nonSolid, size);
+
+    int shake = 0;
+    for (int i = 0; i < Level::LENGTH; ++i) {
+        int d = PathFinder::distance[i];
+        if (d <= size) {
+            Char* ch = Actor::findChar(i);
+            if (ch) {
+                ch->damage(Random::IntRange(2, 6 + (size - d) * 2), Dungeon::hero.get());
+                if (ch->isAlive() && Random::Int(2 + d) == 0) {
+                    ch->affect<Paralysis>();
+                }
+            }
+
+            if (Dungeon::level) {
+                Dungeon::level->press(i, ch);
+            }
+
+            if (Dungeon::visible[i]) {
+                FX::burst(i, 0x886633FF, 3 + (size - d));
+                if (Dungeon::level && Dungeon::level->water[i]) {
+                    FX::ripple(i);
+                }
+                if (shake < size - d) {
+                    shake = size - d;
+                }
+            }
+        }
+    }
+
+    if (noosa::Camera::main) {
+        noosa::Camera::main->shake(3.0f, 0.07f * (3 + shake));
+    }
+
+    if (Dungeon::hero && !Dungeon::hero->isAlive()) {
+        GLog::n("You killed yourself with your own Wand of Avalanche...");
+    }
+}
+
+std::unique_ptr<Item> WandOfAvalanche::clone(int qty) const {
+    auto w = std::make_unique<WandOfAvalanche>();
     w->level = level;
     w->curCharges = curCharges;
     w->maxCharges = maxCharges;

@@ -412,7 +412,7 @@ void Level::affectWell(int cell, Char* ch) {
                 nr->identified = r->identified;
                 newItem = std::move(nr);
             } else if (item->asWand()) {
-                auto nw = std::make_unique<WandOfMagicMissile>();
+                auto nw = Wand::randomWand();
                 nw->level = item->level;
                 nw->cursed = item->cursed;
                 nw->identified = item->identified;
