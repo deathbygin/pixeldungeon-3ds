@@ -145,10 +145,6 @@ void Hero::initClass(HeroClass cl) {
         }
     }
 
-    if (Badges::isUnlocked(Badges::Badge::BOSS_SLAIN_2)) {
-        belongings.collect(std::make_unique<TomeOfMastery>());
-    }
-
     updateAwareness();
     sprite = CharSprite::createForHero(this);
 }
