@@ -83,6 +83,7 @@ void Hero::initClass(HeroClass cl) {
             STR = 11; // Warriors start with 11 STR
 
             auto sword = std::make_unique<ShortSword>();
+            sword->isWarriorStarter = true;
             sword->identify();
             belongings.equip(std::move(sword));
 

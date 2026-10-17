@@ -60,8 +60,10 @@ void WndItem::show(pd::Item* item, pd::Hero* hero, bool allowActions) {
             m_actions.push_back("ZAP");
         }
 
-        if (item->asShortSword()) {
-            m_actions.push_back("REFORGE");
+        if (ShortSword* ss = item->asShortSword()) {
+            if (ss->canReforge(hero)) {
+                m_actions.push_back("REFORGE");
+            }
         }
 
         m_actions.push_back("THROW");

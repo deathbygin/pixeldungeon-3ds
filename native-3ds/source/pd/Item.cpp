@@ -713,9 +713,16 @@ ShortSword::ShortSword() : MeleeWeapon("short sword", 1, 1.0f, 1.0f) {
     STR = 11;
 }
 
+bool ShortSword::canReforge(const Hero* hero) const {
+    if (!isWarriorStarter) return false;
+    if (hero && hero->heroClass != Hero::HeroClass::Warrior) return false;
+    if (level <= 0) return false;
+    return true;
+}
+
 std::vector<std::string> ShortSword::actions(Hero* hero) {
     auto acts = Weapon::actions(hero);
-    if (level > 0) {
+    if (canReforge(hero)) {
         acts.push_back("REFORGE");
     }
     return acts;
@@ -724,6 +731,14 @@ std::vector<std::string> ShortSword::actions(Hero* hero) {
 bool ShortSword::execute(Hero* hero, const std::string& action) {
     if (!hero) return false;
     if (action == "REFORGE") {
+        if (!isWarriorStarter || hero->heroClass != Hero::HeroClass::Warrior) {
+            GLog::w("Only the Warrior's starting short sword can be reforged!");
+            return false;
+        }
+        if (level <= 0) {
+            GLog::w("The short sword must be upgraded before it can be reforged!");
+            return false;
+        }
         if (ui::BottomScreenUI::instance()) {
             ui::BottomScreenUI::instance()->selectItem(ui::WndBag::Mode::WEAPON, "Select a weapon to upgrade", [this, hero](Item* target) {
                 if (!target) return;
@@ -766,7 +781,9 @@ std::string ShortSword::desc() const {
 
 std::string ShortSword::info() const {
     std::string s = MeleeWeapon::info();
-    s += "\n\nWhen upgraded, it can be reforged to upgrade another melee weapon.";
+    if (isWarriorStarter && (!Dungeon::hero || Dungeon::hero->heroClass == Hero::HeroClass::Warrior)) {
+        s += "\n\nWhen upgraded, it can be reforged to upgrade another melee weapon.";
+    }
     return s;
 }
 
@@ -780,6 +797,7 @@ std::unique_ptr<Item> ShortSword::clone(int qty) const {
     s->cursedKnown = cursedKnown;
     s->enchantment = enchantment;
     s->imbue = imbue;
+    s->isWarriorStarter = isWarriorStarter;
     return s;
 }
 

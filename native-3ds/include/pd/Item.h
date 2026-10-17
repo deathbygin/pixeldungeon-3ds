@@ -204,9 +204,12 @@ public:
 
 class ShortSword : public MeleeWeapon {
 public:
+    bool isWarriorStarter = false;
+
     ShortSword();
     ShortSword* asShortSword() override { return this; }
     int max0() const override { return 12; }
+    bool canReforge(const Hero* hero = nullptr) const;
     std::vector<std::string> actions(Hero* hero) override;
     bool execute(Hero* hero, const std::string& action) override;
     std::string desc() const override;
