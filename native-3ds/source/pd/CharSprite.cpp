@@ -480,6 +480,14 @@ std::unique_ptr<CharSprite> CharSprite::createForMob(Mob* mob) {
             sprite->m_die = noosa::Animation(1.0f / 20.0f, { 0 }, false);
             break;
 
+        case Mob::MobType::Mimic:
+            sprite->init(Assets::MIMIC, 16, 16);
+            sprite->m_idle = noosa::Animation(1.0f / 5.0f, { 0, 0, 0, 1, 1 }, true);
+            sprite->m_run = noosa::Animation(1.0f / 10.0f, { 0, 1, 2, 3, 3, 2, 1 }, true);
+            sprite->m_attack = noosa::Animation(1.0f / 10.0f, { 0, 4, 5, 6 }, false);
+            sprite->m_die = noosa::Animation(1.0f / 5.0f, { 7, 8, 9 }, false);
+            break;
+
         default:
             sprite->init(Assets::RAT, 16, 15);
             sprite->m_idle = noosa::Animation(1.0f / 2.0f, { 0, 0, 0, 1 }, true);

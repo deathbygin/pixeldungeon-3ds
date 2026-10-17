@@ -1742,4 +1742,158 @@ void Sheep::interact() {
     yell(quotes[Random::Int(4)]);
 }
 
+// -----------------------------------------------------------------------------
+// Mimic
+// -----------------------------------------------------------------------------
+Mimic::Mimic() {
+    name = "mimic";
+    adjustStats(Dungeon::depth);
+    state = State::HUNTING;
+}
+
+std::string Mimic::description() const {
+    return "Mimics are magical creatures which can take any shape they wish. In dungeons they almost always "
+           "choose a shape of a treasure chest, because they know how to beckon an adventurer.";
+}
+
+void Mimic::adjustStats(int dungeonDepth) {
+    level = dungeonDepth;
+    HT = (3 + level) * 4;
+    HP = HT;
+    expAward = 2 + 2 * (level - 1) / 5;
+    enemySeen = true;
+}
+
+int Mimic::damageRoll() {
+    return Random::IntRange(std::max(1, HT / 10), std::max(2, HT / 4));
+}
+
+int Mimic::attackSkill(Char* target) {
+    (void)target;
+    return 9 + level;
+}
+
+int Mimic::defenseSkill(Char* attacker) {
+    (void)attacker;
+    return (9 + level) / 2;
+}
+
+int Mimic::dr() {
+    return level / 2;
+}
+
+int Mimic::attackProc(Char* enemyChar, int damage) {
+    if (enemyChar == Dungeon::hero.get() && damage > 0 && Random::Int(3) == 0) {
+        Hero* h = Dungeon::hero.get();
+        int currentGold = h->gold > 0 ? h->gold : Dungeon::gold;
+        if (currentGold > 0) {
+            int amount = Random::IntRange(std::max(1, currentGold / 10), std::max(1, currentGold / 2));
+            amount = std::min(amount, currentGold);
+            h->gold = std::max(0, h->gold - amount);
+            Dungeon::gold = std::max(0, Dungeon::gold - amount);
+            if (Dungeon::level) {
+                int dropPos = getSafeDropCell(Dungeon::level.get(), h->pos);
+                Dungeon::level->drop(std::make_unique<Gold>(amount), dropPos);
+            }
+            GLog::n("You dropped some gold!");
+            Sample::play(Assets::SND_GOLD);
+            FX::floatingText(h->pos, "-" + std::to_string(amount), 0xffd700FF);
+        }
+    }
+    return Mob::attackProc(enemyChar, damage);
+}
+
+std::unique_ptr<Item> Mimic::createChestDrop() {
+    float roll = Random::Float();
+    std::unique_ptr<Item> item;
+    if (roll < 0.25f) {
+        item = std::make_unique<Potion>(static_cast<Potion::PotionType>(Random::Int(12)));
+    } else if (roll < 0.50f) {
+        item = Scroll::createRandom();
+    } else if (roll < 0.70f) {
+        item = std::make_unique<Food>();
+    } else if (roll < 0.85f) {
+        item = std::make_unique<Gold>(Random::IntRange(10 * Dungeon::depth, 30 * Dungeon::depth));
+    } else if (roll < 0.93f) {
+        auto w = std::make_unique<Weapon>("Sword", 3, 8 + Dungeon::depth, 10 + Dungeon::depth);
+        w->random();
+        item = std::move(w);
+    } else {
+        auto a = std::make_unique<Armor>("Armor", 1 + Dungeon::depth / 5, 10 + Dungeon::depth);
+        a->random();
+        item = std::move(a);
+    }
+    return item;
+}
+
+void Mimic::die(Actor* src) {
+    if (Dungeon::level) {
+        if (!items.empty()) {
+            for (auto& item : items) {
+                if (item) {
+                    int dropPos = getSafeDropCell(Dungeon::level.get(), pos);
+                    Dungeon::level->drop(std::move(item), dropPos);
+                }
+            }
+            items.clear();
+        } else {
+            int dropPos = getSafeDropCell(Dungeon::level.get(), pos);
+            Dungeon::level->drop(createChestDrop(), dropPos);
+        }
+    }
+    Mob::die(src);
+}
+
+Mimic* Mimic::spawnAt(int pos, std::vector<std::unique_ptr<Item>> chestItems) {
+    if (!Dungeon::level) return nullptr;
+
+    Char* ch = Actor::findChar(pos);
+    if (ch) {
+        std::vector<int> candidates;
+        for (int n : Level::NEIGHBOURS8) {
+            int cell = pos + n;
+            if (cell >= 0 && cell < Level::LENGTH && Dungeon::level->isPassable(cell) && !Actor::findChar(cell)) {
+                candidates.push_back(cell);
+            }
+        }
+        if (!candidates.empty()) {
+            int newPos = candidates[Random::Int(static_cast<int>(candidates.size()))];
+            Actor::freeCell(ch->pos);
+            ch->pos = newPos;
+            Actor::occupyCell(ch);
+            if (ch->getSprite()) {
+                ch->getSprite()->place(newPos);
+            }
+        } else {
+            return nullptr;
+        }
+    }
+
+    auto m = std::make_unique<Mimic>();
+    m->adjustStats(Dungeon::depth);
+    m->pos = pos;
+    m->state = State::HUNTING;
+    m->enemy = Dungeon::hero.get();
+    m->enemySeen = true;
+    m->items = std::move(chestItems);
+
+    Mimic* ptr = m.get();
+    Actor::occupyCell(ptr);
+    Actor::add(ptr, 1.0f);
+
+    if (Dungeon::hero && ptr->getSprite()) {
+        ptr->getSprite()->turnTo(pos, Dungeon::hero->pos);
+    }
+
+    if (Dungeon::visible[pos]) {
+        FX::burst(pos, 0xffd700FFu, 10);
+        Sample::playAt(Assets::SND_MIMIC, pos);
+    }
+
+    GLog::n("This is a mimic!");
+
+    Dungeon::mobs.push_back(std::move(m));
+    return ptr;
+}
+
 } // namespace pd

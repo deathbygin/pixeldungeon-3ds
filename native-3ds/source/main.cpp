@@ -219,6 +219,7 @@ int main(int argc, char* argv[]) {
     auto dm300Tex = Texture::get(Assets::DM300);
     auto kingTex  = Texture::get(Assets::KING);
     auto yogTex   = Texture::get(Assets::YOG);
+    auto mimicTex = Texture::get(Assets::MIMIC);
     auto itemsTex = Texture::get(Assets::ITEMS);
     auto plantsTex = Texture::get(Assets::PLANTS);
 
@@ -245,6 +246,7 @@ int main(int argc, char* argv[]) {
     std::shared_ptr<TextureFilm> dm300Film;
     std::shared_ptr<TextureFilm> kingFilm;
     std::shared_ptr<TextureFilm> yogFilm;
+    std::shared_ptr<TextureFilm> mimicFilm;
     std::shared_ptr<TextureFilm> itemsFilm;
     std::shared_ptr<TextureFilm> plantsFilm;
 
@@ -271,6 +273,7 @@ int main(int argc, char* argv[]) {
     if (dm300Tex && dm300Tex->isLoaded())     dm300Film    = std::make_shared<TextureFilm>(dm300Tex, 22, 20);
     if (kingTex && kingTex->isLoaded())       kingFilm     = std::make_shared<TextureFilm>(kingTex, 16, 16);
     if (yogTex && yogTex->isLoaded())         yogFilm      = std::make_shared<TextureFilm>(yogTex, 20, 19);
+    if (mimicTex && mimicTex->isLoaded())     mimicFilm    = std::make_shared<TextureFilm>(mimicTex, 16, 16);
     if (itemsTex && itemsTex->isLoaded())     itemsFilm    = std::make_shared<TextureFilm>(itemsTex, 16, 16);
     if (plantsTex && plantsTex->isLoaded())   plantsFilm   = std::make_shared<TextureFilm>(plantsTex, 16, 16);
 

@@ -3045,10 +3045,14 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
                     }
                 }
                 if (Dungeon::level) {
+                    std::vector<Heap*> mimicHeaps;
                     for (auto& h : Dungeon::level->heaps) {
                         if (h && h->type == Heap::Type::MIMIC) {
-                            h->open(hero);
+                            mimicHeaps.push_back(h.get());
                         }
+                    }
+                    for (Heap* h : mimicHeaps) {
+                        h->open(hero);
                     }
                 }
                 break;

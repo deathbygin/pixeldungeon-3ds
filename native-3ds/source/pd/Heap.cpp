@@ -7,6 +7,7 @@
 #include "pd/Assets.h"
 #include "pd/Sample.h"
 #include "pd/Mob.h"
+#include "pd/Buff.h"
 #include "noosa/Audio.h"
 #include <algorithm>
 
@@ -47,11 +48,19 @@ void Heap::open(Hero* hero) {
         FX::burst(pos, 0xffd700FFu, 6);
         type = Type::HEAP;
         break;
-    case Type::MIMIC:
-        Sample::playAt(Assets::SND_MIMIC, pos);
-        FX::burst(pos, 0x9955ffFFu, 8);
-        type = Type::HEAP;
+    case Type::MIMIC: {
+        int p = pos;
+        auto itemsToMove = std::move(items);
+        if (Mimic::spawnAt(p, std::move(itemsToMove))) {
+            if (Dungeon::level) {
+                Dungeon::level->removeHeap(this);
+            }
+            return;
+        } else {
+            type = Type::CHEST;
+        }
         break;
+    }
     case Type::SKELETON: {
         GLog::i("You search the skeletal remains...");
         FX::burst(pos, 0xd0c090FFu, 8);
@@ -157,6 +166,19 @@ void Heap::replace(Item* oldItem, std::unique_ptr<Item> newItem) {
 }
 
 void Heap::burn() {
+    if (type == Type::MIMIC) {
+        int p = pos;
+        auto itemsToMove = std::move(items);
+        Mimic* m = Mimic::spawnAt(p, std::move(itemsToMove));
+        if (m) {
+            m->affect<Burning>(5);
+            FX::burst(p, 0xee7722FF, 6);
+            if (Dungeon::level) {
+                Dungeon::level->removeHeap(this);
+            }
+            return;
+        }
+    }
     if (type != Type::HEAP) return;
 
     bool burnt = false;
@@ -179,6 +201,19 @@ void Heap::burn() {
 }
 
 void Heap::freeze() {
+    if (type == Type::MIMIC) {
+        int p = pos;
+        auto itemsToMove = std::move(items);
+        Mimic* m = Mimic::spawnAt(p, std::move(itemsToMove));
+        if (m) {
+            m->affect<Frost>();
+            FX::burst(p, 0x66ccffFF, 6);
+            if (Dungeon::level) {
+                Dungeon::level->removeHeap(this);
+            }
+            return;
+        }
+    }
     if (type != Type::HEAP) return;
 
     for (auto& item : items) {

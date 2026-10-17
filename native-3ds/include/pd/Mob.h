@@ -45,7 +45,8 @@ public:
         King,
         Yog,
         MirrorImage,
-        Sheep
+        Sheep,
+        Mimic
     };
 
     State state = State::SLEEPING;
@@ -420,6 +421,26 @@ public:
     int defenseSkill(Char* attacker) override;
     void aiStep(Hero* hero, Level* currentLevel) override { (void)hero; (void)currentLevel; }
     void interact();
+};
+
+class Mimic : public Mob {
+public:
+    int level = 1;
+    std::vector<std::unique_ptr<Item>> items;
+
+    Mimic();
+    MobType mobType() const override { return MobType::Mimic; }
+    std::string description() const override;
+    int damageRoll() override;
+    int attackSkill(Char* target) override;
+    int defenseSkill(Char* attacker) override;
+    int dr() override;
+    int attackProc(Char* enemy, int damage) override;
+    void die(Actor* src) override;
+    void adjustStats(int dungeonDepth);
+
+    static std::unique_ptr<Item> createChestDrop();
+    static Mimic* spawnAt(int pos, std::vector<std::unique_ptr<Item>> chestItems = {});
 };
 
 } // namespace pd

@@ -253,7 +253,7 @@ std::string BottomScreenUI::getHoverPreviewText(int cell, const pd::Level* level
     // 3. Item Heap
     Heap* heap = level->getHeap(cell);
     if (heap && (level->visited[cell] || Dungeon::visible[cell])) {
-        if (heap->type == Heap::Type::CHEST) return "Chest (unlocked)";
+        if (heap->type == Heap::Type::CHEST || heap->type == Heap::Type::MIMIC) return "Chest (unlocked)";
         if (heap->type == Heap::Type::LOCKED_CHEST) return "Locked Chest";
         if (heap->type == Heap::Type::CRYSTAL_CHEST) return "Crystal Chest";
         if (heap->type == Heap::Type::TOMB) return "Tomb";
@@ -1463,7 +1463,7 @@ void BottomScreenUI::inspectCell(int cell, pd::Level* level) {
     // 3. Check for item heap
     Heap* heap = level->getHeap(cell);
     if (heap && (level->visited[cell] || Dungeon::visible[cell])) {
-        if (heap->type == Heap::Type::CHEST) {
+        if (heap->type == Heap::Type::CHEST || heap->type == Heap::Type::MIMIC) {
             showMessage("Chest\n\nThis wooden chest is unlocked and may hold valuable treasure.");
             return;
         } else if (heap->type == Heap::Type::LOCKED_CHEST) {

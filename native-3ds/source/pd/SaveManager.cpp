@@ -1006,6 +1006,7 @@ bool SaveManager::loadGame(const std::string& customPath) {
             case Mob::MobType::DM300:    mob = std::make_unique<DM300>(); break;
             case Mob::MobType::King:     mob = std::make_unique<King>(); break;
             case Mob::MobType::Yog:      mob = std::make_unique<Yog>(); break;
+            case Mob::MobType::Mimic:    mob = std::make_unique<Mimic>(); break;
             default:                     mob = std::make_unique<Rat>(); break;
         }
 
