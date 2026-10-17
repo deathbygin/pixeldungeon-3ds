@@ -162,10 +162,9 @@ Toolbar::Action Toolbar::update(const TouchController& touch, u32 kDown, pd::Her
     noosa::RectF rSearch(24.0f, 208.0f, 20.0f, 29.0f);
     noosa::RectF rInfo(44.0f, 208.0f, 21.0f, 29.0f);
 
-    // Right cluster: Bag (23px), Quickslot 1 (22px), Quickslot 2 (22px) -> x: 249..316
-    noosa::RectF rBag(249.0f, 208.0f, 23.0f, 29.0f);
-    noosa::RectF rQ1(272.0f, 208.0f, 22.0f, 29.0f);
-    noosa::RectF rQ2(294.0f, 208.0f, 22.0f, 29.0f);
+    // Right cluster: Bag (23px), Quickslot (22px) -> x: 271..316
+    noosa::RectF rBag(271.0f, 208.0f, 23.0f, 29.0f);
+    noosa::RectF rQ1(294.0f, 208.0f, 22.0f, 29.0f);
 
     // Track press state for visual feedback
     m_pressedTool = -1;
@@ -177,7 +176,6 @@ Toolbar::Action Toolbar::update(const TouchController& touch, u32 kDown, pd::Her
         else if (rInfo.contains(tx, ty)) m_pressedTool = 2;
         else if (rBag.contains(tx, ty)) m_pressedTool = 3;
         else if (rQ1.contains(tx, ty)) m_pressedTool = 4;
-        else if (rQ2.contains(tx, ty)) m_pressedTool = 5;
     }
 
     if (touch.clicked(rWait)) {
@@ -200,10 +198,6 @@ Toolbar::Action Toolbar::update(const TouchController& touch, u32 kDown, pd::Her
         Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
         return Action::QUICK1;
     }
-    if (touch.clicked(rQ2)) {
-        Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
-        return Action::QUICK2;
-    }
 
     return Action::NONE;
 }
@@ -211,6 +205,7 @@ Toolbar::Action Toolbar::update(const TouchController& touch, u32 kDown, pd::Her
 void Toolbar::draw(const pd::Hero* hero, C2D_TextBuf textBuf, bool isTargeting, const pd::Item* targetItem, bool isExamining) const {
     (void)hero;
     (void)textBuf;
+    (void)targetItem;
     if (!m_texToolbar || !m_texToolbar->isLoaded()) return;
 
     int potW = m_texToolbar->potWidth();
@@ -274,18 +269,16 @@ void Toolbar::draw(const pd::Hero* hero, C2D_TextBuf textBuf, bool isTargeting, 
     }
 
     // -------------------------------------------------------------
-    // RIGHT CLUSTER: Continuous Quickslot Strip (Bag, Q1, Q2)
+    // RIGHT CLUSTER: Continuous Quickslot Strip (Bag, Quickslot)
     // Slices from toolbar.png (y=7, h=25):
-    // Bag: (60, 7, 23, 25) at x = 249.0f
-    // Quickslot 1: (83, 7, 22, 25) at x = 272.0f (recessed well)
-    // Quickslot 2: (83, 7, 22, 25) at x = 294.0f (recessed well)
-    // Together: 67x25 seamless continuous grey stone bar
+    // Bag: (60, 7, 23, 25) at x = 271.0f
+    // Quickslot: (83, 7, 22, 25) at x = 294.0f (recessed well)
+    // Together: 45x25 seamless continuous grey stone bar
     // -------------------------------------------------------------
-    drawTool(m_subBag,        60, 7, 23, 25, 249.0f, Y_POS, 3);
-    drawTool(m_subQuickSlot1, 83, 7, 22, 25, 272.0f, Y_POS, 4);
-    drawTool(m_subQuickSlot2, 83, 7, 22, 25, 294.0f, Y_POS, 5);
+    drawTool(m_subBag,        60, 7, 23, 25, 271.0f, Y_POS, 3);
+    drawTool(m_subQuickSlot1, 83, 7, 22, 25, 294.0f, Y_POS, 4);
 
-    // Draw Assigned Items inside Quickslots
+    // Draw Assigned Item inside Quickslot
     if (m_texItems && m_texItems->isLoaded()) {
         int iPotW = m_texItems->potWidth();
         int iPotH = m_texItems->potHeight();
@@ -336,19 +329,13 @@ void Toolbar::draw(const pd::Hero* hero, C2D_TextBuf textBuf, bool isTargeting, 
             }
         };
 
-        drawSlotItem(m_slot1, 272.0f, m_subItem1, 4);
-        drawSlotItem(m_slot2, 294.0f, m_subItem2, 5);
+        drawSlotItem(m_slot1, 294.0f, m_subItem1, 4);
     }
 
     // Crosshair target overlay when targeting mode is active
     if (isTargeting && m_texIcons && m_texIcons->isLoaded()) {
-        float crossX = 272.0f; // default to quickslot 1
+        float crossX = 294.0f;
         int crossTool = 4;
-        pd::Item* it2 = m_slot2.resolve(hero);
-        if (targetItem && it2 && targetItem == it2) {
-            crossX = 294.0f;
-            crossTool = 5;
-        }
 
         int oPotW = m_texIcons->potWidth();
         int oPotH = m_texIcons->potHeight();

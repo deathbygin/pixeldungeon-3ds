@@ -830,72 +830,10 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
             // 1. If slot is empty: open inventory in QUICKSLOT mode
             if (slot.isEmpty()) {
                 Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
-                selectItem(WndBag::Mode::QUICKSLOT, "Select item for Quickslot 1", [this](Item* it) {
+                selectItem(WndBag::Mode::QUICKSLOT, "Select item for Quickslot", [this](Item* it) {
                     if (it) {
-                        m_toolbar.setQuickItem1(it);
-                        log("Quickslot 1 assigned: " + it->displayName(), COLOR_TEXT_POSITIVE);
-                    }
-                });
-                return false;
-            }
-
-            // 2. Resolve active item
-            pd::Item* qIt = slot.resolve(hero);
-
-            // 3. If slot is ghost / depleted (quantity <= 0 or not found):
-            if (slot.isGhost(hero) || !qIt || qIt->quantity <= 0) {
-                Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
-                std::string name = !slot.placeholderName.empty() ? slot.placeholderName : "Item";
-                log(name + " is depleted!", COLOR_TEXT_WARNING);
-                return false;
-            }
-
-            // 4. Quick-fire double tap: if targeting is already active for this item
-            if (m_isTargeting && m_targetItem == qIt) {
-                int target = m_targetCell;
-                Char* targetChar = Actor::findChar(target);
-                if (targetChar && targetChar != hero) {
-                    setLastTarget(targetChar);
-                }
-                cancelTargeting();
-                qIt->cast(hero, target);
-                return false;
-            }
-
-            // 5. Activate default action
-            std::string act = !qIt->defaultAction.empty() ? qIt->defaultAction :
-                              (qIt->asWand() ? "ZAP" :
-                              (qIt->asMissile() ? "THROW" :
-                              (qIt->category() == ItemCategory::Potion ? "DRINK" :
-                              (qIt->category() == ItemCategory::Scroll ? "READ" : "USE"))));
-
-            if (act == "THROW" || act == "ZAP") {
-                startTargeting(qIt);
-                log("Aiming " + qIt->displayName() + "...", COLOR_TEXT_ACCENT);
-                return false;
-            } else {
-                log(act + " " + qIt->displayName(), COLOR_TEXT_POSITIVE);
-                bool used = qIt->execute(hero, act);
-                if (used) {
-                    if (qIt->quantity <= 0) hero->belongings.drop(qIt);
-                    Actor::process();
-                    return true;
-                }
-                return false;
-            }
-        }
-
-        case Toolbar::Action::QUICK2: {
-            if (!hero->isAlive()) return false;
-            QuickSlot& slot = m_toolbar.getSlot2();
-
-            // 1. If slot is empty: open inventory in QUICKSLOT mode
-            if (slot.isEmpty()) {
-                Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
-                selectItem(WndBag::Mode::QUICKSLOT, "Select item for Quickslot 2", [this](Item* it) {
-                    if (it) {
-                        m_toolbar.setQuickItem2(it);
-                        log("Quickslot 2 assigned: " + it->displayName(), COLOR_TEXT_POSITIVE);
+                        m_toolbar.setQuickItem(it);
+                        log("Quickslot assigned: " + it->displayName(), COLOR_TEXT_POSITIVE);
                     }
                 });
                 return false;

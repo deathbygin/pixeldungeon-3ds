@@ -47,8 +47,8 @@ public:
         SEARCH,
         INFO,
         BAG,
-        QUICK1,
-        QUICK2
+        QUICK,
+        QUICK1 = QUICK
     };
 
     Toolbar();
@@ -61,16 +61,17 @@ public:
     Action update(const TouchController& touch, u32 kDown, pd::Hero* hero);
     void draw(const pd::Hero* hero, C2D_TextBuf textBuf, bool isTargeting = false, const pd::Item* targetItem = nullptr, bool isExamining = false) const;
 
+    void setQuickItem(pd::Item* it) { m_slot1.set(it); }
     void setQuickItem1(pd::Item* it) { m_slot1.set(it); }
-    void setQuickItem2(pd::Item* it) { m_slot2.set(it); }
+    pd::Item* getQuickItem(const pd::Hero* hero = nullptr) const { return m_slot1.resolve(hero); }
     pd::Item* getQuickItem1(const pd::Hero* hero = nullptr) const { return m_slot1.resolve(hero); }
-    pd::Item* getQuickItem2(const pd::Hero* hero = nullptr) const { return m_slot2.resolve(hero); }
 
+    const QuickSlot& getSlot() const { return m_slot1; }
     const QuickSlot& getSlot1() const { return m_slot1; }
-    const QuickSlot& getSlot2() const { return m_slot2; }
+    QuickSlot& getSlot() { return m_slot1; }
     QuickSlot& getSlot1() { return m_slot1; }
-    QuickSlot& getSlot2() { return m_slot2; }
-    void clearQuickslots() { m_slot1.clear(); m_slot2.clear(); }
+    void clearQuickslot() { m_slot1.clear(); }
+    void clearQuickslots() { m_slot1.clear(); }
 
 private:
     std::shared_ptr<noosa::Texture> m_texToolbar;
@@ -78,19 +79,16 @@ private:
     std::shared_ptr<noosa::Texture> m_texIcons;
 
     QuickSlot m_slot1;
-    QuickSlot m_slot2;
 
     mutable Tex3DS_SubTexture m_subWait{};
     mutable Tex3DS_SubTexture m_subSearch{};
     mutable Tex3DS_SubTexture m_subInfo{};
     mutable Tex3DS_SubTexture m_subBag{};
     mutable Tex3DS_SubTexture m_subQuickSlot1{};
-    mutable Tex3DS_SubTexture m_subQuickSlot2{};
     mutable Tex3DS_SubTexture m_subItem1{};
-    mutable Tex3DS_SubTexture m_subItem2{};
     mutable Tex3DS_SubTexture m_subTargetCross{};
 
-    int m_pressedTool = -1; // 0: wait, 1: search, 2: info, 3: bag, 4: q2, 5: q1
+    int m_pressedTool = -1; // 0: wait, 1: search, 2: info, 3: bag, 4: q1
 };
 
 } // namespace pd::ui
