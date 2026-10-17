@@ -269,8 +269,9 @@ bool WndItem::update(pd::Hero* hero, const TouchController& touch, u32 kDown, u3
                 return false;
             }
 
+            pd::Item* targetItem = m_item;
             hide();
-            bool used = m_item->execute(hero, action);
+            bool used = (targetItem && hero) ? targetItem->execute(hero, action) : false;
             return used;
         }
     }

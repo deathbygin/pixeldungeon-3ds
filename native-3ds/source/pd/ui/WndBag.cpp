@@ -102,6 +102,7 @@ bool WndBag::update(pd::Hero* hero, const TouchController& touch, u32 kDown, u32
     if (m_wndItem.isOpen()) {
         std::string action;
         pd::Item* subIt = m_wndItem.getItem();
+        std::string subName = subIt ? subIt->displayName() : "";
         bool turnAdvanced = m_wndItem.update(hero, touch, kDown, kHeld, action);
 
         if (!m_wndItem.isOpen()) {
@@ -118,9 +119,9 @@ bool WndBag::update(pd::Hero* hero, const TouchController& touch, u32 kDown, u32
             if (isSelectionMode()) {
                 return false;
             }
-            if (turnAdvanced && subIt) {
-                outMessage = action + " " + subIt->displayName();
-                if (subIt->quantity <= 0) {
+            if (turnAdvanced) {
+                outMessage = action + " " + subName;
+                if (subIt && subIt->quantity <= 0) {
                     hero->belongings.drop(subIt);
                 }
                 close();

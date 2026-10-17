@@ -1905,6 +1905,7 @@ bool Armor::execute(Hero* hero, const std::string& action) {
     if (!hero) return false;
     if (action == "EQUIP") {
         hero->belongings.equip(this);
+        hero->updateArmorTier();
         cursedKnown = true;
         if (cursed) {
             FX::burst(hero->pos, 0x550055FFu, 8);
@@ -1923,6 +1924,7 @@ bool Armor::execute(Hero* hero, const std::string& action) {
             return false;
         }
         hero->belongings.unequip(this);
+        hero->updateArmorTier();
         hero->spendAndNext(Actor::TICK);
         return true;
     } else if (action == "DROP") {
