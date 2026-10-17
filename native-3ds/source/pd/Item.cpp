@@ -36,6 +36,15 @@ std::string Item::displayName() const {
     return s;
 }
 
+void Item::notifyIdentified(Hero* hero) {
+    if (!hero) hero = Dungeon::hero.get();
+    Sample::play(Assets::SND_ITEM);
+    if (hero) {
+        FX::floatingText(hero->pos, displayName() + " is identified", 0xffd700FF);
+    }
+    GLog::i("You are now familiar enough with your " + displayName() + " to identify it.");
+}
+
 Item* Item::random() {
     return this;
 }
@@ -402,7 +411,8 @@ void Weapon::proc(Char* attacker, Char* defender, int damage) {
     if (!levelKnown) {
         if (--hitsToKnow <= 0) {
             identify();
-            GLog::i("You are now familiar enough with your " + name + " to identify it. It is " + displayName() + ".");
+            Hero* h = (attacker == Dungeon::hero.get()) ? Dungeon::hero.get() : nullptr;
+            notifyIdentified(h);
         }
     }
 
@@ -875,7 +885,7 @@ void Wand::wandUsed(Hero* hero) {
     curCharges--;
     if (!isIdentified() && --usagesToKnow <= 0) {
         identify();
-        GLog::w("You are now familiar enough with your " + displayName() + ".");
+        notifyIdentified(hero);
     }
     if (hero) {
         hero->spendAndNext(Actor::TICK);
@@ -907,8 +917,6 @@ void Wand::cast(Hero* hero, int targetCell) {
         GLog::i("You can't target yourself");
         return;
     }
-
-    setKnown();
 
     int cell = Ballistica::cast(hero->pos, targetCell, true, hitChars);
     Char* hitChar = Actor::findChar(cell);
@@ -1978,11 +1986,11 @@ int Armor::drRoll() const {
 
 int Armor::proc(Char* attacker, Char* defender, int damage) {
     (void)attacker;
-    (void)defender;
     if (!levelKnown) {
         if (--hitsToKnow <= 0) {
             identify();
-            GLog::w("You are now familiar enough with your " + name + " to identify it. It is " + displayName() + ".");
+            Hero* h = (defender == Dungeon::hero.get()) ? Dungeon::hero.get() : nullptr;
+            notifyIdentified(h);
         }
     }
     return damage;
@@ -4022,9 +4030,69 @@ std::unique_ptr<Item> Amulet::clone(int qty) const {
     return std::make_unique<Amulet>();
 }
 
-// =============================================================================
-// Ring Implementation
-// =============================================================================
+static const char* s_gemNames[12] = {
+    "diamond", "opal", "garnet", "ruby",
+    "amethyst", "topaz", "onyx", "tourmaline",
+    "emerald", "sapphire", "quartz", "agate"
+};
+
+static std::vector<bool> s_ringKnown(12, false);
+
+bool Ring::isKnown(Gem g) {
+    size_t idx = static_cast<size_t>(g);
+    return idx < 12 ? s_ringKnown[idx] : false;
+}
+
+void Ring::setKnown(Gem g) {
+    size_t idx = static_cast<size_t>(g);
+    if (idx >= 12) return;
+    s_ringKnown[idx] = true;
+
+    // 11 out of 12 deduction rule
+    int knownCount = 0;
+    int unknownIdx = -1;
+    for (size_t i = 0; i < 12; ++i) {
+        if (s_ringKnown[i]) {
+            knownCount++;
+        } else {
+            unknownIdx = static_cast<int>(i);
+        }
+    }
+    if (knownCount == 11 && unknownIdx >= 0) {
+        s_ringKnown[unknownIdx] = true;
+    }
+}
+
+bool Ring::allKnown() {
+    for (size_t i = 0; i < 12; ++i) {
+        if (!s_ringKnown[i]) return false;
+    }
+    return true;
+}
+
+const std::vector<bool>& Ring::getKnownTable() {
+    return s_ringKnown;
+}
+
+void Ring::restoreStatus(const std::vector<bool>& known) {
+    if (known.size() >= 12) {
+        s_ringKnown = known;
+    }
+}
+
+bool Ring::isKnown() const {
+    return isKnown(gem);
+}
+
+void Ring::setKnown() {
+    setKnown(gem);
+}
+
+std::string Ring::gemName() const {
+    size_t idx = static_cast<size_t>(gem);
+    return idx < 12 ? s_gemNames[idx] : "gem";
+}
+
 Ring::Ring(Gem g, std::string eff)
     : gem(g), effect(std::move(eff)) {
     name = "Ring of " + effect;
@@ -4046,6 +4114,8 @@ Ring::Ring(Gem g, std::string eff)
 }
 
 Item* Ring::identify() {
+    setKnown();
+    ticksToKnow = 0;
     identified = true;
     levelKnown = true;
     cursedKnown = true;
@@ -4081,6 +4151,7 @@ Item* Ring::random() {
     identified = false;
     levelKnown = false;
     cursedKnown = false;
+    ticksToKnow = TICKS_TO_KNOW;
     if (Random::Float() < 0.30f) {
         level = (Random::Int(2) == 0) ? 1 : -1;
         cursed = (level < 0);
@@ -4109,6 +4180,10 @@ bool Ring::execute(Hero* hero, const std::string& action) {
         }
         if (hero->belongings.equip(this)) {
             cursedKnown = true;
+            if (hero->heroClass == Hero::HeroClass::Rogue && !isKnown()) {
+                setKnown();
+                GLog::i("This is a " + displayName());
+            }
             if (cursed) {
                 FX::burst(hero->pos, 0x550055FFu, 8);
                 Sample::play(Assets::SND_CURSED);
@@ -4153,7 +4228,7 @@ bool Ring::execute(Hero* hero, const std::string& action) {
 }
 
 std::string Ring::displayName() const {
-    std::string s = identified ? name : "Ring";
+    std::string s = isKnown() ? name : (gemName() + " ring");
     if (levelKnown) {
         if (cursed && cursedKnown) s = "cursed " + s;
         if (level > 0) s += " +" + std::to_string(level);
@@ -4165,7 +4240,8 @@ std::string Ring::displayName() const {
 }
 
 std::string Ring::info() const {
-    return "A precious ring imbued with ancient enchantments of " + effect + ".";
+    return "A precious ring adorned with a large " + gemName() + " gem that glitters in the darkness. " +
+           (isKnown() ? ("It is imbued with ancient enchantments of " + effect + ".") : "Who knows what effect it has when worn?");
 }
 
 std::unique_ptr<Item> Ring::clone(int qty) const {
@@ -4176,6 +4252,7 @@ std::unique_ptr<Item> Ring::clone(int qty) const {
     r->identified = identified;
     r->levelKnown = levelKnown;
     r->cursedKnown = cursedKnown;
+    r->ticksToKnow = ticksToKnow;
     return r;
 }
 

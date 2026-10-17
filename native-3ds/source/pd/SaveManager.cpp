@@ -188,6 +188,9 @@ bool SaveManager::getSaveSummary(int& outDepth, int& outLevel, int& outHeroClass
         if (version >= 5) {
             skipBytes += 12 * (sizeof(int32_t) + sizeof(uint8_t));
         }
+        if (version >= 6) {
+            skipBytes += 12 * sizeof(uint8_t);
+        }
         std::fseek(fp, skipBytes, SEEK_CUR);
     }
 
@@ -263,6 +266,11 @@ bool SaveManager::saveGame(const std::string& customPath) {
         int32_t m = (i < wandMap.size()) ? wandMap[i] : static_cast<int32_t>(i);
         uint8_t k = (i < wandKnown.size() && wandKnown[i]) ? 1 : 0;
         std::fwrite(&m, sizeof(int32_t), 1, fp);
+        std::fwrite(&k, sizeof(uint8_t), 1, fp);
+    }
+    const auto& ringKnown = Ring::getKnownTable();
+    for (size_t i = 0; i < 12; ++i) {
+        uint8_t k = (i < ringKnown.size() && ringKnown[i]) ? 1 : 0;
         std::fwrite(&k, sizeof(uint8_t), 1, fp);
     }
 
@@ -343,6 +351,9 @@ bool SaveManager::saveGame(const std::string& customPath) {
             int32_t maxD = w->maxDamage;
             int32_t sReq = w->STR;
             int32_t htk = w->hitsToKnow;
+            if (const Wand* wand = const_cast<Item*>(it)->asWand()) {
+                htk = wand->usagesToKnow;
+            }
             std::fwrite(&minD, sizeof(int32_t), 1, fp);
             std::fwrite(&maxD, sizeof(int32_t), 1, fp);
             std::fwrite(&sReq, sizeof(int32_t), 1, fp);
@@ -363,6 +374,12 @@ bool SaveManager::saveGame(const std::string& customPath) {
             const Scroll* s = static_cast<const Scroll*>(it);
             int32_t sType = static_cast<int32_t>(s->type);
             std::fwrite(&sType, sizeof(int32_t), 1, fp);
+        } else if (it->category() == ItemCategory::Ring) {
+            const Ring* r = const_cast<Item*>(it)->asRing();
+            int32_t gem = r ? static_cast<int32_t>(r->gem) : 0;
+            int32_t ttk = r ? r->ticksToKnow : Ring::TICKS_TO_KNOW;
+            std::fwrite(&gem, sizeof(int32_t), 1, fp);
+            std::fwrite(&ttk, sizeof(int32_t), 1, fp);
         }
     }
 
@@ -445,6 +462,9 @@ bool SaveManager::saveGame(const std::string& customPath) {
                 int32_t maxD = w->maxDamage;
                 int32_t strReq = w->STR;
                 int32_t htk = w->hitsToKnow;
+                if (const Wand* wand = it->asWand()) {
+                    htk = wand->usagesToKnow;
+                }
                 std::fwrite(&minD, sizeof(int32_t), 1, fp);
                 std::fwrite(&maxD, sizeof(int32_t), 1, fp);
                 std::fwrite(&strReq, sizeof(int32_t), 1, fp);
@@ -465,6 +485,12 @@ bool SaveManager::saveGame(const std::string& customPath) {
                 Scroll* s = static_cast<Scroll*>(it.get());
                 int32_t sType = static_cast<int32_t>(s->type);
                 std::fwrite(&sType, sizeof(int32_t), 1, fp);
+            } else if (it->category() == ItemCategory::Ring) {
+                Ring* r = it->asRing();
+                int32_t gem = r ? static_cast<int32_t>(r->gem) : 0;
+                int32_t ttk = r ? r->ticksToKnow : Ring::TICKS_TO_KNOW;
+                std::fwrite(&gem, sizeof(int32_t), 1, fp);
+                std::fwrite(&ttk, sizeof(int32_t), 1, fp);
             }
         }
     }
@@ -573,10 +599,23 @@ bool SaveManager::loadGame(const std::string& customPath) {
         } else {
             Wand::initWoods();
         }
+
+        if (version >= 6) {
+            std::vector<bool> ringKnown(12);
+            for (size_t i = 0; i < 12; ++i) {
+                uint8_t k = 0;
+                std::fread(&k, sizeof(uint8_t), 1, fp);
+                ringKnown[i] = (k != 0);
+            }
+            Ring::restoreStatus(ringKnown);
+        } else {
+            Ring::restoreStatus(std::vector<bool>(12, false));
+        }
     } else {
         Potion::initColors();
         Scroll::initLabels();
         Wand::initWoods();
+        Ring::restoreStatus(std::vector<bool>(12, false));
     }
 
     // 3. Hero State
@@ -684,7 +723,7 @@ bool SaveManager::loadGame(const std::string& customPath) {
             }
             auto wand = Wand::createByName(iName);
             if (wand) {
-                wand->hitsToKnow = htk;
+                wand->usagesToKnow = htk;
                 item = std::move(wand);
             } else {
                 auto weapon = std::make_unique<Weapon>(iName, minD, maxD, sReq);
@@ -709,6 +748,19 @@ bool SaveManager::loadGame(const std::string& customPath) {
             int32_t sType = 0;
             std::fread(&sType, sizeof(int32_t), 1, fp);
             item = std::make_unique<Scroll>(static_cast<Scroll::ScrollType>(sType));
+        } else if (cat == ItemCategory::Ring) {
+            int32_t gem = 0, ttk = Ring::TICKS_TO_KNOW;
+            if (version >= 6) {
+                std::fread(&gem, sizeof(int32_t), 1, fp);
+                std::fread(&ttk, sizeof(int32_t), 1, fp);
+            }
+            std::string eff = "Mending";
+            if (iName.rfind("Ring of ", 0) == 0) {
+                eff = iName.substr(8);
+            }
+            auto ring = std::make_unique<Ring>(static_cast<Ring::Gem>(gem), eff);
+            ring->ticksToKnow = ttk;
+            item = std::move(ring);
         } else {
             if (iName == "Ration of Food" || iName == "Food") {
                 item = std::make_unique<Food>();
@@ -877,7 +929,7 @@ bool SaveManager::loadGame(const std::string& customPath) {
                     }
                     auto wand = Wand::createByName(iName);
                     if (wand) {
-                        wand->hitsToKnow = htk;
+                        wand->usagesToKnow = htk;
                         item = std::move(wand);
                     } else {
                         auto weapon = std::make_unique<Weapon>(iName, minD, maxD, sReq);
@@ -902,6 +954,19 @@ bool SaveManager::loadGame(const std::string& customPath) {
                     int32_t sType = 0;
                     std::fread(&sType, sizeof(int32_t), 1, fp);
                     item = std::make_unique<Scroll>(static_cast<Scroll::ScrollType>(sType));
+                } else if (cat == ItemCategory::Ring) {
+                    int32_t gem = 0, ttk = Ring::TICKS_TO_KNOW;
+                    if (version >= 6) {
+                        std::fread(&gem, sizeof(int32_t), 1, fp);
+                        std::fread(&ttk, sizeof(int32_t), 1, fp);
+                    }
+                    std::string eff = "Mending";
+                    if (iName.rfind("Ring of ", 0) == 0) {
+                        eff = iName.substr(8);
+                    }
+                    auto ring = std::make_unique<Ring>(static_cast<Ring::Gem>(gem), eff);
+                    ring->ticksToKnow = ttk;
+                    item = std::move(ring);
                 } else {
                     if (iName == "Ration of Food" || iName == "Food") {
                         item = std::make_unique<Food>();

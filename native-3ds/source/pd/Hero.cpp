@@ -191,6 +191,20 @@ bool Hero::act() {
         if (w) w->updateCharge(1.0f, this);
     }
 
+    // Ring identification progression
+    auto updateRing = [this](Item* item) {
+        if (!item) return;
+        Ring* r = item->asRing();
+        if (r && !r->isIdentified()) {
+            if (--r->ticksToKnow <= 0) {
+                r->identify();
+                r->notifyIdentified(this);
+            }
+        }
+    };
+    updateRing(belongings.equippedRing1);
+    updateRing(belongings.equippedRing2);
+
     if (restoreHealth) {
         if (isStarving() || HP >= HT) {
             restoreHealth = false;

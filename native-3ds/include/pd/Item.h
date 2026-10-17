@@ -82,6 +82,7 @@ public:
     virtual std::string info() const;
     virtual std::string displayName() const;
     virtual int price() const { return 0; }
+    void notifyIdentified(Hero* hero = nullptr);
 
     virtual Weapon* asWeapon() { return nullptr; }
     virtual Armor* asArmor() { return nullptr; }
@@ -800,15 +801,25 @@ public:
         QUARTZ,
         AGATE
     };
+    static constexpr int TICKS_TO_KNOW = 200;
     Gem gem = Gem::DIAMOND;
     std::string effect = "Mending";
+    int ticksToKnow = TICKS_TO_KNOW;
 
     explicit Ring(Gem g = Gem::DIAMOND, std::string eff = "Mending");
     Ring* asRing() override { return this; }
     ItemCategory category() const override { return ItemCategory::Ring; }
     bool isEquippable() const override { return true; }
     bool isUpgradable() const override { return true; }
-    bool isIdentified() const override { return identified && levelKnown; }
+    bool isIdentified() const override { return identified && levelKnown && isKnown(); }
+    bool isKnown() const;
+    void setKnown();
+    std::string gemName() const;
+    static bool isKnown(Gem g);
+    static void setKnown(Gem g);
+    static bool allKnown();
+    static const std::vector<bool>& getKnownTable();
+    static void restoreStatus(const std::vector<bool>& known);
     Item* identify() override;
     Item* random() override;
     std::vector<std::string> actions(Hero* hero) override;
