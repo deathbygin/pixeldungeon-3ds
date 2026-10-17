@@ -54,24 +54,27 @@ private:
 
     // Bottom screen chrome & grid layout
     static constexpr int COLS = 6;
+    static constexpr int VISIBLE_ROWS = 5;
     float m_winX = 10.0f;
     float m_winY = 24.0f;
     float m_winW = 300.0f;
     float m_winH = 176.0f;
-    float m_cellW = 44.0f;
-    float m_cellH = 34.0f;
+    float m_cellW = 43.0f;
+    float m_cellH = 28.0f;
     float m_spacingX = 3.0f;
-    float m_spacingY = 3.0f;
+    float m_spacingY = 2.0f;
+    float m_gridPaddingX = 13.0f;
+    float m_gridPaddingY = 14.0f;
 
     // Action buttons at bottom
     float m_btnInspectX = 14.0f;
-    float m_btnInspectY = 206.0f;
-    float m_btnInspectW = 120.0f;
+    float m_btnInspectY = 208.0f;
+    float m_btnInspectW = 140.0f;
     float m_btnInspectH = 24.0f;
 
-    float m_btnBackX = 186.0f;
-    float m_btnBackY = 206.0f;
-    float m_btnBackW = 120.0f;
+    float m_btnBackX = 166.0f;
+    float m_btnBackY = 208.0f;
+    float m_btnBackW = 140.0f;
     float m_btnBackH = 24.0f;
 
     void ensureVisible(int index);

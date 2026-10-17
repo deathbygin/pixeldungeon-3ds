@@ -79,23 +79,25 @@ void BadgesScene::refresh() {
     }
 
     int totalRows = (static_cast<int>(m_items.size()) + COLS - 1) / COLS;
-    float totalContentH = totalRows * (m_cellH + m_spacingY);
-    float viewH = m_winH - 16.0f;
-    m_maxScroll = std::max(0.0f, totalContentH - viewH);
+    float rowStep = m_cellH + m_spacingY;
+    if (totalRows > VISIBLE_ROWS) {
+        m_maxScroll = (totalRows - VISIBLE_ROWS) * rowStep;
+    } else {
+        m_maxScroll = 0.0f;
+    }
     m_scrollY = 0.0f;
 }
 
 void BadgesScene::ensureVisible(int index) {
     if (index < 0 || index >= static_cast<int>(m_items.size())) return;
     int row = index / COLS;
-    float rowTop = row * (m_cellH + m_spacingY);
-    float rowBottom = rowTop + m_cellH;
-    float viewH = m_winH - 16.0f;
+    float rowStep = m_cellH + m_spacingY;
+    float rowTop = row * rowStep;
 
     if (rowTop < m_scrollY) {
         m_scrollY = rowTop;
-    } else if (rowBottom > m_scrollY + viewH) {
-        m_scrollY = rowBottom - viewH;
+    } else if (rowTop >= m_scrollY + VISIBLE_ROWS * rowStep) {
+        m_scrollY = (row - VISIBLE_ROWS + 1) * rowStep;
     }
     m_scrollY = std::clamp(m_scrollY, 0.0f, m_maxScroll);
 }
@@ -204,7 +206,7 @@ void BadgesScene::update(float dt, u32 kDown, u32 kHeld, const pd::ui::TouchCont
     }
 
     // Grid scrolling drag
-    noosa::RectF rGrid(m_winX + 4.0f, m_winY + 4.0f, m_winW - 8.0f, m_winH - 8.0f);
+    noosa::RectF rGrid(m_winX + 7.0f, m_winY + 7.0f, m_winW - 14.0f, m_winH - 14.0f);
     float tx = static_cast<float>(touch.x());
     float ty = static_cast<float>(touch.y());
 
@@ -225,24 +227,35 @@ void BadgesScene::update(float dt, u32 kDown, u32 kHeld, const pd::ui::TouchCont
 
     // Grid cell tap
     if (touch.clicked(rGrid)) {
-        float gridStartX = m_winX + 10.0f;
-        float gridStartY = m_winY + 8.0f;
         float cellStepX = m_cellW + m_spacingX;
         float cellStepY = m_cellH + m_spacingY;
+        float gridStartX = m_winX + m_gridPaddingX;
+        float gridStartY = m_winY + m_gridPaddingY;
+
+        float clipY1 = m_winY + 7.0f;
+        float clipY2 = m_winY + m_winH - 7.0f;
 
         int col = static_cast<int>((tx - gridStartX) / cellStepX);
         int row = static_cast<int>((ty + m_scrollY - gridStartY) / cellStepY);
 
         if (col >= 0 && col < COLS && row >= 0) {
-            int idx = row * COLS + col;
-            if (idx >= 0 && idx < count) {
-                if (idx == m_selectedIndex) {
-                    Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
-                    m_wndBadge.show(m_items[idx].badge, m_items[idx].unlocked);
-                } else {
-                    m_selectedIndex = idx;
-                    Sample::play(Assets::SND_CLICK, 0.5f, 1.1f);
-                    ensureVisible(m_selectedIndex);
+            float cellLeft = gridStartX + col * cellStepX;
+            float cellTop = gridStartY + row * cellStepY - m_scrollY;
+
+            // Only register tap if the cell is completely within the interior frame
+            if (tx >= cellLeft && tx <= cellLeft + m_cellW &&
+                ty >= cellTop && ty <= cellTop + m_cellH &&
+                cellTop >= clipY1 && cellTop + m_cellH <= clipY2) {
+                int idx = row * COLS + col;
+                if (idx >= 0 && idx < count) {
+                    if (idx == m_selectedIndex) {
+                        Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
+                        m_wndBadge.show(m_items[idx].badge, m_items[idx].unlocked);
+                    } else {
+                        m_selectedIndex = idx;
+                        Sample::play(Assets::SND_CLICK, 0.5f, 1.1f);
+                        ensureVisible(m_selectedIndex);
+                    }
                 }
             }
         }
@@ -338,7 +351,7 @@ void BadgesScene::drawBottom(C2D_TextBuf textBuf) {
     float tabW = 80.0f;
     float tabH = 16.0f;
     float tabX = (320.0f - tabW) * 0.5f;
-    float tabY = 8.0f;
+    float tabY = 6.0f;
     pd::ui::Chrome::get(pd::ui::Chrome::Type::TOAST).draw(tabX, tabY, tabW, tabH, zHeader);
 
     float tabTW = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, "Badges");
@@ -348,13 +361,13 @@ void BadgesScene::drawBottom(C2D_TextBuf textBuf) {
     // Window Container for badges grid
     pd::ui::Chrome::get(pd::ui::Chrome::Type::WINDOW).draw(m_winX, m_winY, m_winW, m_winH, zContent);
 
-    float gridStartX = m_winX + 10.0f;
-    float gridStartY = m_winY + 8.0f;
+    float gridStartX = m_winX + m_gridPaddingX;
+    float gridStartY = m_winY + m_gridPaddingY;
     float cellStepX = m_cellW + m_spacingX;
     float cellStepY = m_cellH + m_spacingY;
 
-    float listClipY1 = m_winY + 6.0f;
-    float listClipY2 = m_winY + m_winH - 6.0f;
+    float listClipY1 = m_winY + 7.0f;
+    float listClipY2 = m_winY + m_winH - 7.0f;
 
     for (size_t i = 0; i < m_items.size(); ++i) {
         int col = static_cast<int>(i % COLS);
@@ -363,7 +376,8 @@ void BadgesScene::drawBottom(C2D_TextBuf textBuf) {
         float cellX = gridStartX + col * cellStepX;
         float cellY = gridStartY + row * cellStepY - m_scrollY;
 
-        if (cellY + m_cellH < listClipY1 || cellY > listClipY2) continue;
+        // Discard any badge slot that would breach or spill out of the interior stone frame
+        if (cellY < listClipY1 || cellY + m_cellH > listClipY2) continue;
 
         const auto& item = m_items[i];
         bool isSel = (static_cast<int>(i) == m_selectedIndex);
@@ -391,12 +405,14 @@ void BadgesScene::drawBottom(C2D_TextBuf textBuf) {
 
     // Scrollbar indicator
     if (m_maxScroll > 0.0f) {
-        float scrollTrackH = m_winH - 20.0f;
-        float scrollThumbH = std::max(12.0f, scrollTrackH * ((m_winH - 16.0f) / ((m_winH - 16.0f) + m_maxScroll)));
-        float thumbY = (m_winY + 10.0f) + (m_scrollY / m_maxScroll) * (scrollTrackH - scrollThumbH);
-        float thumbX = m_winX + m_winW - 6.0f;
+        int totalRows = (static_cast<int>(m_items.size()) + COLS - 1) / COLS;
+        float scrollTrackY = m_winY + 12.0f;
+        float scrollTrackH = m_winH - 24.0f;
+        float scrollThumbH = std::max(16.0f, scrollTrackH * (static_cast<float>(VISIBLE_ROWS) / static_cast<float>(totalRows)));
+        float thumbY = scrollTrackY + (m_scrollY / m_maxScroll) * (scrollTrackH - scrollThumbH);
+        float thumbX = m_winX + m_winW - 10.0f;
 
-        C2D_DrawRectSolid(thumbX, m_winY + 10.0f, zContent + 0.01f, 3.0f, scrollTrackH, C2D_Color32(0x22, 0x24, 0x20, 0xFF));
+        C2D_DrawRectSolid(thumbX, scrollTrackY, zContent + 0.01f, 3.0f, scrollTrackH, C2D_Color32(0x22, 0x24, 0x20, 0xFF));
         C2D_DrawRectSolid(thumbX, thumbY, zContent + 0.02f, 3.0f, scrollThumbH, C2D_Color32(0x7A, 0x81, 0x73, 0xFF));
     }
 
