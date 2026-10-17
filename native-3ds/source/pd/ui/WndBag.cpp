@@ -132,6 +132,27 @@ bool WndBag::update(pd::Hero* hero, const TouchController& touch, u32 kDown, u32
     }
 
     // -------------------------------------------------------------------------
+    // Tap-Outside-to-Dismiss (Backdrop Touch on 320x240 screen)
+    // -------------------------------------------------------------------------
+    float tabY = WIN_Y - 9.0f;
+    noosa::RectF rWin(WIN_X, tabY, WIN_W, WIN_H + (WIN_Y - tabY));
+    if (touch.justPressed()) {
+        float tx = static_cast<float>(touch.x());
+        float ty = static_cast<float>(touch.y());
+        if (!rWin.contains(tx, ty)) {
+            Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
+            if (isSelectionMode()) {
+                auto listener = std::move(m_selectionListener);
+                close();
+                if (listener) listener(nullptr);
+            } else {
+                close();
+            }
+            return false;
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Selection Mode (e.g. Scroll of Identify, Upgrade, Enchantment)
     // -------------------------------------------------------------------------
     if (isSelectionMode()) {
@@ -251,28 +272,50 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
     // 2. Stone Window Frame using authentic Chrome::WINDOW
     Chrome::get(Chrome::Type::WINDOW).draw(WIN_X, WIN_Y, WIN_W, WIN_H, zWin);
 
-    // 3. Tab along top edge (Backpack selected tab)
-    Chrome::get(Chrome::Type::TAB_SELECTED).draw(WIN_X + 10.0f, WIN_Y - 11.0f, 24.0f, 14.0f, zWin + 0.01f);
-    if (m_texIcons && m_texIcons->isLoaded()) {
+    // 3. Dedicated raised 9-slice container tab for "Backpack" Title & Icon
+    std::string titleStr = (isSelectionMode() && !m_selectionTitle.empty()) ? m_selectionTitle : "Backpack";
+    float titleW = BitmapFont::width(BitmapFont::FontType::Font1x, titleStr);
+
+    bool showIcon = !isSelectionMode() || (m_selectionTitle.length() <= 14);
+    float iconW = showIcon ? 10.0f : 0.0f;
+    float iconSpacing = showIcon ? 6.0f : 0.0f;
+    float contentW = iconW + iconSpacing + titleW;
+
+    float tabH = 22.0f;
+    float tabW = std::clamp(contentW + 24.0f, 90.0f, WIN_W - 16.0f);
+    float tabX = WIN_X + std::floor((WIN_W - tabW) * 0.5f);
+    float tabY = WIN_Y - 9.0f;
+    float zTab = zWin + 0.02f;
+    float zContent = zTab + 0.03f;
+
+    // Draw the raised stone container tab
+    Chrome::get(Chrome::Type::TOAST).draw(tabX, tabY, tabW, tabH, zTab);
+
+    // Center icon & title inside the tab
+    float contentX = tabX + std::floor((tabW - contentW) * 0.5f);
+
+    if (showIcon && m_texIcons && m_texIcons->isLoaded()) {
+        float iconX = contentX;
+        float iconY = tabY + std::floor((tabH - 10.0f) * 0.5f);
+
         Tex3DS_SubTexture subTab;
         setupSubTex(subTab, m_texIcons->potWidth(), m_texIcons->potHeight(), 58, 0, 10, 10);
         C2D_Image imgTab = { m_texIcons->getTex(), &subTab };
         C2D_DrawParams pT;
-        pT.pos.x = WIN_X + 17.0f; pT.pos.y = WIN_Y - 9.0f; pT.pos.w = 10.0f; pT.pos.h = 10.0f;
-        pT.center.x = pT.center.y = 0.0f; pT.depth = zWin + 0.02f; pT.angle = 0.0f;
+        pT.pos.x = iconX;
+        pT.pos.y = iconY;
+        pT.pos.w = 10.0f;
+        pT.pos.h = 10.0f;
+        pT.center.x = 0.0f;
+        pT.center.y = 0.0f;
+        pT.depth = zContent;
+        pT.angle = 0.0f;
         C2D_DrawImage(imgTab, &pT, nullptr);
     }
 
-    // 4. Yellow Title Banner using authentic Font2x or Font1x
-    if (isSelectionMode() && !m_selectionTitle.empty()) {
-        if (m_selectionTitle.length() > 14) {
-            BitmapFont::draw(BitmapFont::FontType::Font1x, m_selectionTitle, WIN_X + 20.0f, WIN_Y + 4.0f, zText, 0xFFFF44FF);
-        } else {
-            BitmapFont::draw(BitmapFont::FontType::Font2x, m_selectionTitle, WIN_X + 45.0f, WIN_Y + 2.0f, zText, 0xFFFF44FF);
-        }
-    } else {
-        BitmapFont::draw(BitmapFont::FontType::Font2x, "Backpack", WIN_X + 90.0f, WIN_Y + 2.0f, zText, 0xFFFF44FF);
-    }
+    float textX = contentX + iconW + iconSpacing;
+    float textY = tabY + std::floor((tabH - 8.0f) * 0.5f);
+    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, titleStr, textX, textY, zContent, C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
 
     // 5. 4x5 Recessed Item Grid (Slot size 28x28, margin 2px)
     int potW = m_texItems ? m_texItems->potWidth() : 128;
@@ -307,8 +350,8 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
             if (it && it->cursed && it->cursedKnown) {
                 slotColor = C2D_Color32(0x73, 0x3d, 0x3d, 0xFF); // Reddish cursed tint
             } else if (it && !it->isIdentified()) {
-                // Purple shaded background for unidentified items
-                slotColor = isEquippedSlot ? C2D_Color32(0x70, 0x54, 0x7e, 0xFF) : C2D_Color32(0x5a, 0x3d, 0x6e, 0xFF);
+                // Neutral shaded background for unidentified items
+                slotColor = isEquippedSlot ? C2D_Color32(0x56, 0x50, 0x48, 0xFF) : C2D_Color32(0x40, 0x3c, 0x38, 0xFF);
             }
             C2D_DrawRectSolid(sx, sy, zSlot, SLOT_SIZE, SLOT_SIZE, slotColor);
 
@@ -338,7 +381,7 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
 
                 char gBuf[16];
                 std::snprintf(gBuf, sizeof(gBuf), "%d", hero->gold);
-                BitmapFont::draw(BitmapFont::FontType::Font1x, gBuf, sx + 2.0f, sy + 18.0f, zText, 0xE4A672FF);
+                BitmapFont::draw(BitmapFont::FontType::Font1x, gBuf, sx + 2.0f, sy + 18.0f, zText, C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF));
             } else if (it && iTex) {
                 // Render Item Icon (16x16)
                 int imgIdx = it->image;
@@ -352,7 +395,7 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
                 // Top-Left Badge: Stack count (e.g., 8)
                 if (it->quantity > 1) {
                     std::string qStr = std::to_string(it->quantity);
-                    BitmapFont::draw(BitmapFont::FontType::Font1x, qStr, sx + 2.0f, sy + 1.0f, zText, 0xFFFFFFFF);
+                    BitmapFont::draw(BitmapFont::FontType::Font1x, qStr, sx + 2.0f, sy + 1.0f, zText, C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF));
                 }
 
                 // Top-Right Badge: Strength requirement (:10 or ?10)
@@ -368,11 +411,11 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
                     std::string strBadge = identified ? (":" + std::to_string(reqStr)) : ("?" + std::to_string(reqStr));
                     u32 strCol;
                     if (!identified) {
-                        strCol = 0xFF8800FF; // Authentic warning orange for typical/unidentified strength
+                        strCol = C2D_Color32(0xFF, 0xAA, 0x22, 0xFF); // Warning orange for typical/unidentified strength
                     } else if (reqStr > hero->STR) {
-                        strCol = 0xFF4444FF; // Red if hero strength is insufficient
+                        strCol = C2D_Color32(0xFF, 0x44, 0x44, 0xFF); // Red if hero strength is insufficient
                     } else {
-                        strCol = 0xCACFC2FF; // Normal light gray
+                        strCol = C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF); // Clean white
                     }
                     float bw = BitmapFont::width(BitmapFont::FontType::Font1x, strBadge);
                     float bx = sx + SLOT_SIZE - bw - 2.0f;
@@ -384,12 +427,12 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
                     std::string lvlBadge = (it->level > 0 ? "+" : "") + std::to_string(it->level);
                     float lw = BitmapFont::width(BitmapFont::FontType::Font1x, lvlBadge);
                     float lx = sx + SLOT_SIZE - lw - 2.0f;
-                    u32 lCol = (it->level > 0) ? 0x44FF44FF : 0xFF4444FF;
+                    u32 lCol = (it->level > 0) ? C2D_Color32(0x44, 0xFF, 0x44, 0xFF) : C2D_Color32(0xFF, 0x44, 0x44, 0xFF);
                     BitmapFont::draw(BitmapFont::FontType::Font1x, lvlBadge, lx, sy + 18.0f, zText, lCol);
                 } else if (it->cursed && it->cursedKnown) {
                     float cw = BitmapFont::width(BitmapFont::FontType::Font1x, "C");
                     float cx = sx + SLOT_SIZE - cw - 2.0f;
-                    BitmapFont::draw(BitmapFont::FontType::Font1x, "C", cx, sy + 18.0f, zText, 0xFF4444FF);
+                    BitmapFont::draw(BitmapFont::FontType::Font1x, "C", cx, sy + 18.0f, zText, C2D_Color32(0xFF, 0x44, 0x44, 0xFF));
                 }
 
                 // Bottom-Left Ticks: Durability
