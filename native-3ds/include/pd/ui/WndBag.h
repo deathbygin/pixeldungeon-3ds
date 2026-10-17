@@ -23,6 +23,8 @@ public:
         UNIDENTIFIED,
         UPGRADEABLE,
         ENCHANTABLE,
+        WEAPON,
+        WAND,
         QUICKSLOT
     };
 

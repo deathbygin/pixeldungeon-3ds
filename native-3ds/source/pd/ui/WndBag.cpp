@@ -64,7 +64,11 @@ bool WndBag::isItemEligible(const pd::Item* it) const {
         case Mode::UPGRADEABLE:
             return it->isUpgradable();
         case Mode::ENCHANTABLE:
-            return ((it->category() == ItemCategory::Weapon && !const_cast<Item*>(it)->asWand()) || it->category() == ItemCategory::Armor);
+            return it->isUpgradable() && (it->category() == ItemCategory::Armor || (it->category() == ItemCategory::Weapon && !const_cast<Item*>(it)->asWand() && (!const_cast<Item*>(it)->asMissile() || const_cast<Item*>(it)->asBoomerang())));
+        case Mode::WEAPON:
+            return (const_cast<Item*>(it)->asWeapon() != nullptr && !const_cast<Item*>(it)->asWand() && (!const_cast<Item*>(it)->asMissile() || const_cast<Item*>(it)->asBoomerang()));
+        case Mode::WAND:
+            return (const_cast<Item*>(it)->asWand() != nullptr && it->isUpgradable());
         case Mode::ALL:
         default:
             return true;
@@ -391,10 +395,12 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
 
             // Selected Reticle Box
             if (slotIdx == m_selectedSlot) {
-                C2D_DrawRectSolid(sx - 1.0f, sy - 1.0f, zSlot + 0.02f, SLOT_SIZE + 2.0f, 1.0f, C2D_Color32(0xff, 0xff, 0x44, 0xFF));
-                C2D_DrawRectSolid(sx - 1.0f, sy + SLOT_SIZE, zSlot + 0.02f, SLOT_SIZE + 2.0f, 1.0f, C2D_Color32(0xff, 0xff, 0x44, 0xFF));
-                C2D_DrawRectSolid(sx - 1.0f, sy - 1.0f, zSlot + 0.02f, 1.0f, SLOT_SIZE + 2.0f, C2D_Color32(0xff, 0xff, 0x44, 0xFF));
-                C2D_DrawRectSolid(sx + SLOT_SIZE, sy - 1.0f, zSlot + 0.02f, 1.0f, SLOT_SIZE + 2.0f, C2D_Color32(0xff, 0xff, 0x44, 0xFF));
+                bool isEligible = isSelectionMode() ? (it && isItemEligible(it)) : true;
+                u32 reticleCol = (isSelectionMode() && !isEligible) ? C2D_Color32(0x55, 0x55, 0x55, 0xFF) : C2D_Color32(0xff, 0xff, 0x44, 0xFF);
+                C2D_DrawRectSolid(sx - 1.0f, sy - 1.0f, zSlot + 0.02f, SLOT_SIZE + 2.0f, 1.0f, reticleCol);
+                C2D_DrawRectSolid(sx - 1.0f, sy + SLOT_SIZE, zSlot + 0.02f, SLOT_SIZE + 2.0f, 1.0f, reticleCol);
+                C2D_DrawRectSolid(sx - 1.0f, sy - 1.0f, zSlot + 0.02f, 1.0f, SLOT_SIZE + 2.0f, reticleCol);
+                C2D_DrawRectSolid(sx + SLOT_SIZE, sy - 1.0f, zSlot + 0.02f, 1.0f, SLOT_SIZE + 2.0f, reticleCol);
             }
 
             // Draw Item / Placeholder / Gold
@@ -493,7 +499,7 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
             // In selection mode, dim ineligible or empty slots
             if (isSelectionMode()) {
                 if (slotIdx == 19 || !it || !isItemEligible(it)) {
-                    C2D_DrawRectSolid(sx, sy, zItem + 0.03f, SLOT_SIZE, SLOT_SIZE, C2D_Color32(0x00, 0x00, 0x00, 0xAA));
+                    C2D_DrawRectSolid(sx, sy, zText + 0.01f, SLOT_SIZE, SLOT_SIZE, C2D_Color32(0x00, 0x00, 0x00, 0xB8));
                 }
             }
         }

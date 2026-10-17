@@ -64,8 +64,17 @@ public:
     virtual bool isEquippable() const { return false; }
     virtual bool isStackable() const { return false; }
     virtual bool isUpgradable() const { return false; }
-    virtual void upgrade() { level++; cursed = false; cursedKnown = true; }
-    virtual void degrade() { level--; }
+    virtual void upgrade() {
+        if (!isUpgradable()) return;
+        level++;
+        cursed = false;
+        cursedKnown = true;
+    }
+    virtual void degrade() {
+        if (!isUpgradable()) return;
+        level--;
+    }
+    bool isEquipped(const Hero* hero) const;
     virtual bool isBroken() const { return false; }
     virtual void fix() {}
     virtual Item* random();
@@ -114,6 +123,7 @@ public:
     bool isUpgradable() const override { return true; }
     void upgrade() override { upgrade(false); }
     virtual void upgrade(bool enchant);
+    void degrade() override;
     bool isIdentified() const override { return identified && levelKnown; }
     Item* identify() override;
     Item* random() override;
@@ -387,6 +397,7 @@ public:
     bool isUpgradable() const override { return true; }
     void upgrade() override { upgrade(false); }
     virtual void upgrade(bool inscribe);
+    void degrade() override;
     bool isIdentified() const override { return identified && levelKnown; }
     Item* identify() override;
     Item* random() override;
@@ -444,6 +455,7 @@ public:
     Potion* asPotion() override { return this; }
     ItemCategory category() const override { return ItemCategory::Potion; }
     bool isStackable() const override { return true; }
+    bool isUpgradable() const override { return false; }
     bool isIdentified() const override { return isKnown(type); }
     Item* identify() override;
     std::vector<std::string> actions(Hero* hero) override;
@@ -501,6 +513,7 @@ public:
     Scroll* asScroll() override { return this; }
     ItemCategory category() const override { return ItemCategory::Scroll; }
     bool isStackable() const override { return true; }
+    bool isUpgradable() const override { return false; }
     bool isIdentified() const override { return isKnown(type); }
     Item* identify() override;
     std::vector<std::string> actions(Hero* hero) override;
@@ -531,6 +544,7 @@ class Food : public Item {
 public:
     Food();
     ItemCategory category() const override { return ItemCategory::Generic; }
+    bool isUpgradable() const override { return false; }
     std::vector<std::string> actions(Hero* hero) override;
     bool execute(Hero* hero, const std::string& action) override;
     std::string info() const override;
@@ -541,6 +555,7 @@ class Dewdrop : public Item {
 public:
     Dewdrop();
     ItemCategory category() const override { return ItemCategory::Generic; }
+    bool isUpgradable() const override { return false; }
     std::vector<std::string> actions(Hero* hero) override;
     bool execute(Hero* hero, const std::string& action) override;
     std::string info() const override;
@@ -552,6 +567,7 @@ public:
     explicit Gold(int value = 1);
     ItemCategory category() const override { return ItemCategory::Generic; }
     bool isStackable() const override { return true; }
+    bool isUpgradable() const override { return false; }
     std::vector<std::string> actions(Hero* hero) override;
     bool execute(Hero* hero, const std::string& action) override;
     std::string info() const override;
@@ -729,6 +745,7 @@ public:
     explicit PlantSeed(PlantType pt);
     PlantSeed* asPlantSeed() override { return this; }
     bool isStackable() const override { return true; }
+    bool isUpgradable() const override { return false; }
     bool isIdentified() const override { return true; }
     std::vector<std::string> actions(Hero* hero) override;
     bool execute(Hero* hero, const std::string& action) override;
@@ -775,6 +792,7 @@ public:
 class Amulet : public Item {
 public:
     Amulet();
+    bool isUpgradable() const override { return false; }
     bool isIdentified() const override { return true; }
     std::vector<std::string> actions(Hero* hero) override;
     bool execute(Hero* hero, const std::string& action) override;

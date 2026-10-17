@@ -38,6 +38,7 @@ public:
     Hero();
     explicit Hero(HeroClass cl);
     ~Hero() override = default;
+    Hero* asHero() override { return this; }
 
     std::string className() const;
     void updateAwareness();

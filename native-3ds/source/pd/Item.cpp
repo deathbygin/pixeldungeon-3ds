@@ -45,6 +45,14 @@ void Item::notifyIdentified(Hero* hero) {
     GLog::i("You are now familiar enough with your " + displayName() + " to identify it.");
 }
 
+bool Item::isEquipped(const Hero* hero) const {
+    if (!hero) return false;
+    return (this == hero->belongings.equippedWeapon ||
+            this == hero->belongings.equippedArmor ||
+            this == hero->belongings.equippedRing1 ||
+            this == hero->belongings.equippedRing2);
+}
+
 Item* Item::random() {
     return this;
 }
@@ -381,13 +389,25 @@ int Weapon::damageRoll(Hero* hero) const {
 }
 
 void Weapon::upgrade(bool enchant) {
+    if (!isUpgradable()) return;
     if (isEnchanted()) {
         if (!enchant && Random::Int(level) > 0) {
-            GLog::w("Incompatible magic erased the enchantment!");
+            GLog::w("wonderful energy of the scroll strips the enchantment from your weapon!");
             enchantment = Enchantment::NONE;
         }
     }
+    if (!asWand() && !asBoomerang()) {
+        if (STR > 1) STR--;
+    }
     Item::upgrade();
+}
+
+void Weapon::degrade() {
+    if (!isUpgradable()) return;
+    if (!asWand() && !asBoomerang()) {
+        STR++;
+    }
+    Item::degrade();
 }
 
 void Weapon::enchant(Enchantment ench) {
@@ -411,7 +431,7 @@ void Weapon::proc(Char* attacker, Char* defender, int damage) {
     if (!levelKnown) {
         if (--hitsToKnow <= 0) {
             identify();
-            Hero* h = (attacker == Dungeon::hero.get()) ? Dungeon::hero.get() : nullptr;
+            Hero* h = attacker ? attacker->asHero() : nullptr;
             notifyIdentified(h);
         }
     }
@@ -487,35 +507,38 @@ std::vector<std::string> ShortSword::actions(Hero* hero) {
 bool ShortSword::execute(Hero* hero, const std::string& action) {
     if (!hero) return false;
     if (action == "REFORGE") {
-        Weapon* target = nullptr;
-        if (hero->belongings.equippedWeapon && hero->belongings.equippedWeapon != this) {
-            target = hero->belongings.equippedWeapon;
-        } else {
-            for (auto& it : hero->belongings.backpack) {
-                if (it && it.get() != this) {
-                    Weapon* w = it->asWeapon();
-                    if (w && !w->asBoomerang()) {
-                        target = w;
-                        break;
-                    }
+        if (ui::BottomScreenUI::instance()) {
+            ui::BottomScreenUI::instance()->selectItem(ui::WndBag::Mode::WEAPON, "Select a weapon to upgrade", [this, hero](Item* target) {
+                if (!target) return;
+                if (target->asBoomerang()) {
+                    GLog::w("you can't upgrade a boomerang this way");
+                    return;
                 }
-            }
-        }
-        if (target) {
-            Sample::play(Assets::SND_EVOKE);
-            target->upgrade();
-            target->identify();
-            GLog::w("You reforged the shortsword to upgrade your " + target->name + "!");
-            FX::burst(hero->pos, 0xffd700FF, 12);
-            FX::floatingText(hero->pos, "+1 LVL", 0xffd700FF);
-            hero->spendAndNext(2.0f * Actor::TICK);
-            quantity = 0;
-            hero->belongings.drop(this);
-            return true;
-        } else {
-            GLog::w("You need another melee weapon to reforge this onto!");
+                if (target == this) {
+                    GLog::w("You can't reforge a weapon onto itself!");
+                    return;
+                }
+                Weapon* targetWeapon = target->asWeapon();
+                if (targetWeapon && targetWeapon->isUpgradable() && !targetWeapon->asWand()) {
+                    Sample::play(Assets::SND_EVOKE);
+                    targetWeapon->upgrade(targetWeapon->isEnchanted());
+                    targetWeapon->identify();
+                    char buf[128];
+                    std::snprintf(buf, sizeof(buf), "you reforged the short sword to upgrade your %s", targetWeapon->displayName().c_str());
+                    GLog::w(buf);
+                    FX::burst(hero->pos, 0xffd700FF, 12);
+                    FX::floatingText(hero->pos, "+1 LVL", 0xffd700FF);
+                    hero->spendAndNext(2.0f * Actor::TICK);
+                    this->quantity = 0;
+                    hero->belongings.drop(this);
+                    Actor::process();
+                } else {
+                    GLog::w("This item cannot be upgraded this way!");
+                }
+            });
             return false;
         }
+        return false;
     }
     return Weapon::execute(hero, action);
 }
@@ -862,6 +885,7 @@ void Wand::restoreCharge(int count) {
 }
 
 void Wand::upgrade() {
+    if (!isUpgradable()) return;
     Weapon::upgrade();
     maxCharges = std::min(initialCharges() + level, 9);
     curCharges = std::min(maxCharges, curCharges + 1);
@@ -974,31 +998,34 @@ std::vector<std::string> WandOfMagicMissile::actions(Hero* hero) {
 bool WandOfMagicMissile::execute(Hero* hero, const std::string& action) {
     if (!hero) return false;
     if (action == "DISENCHANT") {
-        Wand* targetWand = nullptr;
-        for (auto& it : hero->belongings.backpack) {
-            if (it && it.get() != this) {
-                Wand* w = it->asWand();
-                if (w) {
-                    targetWand = w;
-                    break;
+        if (ui::BottomScreenUI::instance()) {
+            ui::BottomScreenUI::instance()->selectItem(ui::WndBag::Mode::WAND, "Select a wand to upgrade", [this, hero](Item* target) {
+                if (!target) return;
+                if (target == this) {
+                    GLog::w("You can't disenchant a wand into itself!");
+                    return;
                 }
-            }
-        }
-        if (targetWand) {
-            Sample::play(Assets::SND_EVOKE);
-            targetWand->upgrade();
-            targetWand->identify();
-            GLog::w("You disenchanted the Wand of Magic Missile to upgrade your " + targetWand->name + "!");
-            FX::burst(hero->pos, 0x99ccffFF, 12);
-            FX::floatingText(hero->pos, "+1 LVL", 0x99ccffFF);
-            hero->spendAndNext(2.0f * Actor::TICK);
-            quantity = 0;
-            hero->belongings.drop(this);
-            return true;
-        } else {
-            GLog::w("You need another wand to disenchant this into!");
+                Wand* targetWand = target->asWand();
+                if (targetWand && targetWand->isUpgradable()) {
+                    Sample::play(Assets::SND_EVOKE);
+                    targetWand->upgrade();
+                    targetWand->identify();
+                    char buf[128];
+                    std::snprintf(buf, sizeof(buf), "You disenchanted the Wand of Magic Missile to upgrade your %s!", targetWand->displayName().c_str());
+                    GLog::w(buf);
+                    FX::burst(hero->pos, 0x99ccffFF, 12);
+                    FX::floatingText(hero->pos, "+1 LVL", 0x99ccffFF);
+                    hero->spendAndNext(2.0f * Actor::TICK);
+                    this->quantity = 0;
+                    hero->belongings.drop(this);
+                    Actor::process();
+                } else {
+                    GLog::w("This wand cannot be upgraded!");
+                }
+            });
             return false;
         }
+        return false;
     }
     return Wand::execute(hero, action);
 }
@@ -1849,13 +1876,21 @@ Item* Armor::random() {
 }
 
 void Armor::upgrade(bool inscribe) {
+    if (!isUpgradable()) return;
     if (isInscribed()) {
         if (!inscribe && Random::Int(level) > 0) {
-            GLog::w("Incompatible magic erased the enchantment!");
+            GLog::w("wonderful energy of the scroll strips the glyph from your armor!");
             glyph = Glyph::NONE;
         }
     }
+    if (STR > 1) STR--;
     Item::upgrade();
+}
+
+void Armor::degrade() {
+    if (!isUpgradable()) return;
+    STR++;
+    Item::degrade();
 }
 
 void Armor::inscribe(Glyph g) {
@@ -1989,7 +2024,7 @@ int Armor::proc(Char* attacker, Char* defender, int damage) {
     if (!levelKnown) {
         if (--hitsToKnow <= 0) {
             identify();
-            Hero* h = (defender == Dungeon::hero.get()) ? Dungeon::hero.get() : nullptr;
+            Hero* h = defender ? defender->asHero() : nullptr;
             notifyIdentified(h);
         }
     }
@@ -2861,9 +2896,10 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
                 updatePerception();
                 if (ui::BottomScreenUI::instance()) {
                     ui::BottomScreenUI::instance()->selectItem(ui::WndBag::Mode::UPGRADEABLE, "Select an item to upgrade", [this, hero](Item* target) {
-                        if (target) {
+                        if (target && target->isUpgradable()) {
                             if (target->cursed) {
                                 target->cursed = false;
+                                target->cursedKnown = true;
                             }
                             if (target->isBroken()) {
                                 target->fix();
@@ -2900,9 +2936,10 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
                 updatePerception();
                 if (ui::BottomScreenUI::instance()) {
                     ui::BottomScreenUI::instance()->selectItem(ui::WndBag::Mode::ENCHANTABLE, "Select an enchantable item", [this, hero](Item* target) {
-                        if (target) {
+                        if (target && target->isUpgradable() && (target->asArmor() != nullptr || (target->asWeapon() != nullptr && !target->asWand() && (!target->asMissile() || target->asBoomerang())))) {
                             if (target->cursed) {
                                 target->cursed = false;
+                                target->cursedKnown = true;
                             }
                             if (auto* w = target->asWeapon()) {
                                 w->enchant();

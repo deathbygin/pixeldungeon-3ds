@@ -36,6 +36,7 @@ public:
     bool act() override;
     Char* asChar() override { return this; }
     virtual class Mob* asMob() { return nullptr; }
+    virtual class Hero* asHero() { return nullptr; }
 
     virtual CharSprite* getSprite();
 

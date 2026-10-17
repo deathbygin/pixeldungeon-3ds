@@ -92,10 +92,24 @@ bool InventoryView::update(pd::Hero* hero, const TouchController& touch, u32 kDo
             Item* targetItem = pack[pickedSlot].get();
             if (mode == Mode::SELECT_UPGRADE) {
                 if (targetItem->isUpgradable()) {
-                    targetItem->upgrade();
+                    if (targetItem->cursed) {
+                        targetItem->cursed = false;
+                        targetItem->cursedKnown = true;
+                    }
+                    if (targetItem->isBroken()) {
+                        targetItem->fix();
+                    } else {
+                        if (auto* w = targetItem->asWeapon()) {
+                            w->upgrade(false);
+                        } else if (auto* a = targetItem->asArmor()) {
+                            a->upgrade(false);
+                        } else {
+                            targetItem->upgrade();
+                        }
+                    }
                     FX::burst(hero->pos, 0xffd700FF, 12);
                     FX::floatingText(hero->pos, "+1 LVL", 0xffd700FF);
-                    outMessage = "Your " + targetItem->name + " certainly looks better now!";
+                    outMessage = "your " + targetItem->displayName() + " certainly looks better now";
 
                     // Consume the upgrade scroll and identify it
                     if (m_targetScrollIdx >= 0 && m_targetScrollIdx < packSize && pack[m_targetScrollIdx]) {
