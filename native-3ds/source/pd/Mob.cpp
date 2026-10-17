@@ -14,6 +14,7 @@
 #include "pd/CharSprite.h"
 #include "pd/Sample.h"
 #include "pd/Debug.h"
+#include "pd/Statistics.h"
 #include "noosa/Audio.h"
 #include "noosa/Music.h"
 #include <cmath>
@@ -78,6 +79,7 @@ void Mob::damage(int dmg, Actor* src) {
 }
 
 void Mob::die(Actor* src) {
+    Statistics::enemiesSlain++;
     if (Dungeon::hero) {
         Dungeon::hero->earnExp(expAward);
         FX::floatingText(pos, "+" + std::to_string(expAward) + "EXP", 0xd4af37FF);

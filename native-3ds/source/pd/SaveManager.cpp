@@ -12,6 +12,8 @@
 #include "pd/Badges.h"
 #include "pd/Preferences.h"
 #include "pd/FogOfWar.h"
+#include "pd/Rankings.h"
+#include "pd/Statistics.h"
 
 #include <3ds.h>
 #include <sys/stat.h>
@@ -141,6 +143,8 @@ void SaveManager::wipeAllData() {
 
     // Reset badges
     Badges::reset();
+    Rankings::instance().reset();
+    Statistics::reset();
 
     // Reset preferences
     Preferences::resetDefaults();

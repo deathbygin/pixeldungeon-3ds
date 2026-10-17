@@ -18,6 +18,7 @@
 #include "noosa/Audio.h"
 #include "noosa/Camera.h"
 #include "pd/ui/BottomScreenUI.h"
+#include "pd/Statistics.h"
 #include <sstream>
 #include <algorithm>
 
@@ -1697,6 +1698,7 @@ void WandOfReach::onZap(int cell) {
                         int g = it->quantity;
                         Dungeon::hero->gold += g;
                         Dungeon::gold += g;
+                        Statistics::goldCollected += g;
                         FX::floatingText(Dungeon::hero->pos, "+" + std::to_string(g), 0xffd700FF);
                         GLog::p("You have magically transported " + std::to_string(g) + " gold into your backpack");
                         Sample::play(Assets::SND_GOLD);
@@ -3290,6 +3292,7 @@ bool Food::execute(Hero* hero, const std::string& action) {
         if (hunger) {
             hunger->satisfy(Hunger::HUNGRY);
         }
+        Statistics::foodEaten++;
         GLog::i("That food tasted delicious!");
         if (hero->heroClass == Hero::HeroClass::Warrior) {
             if (hero->HP < hero->HT) {
@@ -4548,6 +4551,7 @@ bool MysteryMeat::execute(Hero* hero, const std::string& action) {
         if (hunger) {
             hunger->satisfy(Hunger::STARVING - Hunger::HUNGRY);
         }
+        Statistics::foodEaten++;
         GLog::i("That food tasted... strange.");
         switch (Random::Int(5)) {
             case 0:

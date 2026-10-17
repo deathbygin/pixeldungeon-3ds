@@ -297,4 +297,14 @@ void Belongings::uncurseEquipped() {
     }
 }
 
+void Belongings::identify() {
+    if (equippedWeapon) equippedWeapon->identify();
+    if (equippedArmor) equippedArmor->identify();
+    if (equippedRing1) equippedRing1->identify();
+    if (equippedRing2) equippedRing2->identify();
+    for (auto& it : backpack) {
+        if (it) it->identify();
+    }
+}
+
 } // namespace pd

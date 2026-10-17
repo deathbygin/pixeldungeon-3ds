@@ -14,6 +14,7 @@
 #include "pd/Sign.h"
 #include "pd/Sample.h"
 #include "pd/Debug.h"
+#include "pd/Statistics.h"
 #include "pd/ui/BottomScreenUI.h"
 #include "noosa/Audio.h"
 #include <algorithm>
@@ -504,6 +505,7 @@ bool Hero::pickUp(Level* currentLevel, bool spendTurn) {
         int g = item->quantity;
         gold += g;
         Dungeon::gold += g;
+        Statistics::goldCollected += g;
         Badges::validateGoldCollected(Dungeon::gold);
         FX::floatingText(pos, "+" + std::to_string(g), 0xffd700FF);
         GLog::p("You collected " + std::to_string(g) + " gold.");
@@ -688,17 +690,54 @@ void Hero::die(Actor* src) {
     }
     Sample::play(Assets::SND_DEATH);
     GLog::n("You died...");
+    std::string deathReason = "";
     if (src) {
         Buff* b = src->asBuff();
         if (b) {
             switch (b->type()) {
-                case BuffType::Burning: Badges::validateDeathFromFire(); break;
-                case BuffType::Poison:  Badges::validateDeathFromPoison(); break;
-                case BuffType::Hunger:  Badges::validateDeathFromHunger(); break;
+                case BuffType::Burning:
+                    Badges::validateDeathFromFire();
+                    deathReason = "Burned to death on level " + std::to_string(Dungeon::depth);
+                    break;
+                case BuffType::Poison:
+                    Badges::validateDeathFromPoison();
+                    deathReason = "Died from poison on level " + std::to_string(Dungeon::depth);
+                    break;
+                case BuffType::Hunger:
+                    Badges::validateDeathFromHunger();
+                    deathReason = "Starved to death on level " + std::to_string(Dungeon::depth);
+                    break;
+                case BuffType::Bleeding:
+                    deathReason = "Bled to death on level " + std::to_string(Dungeon::depth);
+                    break;
+                case BuffType::Ooze:
+                    deathReason = "Killed by a caustic ooze on level " + std::to_string(Dungeon::depth);
+                    break;
                 default: break;
             }
         }
+        Char* ch = src->asChar();
+        if (ch) {
+            Mob* m = ch->asMob();
+            if (m) {
+                if (Dungeon::bossLevel(Dungeon::depth)) {
+                    deathReason = "Killed by the " + m->name + " on level " + std::to_string(Dungeon::depth);
+                } else {
+                    char first = m->name.empty() ? 'x' : std::tolower(static_cast<unsigned char>(m->name[0]));
+                    bool vowel = (first == 'a' || first == 'e' || first == 'i' || first == 'o' || first == 'u');
+                    deathReason = "Killed by " + std::string(vowel ? "an " : "a ") + m->name + " on level " + std::to_string(Dungeon::depth);
+                }
+            }
+        }
     }
+    if (deathReason.empty()) {
+        if (!Dungeon::resultDescription.empty()) {
+            deathReason = Dungeon::resultDescription;
+        } else {
+            deathReason = "Died on level " + std::to_string(Dungeon::depth);
+        }
+    }
+    Dungeon::fail(deathReason);
     Char::die(src);
 }
 

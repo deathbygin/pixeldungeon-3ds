@@ -68,9 +68,12 @@
 #include "pd/ui/WndOptions.h"
 #include "pd/scenes/TitleScene.h"
 #include "pd/scenes/HeroSelectScene.h"
+#include "pd/scenes/RankingsScene.h"
 #include "pd/windows/WndStory.h"
 #include "pd/windows/WndSettings.h"
 #include "pd/Preferences.h"
+#include "pd/Rankings.h"
+#include "pd/Statistics.h"
 
 using namespace noosa;
 using namespace pd;
@@ -345,17 +348,20 @@ int main(int argc, char* argv[]) {
         CONFIRM_ERASE,
         HERO_SELECT,
         INTERLEVEL,
-        GAME
+        GAME,
+        RANKINGS
     };
     AppState appState = AppState::TITLE;
     pd::scenes::TitleScene titleScene;
     pd::scenes::HeroSelectScene heroSelectScene;
+    pd::scenes::RankingsScene rankingsScene;
     pd::ui::WndOptions wndOptions;
     pd::windows::WndStory wndStory;
     Hero::HeroClass chosenHeroClass = Hero::HeroClass::Warrior;
     pd::windows::WndSettings wndTitleSettings;
     wndTitleSettings.setOnDataWiped([&]() {
         heroSelectScene.refreshUnlocked();
+        rankingsScene.refresh();
         chosenHeroClass = Hero::HeroClass::Warrior;
         titleScene.clearAction();
     });
@@ -491,6 +497,10 @@ int main(int argc, char* argv[]) {
                         // No save: straight to Hero Selection
                         appState = AppState::HERO_SELECT;
                     }
+                } else if (titleScene.getPendingAction() == pd::scenes::TitleAction::RANKINGS) {
+                    titleScene.clearAction();
+                    rankingsScene.refresh();
+                    appState = AppState::RANKINGS;
                 } else if (titleScene.getPendingAction() == pd::scenes::TitleAction::SETTINGS) {
                     titleScene.clearAction();
                     wndTitleSettings.show(false);
@@ -575,6 +585,35 @@ int main(int argc, char* argv[]) {
             C2D_TargetClear(bottomTarget, C2D_Color32(0x10, 0x0c, 0x18, 0xFF));
             C2D_SceneBegin(bottomTarget);
             heroSelectScene.drawBottom(textBuf);
+
+            C3D_FrameEnd(0);
+            Profiler::endRender();
+            Profiler::endFrame();
+            continue;
+        }
+
+        // ---------------------------------------------------------------------
+        // STATE: RANKINGS / HIGH SCORES
+        // ---------------------------------------------------------------------
+        if (appState == AppState::RANKINGS) {
+            rankingsScene.update(dt, kDown, kHeld, screenTouch);
+
+            if (rankingsScene.getPendingAction() == pd::scenes::RankingsAction::BACK_TO_TITLE) {
+                rankingsScene.clearAction();
+                appState = AppState::TITLE;
+            }
+
+            Profiler::beginRender();
+            C2D_TextBufClear(textBuf);
+            C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+
+            C2D_TargetClear(topTarget, C2D_Color32(0x10, 0x0c, 0x18, 0xFF));
+            C2D_SceneBegin(topTarget);
+            rankingsScene.drawTop(textBuf);
+
+            C2D_TargetClear(bottomTarget, C2D_Color32(0x10, 0x0c, 0x18, 0xFF));
+            C2D_SceneBegin(bottomTarget);
+            rankingsScene.drawBottom(textBuf);
 
             C3D_FrameEnd(0);
             Profiler::endRender();
@@ -713,6 +752,8 @@ int main(int argc, char* argv[]) {
         // ---------------------------------------------------------------------
         // STATE 6: ACTIVE GAMEPLAY
         // ---------------------------------------------------------------------
+        Statistics::duration += dt;
+
         bool storyWasOpen = wndStory.isOpen();
         if (storyWasOpen) {
             wndStory.update(screenTouch, kDown);
@@ -766,14 +807,20 @@ int main(int argc, char* argv[]) {
             } else if (trans == LevelTransition::WIN) {
                 bottomUI.clearPendingTransition();
                 Dungeon::pendingTransition = LevelTransition::NONE;
+                Dungeon::win("Obtained the Amulet of Yendor");
                 SaveManager::deleteSave();
                 noosa::Music::play(pd::Assets::HAPPY, true);
                 wndOptions.show("HAPPY ENDING!",
                     "You have retrieved the Amulet of Yendor and ascended back to the surface! You are victorious!",
-                    { "Return to Title" },
-                    [&](int) {
-                        appState = AppState::TITLE;
-                        noosa::Music::play(pd::Assets::THEME, true);
+                    { "View Rankings", "Return to Title" },
+                    [&](int optIdx) {
+                        if (optIdx == 0) {
+                            rankingsScene.refresh();
+                            appState = AppState::RANKINGS;
+                        } else {
+                            appState = AppState::TITLE;
+                            noosa::Music::play(pd::Assets::THEME, true);
+                        }
                     });
                 appState = AppState::PROMPT_LOAD;
                 continue;
@@ -825,6 +872,20 @@ int main(int argc, char* argv[]) {
                         Sample::play(Assets::SND_DEATH);
                         SaveManager::deleteSave();
                         GLog::n("HERO PERISHED! Save erased.");
+                        wndOptions.show("GAME OVER",
+                            "You have perished in the dungeon. View your final score and rankings, or return to title.",
+                            { "View Rankings", "Return to Title" },
+                            [&](int optIdx) {
+                                if (optIdx == 0) {
+                                    rankingsScene.refresh();
+                                    appState = AppState::RANKINGS;
+                                } else {
+                                    appState = AppState::TITLE;
+                                    noosa::Music::play(pd::Assets::THEME, true);
+                                }
+                            });
+                        appState = AppState::PROMPT_LOAD;
+                        continue;
                     }
                     if (Dungeon::pendingTransition == LevelTransition::FALL) {
                         bottomUI.clearPendingTransition();
@@ -912,6 +973,20 @@ int main(int argc, char* argv[]) {
                             Sample::play(Assets::SND_DEATH);
                             SaveManager::deleteSave();
                             GLog::n("HERO PERISHED! Save erased.");
+                            wndOptions.show("GAME OVER",
+                                "You have perished in the dungeon. View your final score and rankings, or return to title.",
+                                { "View Rankings", "Return to Title" },
+                                [&](int optIdx) {
+                                    if (optIdx == 0) {
+                                        rankingsScene.refresh();
+                                        appState = AppState::RANKINGS;
+                                    } else {
+                                        appState = AppState::TITLE;
+                                        noosa::Music::play(pd::Assets::THEME, true);
+                                    }
+                                });
+                            appState = AppState::PROMPT_LOAD;
+                            continue;
                         } else if (level) {
                             if (level->map[hero->pos] == Terrain::EXIT || level->map[hero->pos] == Terrain::UNLOCKED_EXIT) {
                                 bottomUI.promptStairs(true);

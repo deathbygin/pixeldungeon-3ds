@@ -18,7 +18,7 @@ include $(DEVKITARM)/3ds_rules
 #---------------------------------------------------------------------------------
 TARGET          := PixelDungeon
 BUILD           := build
-SOURCES         := source source/noosa source/pd source/pd/ui source/pd/windows
+SOURCES         := source source/noosa source/pd source/pd/scenes source/pd/ui source/pd/windows
 DATA            := data
 INCLUDES        := include include/noosa include/pd include/pd/ui include/pd/scenes include/pd/windows include/pd/effects
 GRAPHICS        := gfx

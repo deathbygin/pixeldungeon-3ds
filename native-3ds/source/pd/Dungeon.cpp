@@ -9,6 +9,8 @@
 #include <ctime>
 
 #include "pd/FX.h"
+#include "pd/Statistics.h"
+#include "pd/Rankings.h"
 
 namespace pd {
 
@@ -27,11 +29,29 @@ int Dungeon::depth = 1;
 int Dungeon::gold = 0;
 int Dungeon::deepestFloor = 1;
 bool Dungeon::nightMode = false;
+std::string Dungeon::resultDescription = "";
 std::unordered_map<int, std::vector<std::unique_ptr<Item>>> Dungeon::droppedItems;
 
 int Dungeon::scrollsOfUpgrade = 0;
 int Dungeon::scrollsOfEnchantment = 0;
 int Dungeon::potionOfStrength = 0;
+
+void Dungeon::fail(const std::string& desc) {
+    if (!desc.empty()) {
+        resultDescription = desc;
+    }
+    Rankings::instance().submit(false, resultDescription);
+}
+
+void Dungeon::win(const std::string& desc) {
+    if (!desc.empty()) {
+        resultDescription = desc;
+    }
+    if (hero) {
+        hero->belongings.identify();
+    }
+    Rankings::instance().submit(true, resultDescription);
+}
 
 static bool quotaChance(const int* quota, int quotaLen, int number) {
     for (int i = 0; i < quotaLen; i += 2) {
@@ -112,6 +132,7 @@ void Dungeon::announceLevelEntrance() {
         GLog::h("Welcome to level " + std::to_string(depth) + " of Pixel Dungeon!");
         deepestFloor = std::max(deepestFloor, depth);
     }
+    Statistics::deepestFloor = std::max(Statistics::deepestFloor, depth);
 
     switch (level->feeling) {
     case Level::Feeling::CHASM:
@@ -147,6 +168,9 @@ void Dungeon::newGame() {
     depth = 1;
     gold = 0;
     deepestFloor = 1;
+    resultDescription.clear();
+    Statistics::reset();
+    Statistics::deepestFloor = 1;
     scrollsOfUpgrade = 0;
     scrollsOfEnchantment = 0;
     potionOfStrength = 0;

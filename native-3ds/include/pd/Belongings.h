@@ -38,6 +38,7 @@ public:
     Item* getItem(const std::string& itemName);
     void observe();
     void uncurseEquipped();
+    void identify();
     bool isFull() const { return backpack.size() >= BACKPACK_SIZE; }
 };
 

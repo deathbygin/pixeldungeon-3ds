@@ -38,6 +38,10 @@ public:
 
     static bool bossLevel(int d = -1);
 
+    static std::string resultDescription;
+    static void fail(const std::string& desc = "");
+    static void win(const std::string& desc = "");
+
     static void init();
     static void newGame();
     static void resetLevel();
