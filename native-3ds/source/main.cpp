@@ -1234,7 +1234,7 @@ int main(int argc, char* argv[]) {
         // =====================================================================
         // BOTTOM SCREEN (320x240): Tactical HUD, Quickslots, Inventory & Log
         // =====================================================================
-        C2D_TargetClear(bottomTarget, C2D_Color32(0x22, 0x20, 0x34, 0xFF));
+        C2D_TargetClear(bottomTarget, C2D_Color32(0x14, 0x14, 0x14, 0xFF));
         C2D_SceneBegin(bottomTarget);
 
         bottomUI.draw(hero, Dungeon::depth, textBuf);

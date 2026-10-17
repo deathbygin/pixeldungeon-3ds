@@ -1133,8 +1133,8 @@ void BottomScreenUI::drawRightGlanceCard(const pd::Hero* hero, C2D_TextBuf textB
 }
 
 void BottomScreenUI::draw(const pd::Hero* hero, int depth, C2D_TextBuf textBuf) {
-    // 1. Dark Slate Base (320x240)
-    C2D_DrawRectSolid(0.0f, 0.0f, 0.2f, 320.0f, 240.0f, C2D_Color32(0x18, 0x14, 0x25, 0xFF));
+    // 1. Very Dark Gray Base (320x240)
+    C2D_DrawRectSolid(0.0f, 0.0f, 0.2f, 320.0f, 240.0f, C2D_Color32(0x14, 0x14, 0x14, 0xFF));
 
     // 2. Persistent Top Status Header (320x33, y=0..33)
     m_statusPane.draw(hero, depth, textBuf);
