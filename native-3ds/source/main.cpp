@@ -70,6 +70,7 @@
 #include "pd/scenes/HeroSelectScene.h"
 #include "pd/scenes/RankingsScene.h"
 #include "pd/scenes/BadgesScene.h"
+#include "pd/scenes/AboutScene.h"
 #include "pd/BadgeBanner.h"
 #include "pd/windows/WndStory.h"
 #include "pd/windows/WndSettings.h"
@@ -356,13 +357,15 @@ int main(int argc, char* argv[]) {
         INTERLEVEL,
         GAME,
         RANKINGS,
-        BADGES
+        BADGES,
+        ABOUT
     };
     AppState appState = AppState::TITLE;
     pd::scenes::TitleScene titleScene;
     pd::scenes::HeroSelectScene heroSelectScene;
     pd::scenes::RankingsScene rankingsScene;
     pd::scenes::BadgesScene badgesScene;
+    pd::scenes::AboutScene aboutScene;
     pd::ui::WndOptions wndOptions;
     pd::windows::WndStory wndStory;
     Hero::HeroClass chosenHeroClass = Hero::HeroClass::Warrior;
@@ -515,6 +518,10 @@ int main(int argc, char* argv[]) {
                     titleScene.clearAction();
                     badgesScene.refresh();
                     appState = AppState::BADGES;
+                } else if (titleScene.getPendingAction() == pd::scenes::TitleAction::ABOUT) {
+                    titleScene.clearAction();
+                    aboutScene.refresh();
+                    appState = AppState::ABOUT;
                 } else if (titleScene.getPendingAction() == pd::scenes::TitleAction::SETTINGS) {
                     titleScene.clearAction();
                     wndTitleSettings.show(false);
@@ -657,6 +664,35 @@ int main(int argc, char* argv[]) {
             C2D_TargetClear(bottomTarget, C2D_Color32(0x10, 0x0c, 0x18, 0xFF));
             C2D_SceneBegin(bottomTarget);
             badgesScene.drawBottom(textBuf);
+
+            C3D_FrameEnd(0);
+            Profiler::endRender();
+            Profiler::endFrame();
+            continue;
+        }
+
+        // ---------------------------------------------------------------------
+        // STATE: ABOUT / CREDITS
+        // ---------------------------------------------------------------------
+        if (appState == AppState::ABOUT) {
+            aboutScene.update(dt, kDown, kHeld, screenTouch);
+
+            if (aboutScene.getPendingAction() == pd::scenes::AboutAction::BACK_TO_TITLE) {
+                aboutScene.clearAction();
+                appState = AppState::TITLE;
+            }
+
+            Profiler::beginRender();
+            C2D_TextBufClear(textBuf);
+            C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+
+            C2D_TargetClear(topTarget, C2D_Color32(0x10, 0x0c, 0x18, 0xFF));
+            C2D_SceneBegin(topTarget);
+            aboutScene.drawTop(textBuf);
+
+            C2D_TargetClear(bottomTarget, C2D_Color32(0x10, 0x0c, 0x18, 0xFF));
+            C2D_SceneBegin(bottomTarget);
+            aboutScene.drawBottom(textBuf);
 
             C3D_FrameEnd(0);
             Profiler::endRender();
