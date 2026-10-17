@@ -57,6 +57,8 @@ void WndBag::close() {
 bool WndBag::isItemEligible(const pd::Item* it) const {
     if (!it) return false;
     switch (m_selectionMode) {
+        case Mode::QUICKSLOT:
+            return !it->defaultAction.empty();
         case Mode::UNIDENTIFIED:
             return !it->isIdentified();
         case Mode::UPGRADEABLE:
@@ -137,6 +139,7 @@ bool WndBag::update(pd::Hero* hero, const TouchController& touch, u32 kDown, u32
     float tabY = WIN_Y - 9.0f;
     noosa::RectF rWin(WIN_X, tabY, WIN_W, WIN_H + (WIN_Y - tabY));
     if (touch.justPressed()) {
+        m_longPressTriggered = false;
         float tx = static_cast<float>(touch.x());
         float ty = static_cast<float>(touch.y());
         if (!rWin.contains(tx, ty)) {
@@ -222,6 +225,31 @@ bool WndBag::update(pd::Hero* hero, const TouchController& touch, u32 kDown, u32
     if (kDown & KEY_DRIGHT) m_selectedSlot = (m_selectedSlot % COLS < COLS - 1) ? m_selectedSlot + 1 : m_selectedSlot;
     if (kDown & KEY_DUP)    m_selectedSlot = std::max(0, m_selectedSlot - COLS);
     if (kDown & KEY_DDOWN)  m_selectedSlot = std::min(COLS * ROWS - 1, m_selectedSlot + COLS);
+
+    // Long-press detection to quickly assign item to Quickslot (authentic Pixel Dungeon behavior)
+    if (!isSelectionMode() && touch.isDown() && !m_longPressTriggered && touch.heldTime() >= 0.5f) {
+        for (int r = 0; r < ROWS; ++r) {
+            for (int c = 0; c < COLS; ++c) {
+                int slotIdx = r * COLS + c;
+                float sx = GRID_START_X + c * (SLOT_SIZE + SLOT_MARGIN);
+                float sy = GRID_START_Y + r * (SLOT_SIZE + SLOT_MARGIN);
+                noosa::RectF rSlot(sx, sy, SLOT_SIZE, SLOT_SIZE);
+
+                if (touch.hitTest(rSlot)) {
+                    m_selectedSlot = slotIdx;
+                    pd::Item* it = getSelectedItem(hero);
+                    if (it && !it->defaultAction.empty()) {
+                        m_longPressTriggered = true;
+                        Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
+                        outMessage = "SET_QUICKSLOT";
+                        close();
+                        return false;
+                    }
+                    break;
+                }
+            }
+        }
+    }
 
     // Slot click / tap detection
     for (int r = 0; r < ROWS; ++r) {

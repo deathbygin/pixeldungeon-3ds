@@ -389,6 +389,7 @@ int main(int argc, char* argv[]) {
         SaveManager::saveGame();
 
         bottomUI.reset();
+        bottomUI.clearQuickslots();
         bottomUI.log("Entered Depth 1 as " + Dungeon::hero->name + ".");
     };
 

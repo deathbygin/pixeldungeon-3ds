@@ -13,6 +13,7 @@
 #include "pd/Mob.h"
 #include "pd/FX.h"
 #include "pd/Assets.h"
+#include "pd/Sample.h"
 #include "pd/Sign.h"
 #include "noosa/Audio.h"
 #include <algorithm>
@@ -85,6 +86,7 @@ void BottomScreenUI::reset() {
     m_logConsole.clear();
     cancelTargeting();
     cancelExamine();
+    m_lastTarget = nullptr;
     if (m_wndBag.isOpen) m_wndBag.close();
     if (m_wndHero.isOpen()) m_wndHero.hide();
     m_wndGame.hide();
@@ -94,7 +96,6 @@ void BottomScreenUI::reset() {
     m_pendingGameAction = pd::windows::GameAction::NONE;
     m_pendingTransition = LevelTransition::NONE;
     m_isInspecting = false;
-    m_toolbar = Toolbar();
     m_showMinimap = true;
     initLogger();
 }
@@ -142,6 +143,12 @@ static bool canTargetCell(const Hero* hero, const Level* level, const Item* item
     return true;
 }
 
+void BottomScreenUI::setLastTarget(Char* target) {
+    if (s_instance && target && target != Dungeon::hero.get()) {
+        s_instance->m_lastTarget = target;
+    }
+}
+
 void BottomScreenUI::startTargeting(Item* item) {
     if (!item) return;
     m_isTargeting = true;
@@ -150,17 +157,37 @@ void BottomScreenUI::startTargeting(Item* item) {
     m_targetLastDirX = 0;
     m_targetLastDirY = 0;
 
-    // Default target: snap to nearest visible enemy within maxDistance, or hero pos
+    // Default target: snap to last targeted enemy, or nearest visible enemy with clear LOS, or hero pos
     m_targetCell = Dungeon::hero ? Dungeon::hero->pos : 0;
     if (Dungeon::hero) {
         int maxDist = item->maxDistance(Dungeon::hero.get());
-        float minDist = 999.0f;
-        for (const auto& m : Dungeon::mobs) {
-            if (m && m->isAlive() && Dungeon::visible[m->pos]) {
-                int dist = PathFinder::distanceChebyshev(Dungeon::hero->pos, m->pos);
-                if (dist <= maxDist && static_cast<float>(dist) < minDist) {
-                    minDist = static_cast<float>(dist);
-                    m_targetCell = m->pos;
+
+        bool targetValid = false;
+        if (m_lastTarget && m_lastTarget->isAlive() && Dungeon::visible[m_lastTarget->pos]) {
+            int dist = PathFinder::distanceChebyshev(Dungeon::hero->pos, m_lastTarget->pos);
+            if (dist <= maxDist) {
+                int castCell = Ballistica::cast(Dungeon::hero->pos, m_lastTarget->pos, false, true);
+                if (castCell == m_lastTarget->pos) {
+                    m_targetCell = m_lastTarget->pos;
+                    targetValid = true;
+                }
+            }
+        }
+
+        if (!targetValid) {
+            m_lastTarget = nullptr;
+            float minDist = 999.0f;
+            for (const auto& m : Dungeon::mobs) {
+                if (m && m->isAlive() && Dungeon::visible[m->pos]) {
+                    int dist = PathFinder::distanceChebyshev(Dungeon::hero->pos, m->pos);
+                    if (dist <= maxDist && static_cast<float>(dist) < minDist) {
+                        int castCell = Ballistica::cast(Dungeon::hero->pos, m->pos, false, true);
+                        if (castCell == m->pos) {
+                            minDist = static_cast<float>(dist);
+                            m_targetCell = m->pos;
+                            m_lastTarget = m.get();
+                        }
+                    }
                 }
             }
         }
@@ -798,47 +825,126 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
 
         case Toolbar::Action::QUICK1: {
             if (!hero->isAlive()) return false;
-            pd::Item* qIt = m_toolbar.getQuickItem1();
-            if (qIt) {
-                if (Wand* w = qIt->asWand()) {
-                    startTargeting(w);
-                    return false;
-                } else if (qIt->asMissile()) {
-                    startTargeting(qIt);
-                    return false;
-                } else {
-                    std::string act = (qIt->category() == ItemCategory::Potion) ? "DRINK" :
-                                      (qIt->category() == ItemCategory::Scroll) ? "READ" : "USE";
-                    log(act + " " + qIt->displayName(), C2D_Color32(0x38, 0x9e, 0x38, 0xFF));
-                    bool used = qIt->execute(hero, act);
-                    if (used) {
-                        if (qIt->quantity <= 0) hero->belongings.drop(qIt);
-                        Actor::process();
-                        return true;
+            QuickSlot& slot = m_toolbar.getSlot1();
+
+            // 1. If slot is empty: open inventory in QUICKSLOT mode
+            if (slot.isEmpty()) {
+                Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
+                selectItem(WndBag::Mode::QUICKSLOT, "Select item for Quickslot 1", [this](Item* it) {
+                    if (it) {
+                        m_toolbar.setQuickItem1(it);
+                        log("Quickslot 1 assigned: " + it->displayName(), COLOR_TEXT_POSITIVE);
                     }
-                    return false;
-                }
-            } else {
-                log("Quickslot 1 is empty!", C2D_Color32(0xd6, 0x30, 0x30, 0xFF));
+                });
+                return false;
             }
-            break;
+
+            // 2. Resolve active item
+            pd::Item* qIt = slot.resolve(hero);
+
+            // 3. If slot is ghost / depleted (quantity <= 0 or not found):
+            if (slot.isGhost(hero) || !qIt || qIt->quantity <= 0) {
+                Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
+                std::string name = !slot.placeholderName.empty() ? slot.placeholderName : "Item";
+                log(name + " is depleted!", COLOR_TEXT_WARNING);
+                return false;
+            }
+
+            // 4. Quick-fire double tap: if targeting is already active for this item
+            if (m_isTargeting && m_targetItem == qIt) {
+                int target = m_targetCell;
+                Char* targetChar = Actor::findChar(target);
+                if (targetChar && targetChar != hero) {
+                    setLastTarget(targetChar);
+                }
+                cancelTargeting();
+                qIt->cast(hero, target);
+                return false;
+            }
+
+            // 5. Activate default action
+            std::string act = !qIt->defaultAction.empty() ? qIt->defaultAction :
+                              (qIt->asWand() ? "ZAP" :
+                              (qIt->asMissile() ? "THROW" :
+                              (qIt->category() == ItemCategory::Potion ? "DRINK" :
+                              (qIt->category() == ItemCategory::Scroll ? "READ" : "USE"))));
+
+            if (act == "THROW" || act == "ZAP") {
+                startTargeting(qIt);
+                log("Aiming " + qIt->displayName() + "...", COLOR_TEXT_ACCENT);
+                return false;
+            } else {
+                log(act + " " + qIt->displayName(), COLOR_TEXT_POSITIVE);
+                bool used = qIt->execute(hero, act);
+                if (used) {
+                    if (qIt->quantity <= 0) hero->belongings.drop(qIt);
+                    Actor::process();
+                    return true;
+                }
+                return false;
+            }
         }
 
         case Toolbar::Action::QUICK2: {
             if (!hero->isAlive()) return false;
-            pd::Item* qIt = m_toolbar.getQuickItem2();
-            if (qIt) {
-                if (Wand* w = qIt->asWand()) {
-                    startTargeting(w);
-                    return false;
-                } else if (qIt->asMissile()) {
-                    startTargeting(qIt);
-                    return false;
-                }
-            } else {
-                log("Quickslot 2 is empty!", C2D_Color32(0xd6, 0x30, 0x30, 0xFF));
+            QuickSlot& slot = m_toolbar.getSlot2();
+
+            // 1. If slot is empty: open inventory in QUICKSLOT mode
+            if (slot.isEmpty()) {
+                Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
+                selectItem(WndBag::Mode::QUICKSLOT, "Select item for Quickslot 2", [this](Item* it) {
+                    if (it) {
+                        m_toolbar.setQuickItem2(it);
+                        log("Quickslot 2 assigned: " + it->displayName(), COLOR_TEXT_POSITIVE);
+                    }
+                });
+                return false;
             }
-            break;
+
+            // 2. Resolve active item
+            pd::Item* qIt = slot.resolve(hero);
+
+            // 3. If slot is ghost / depleted (quantity <= 0 or not found):
+            if (slot.isGhost(hero) || !qIt || qIt->quantity <= 0) {
+                Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
+                std::string name = !slot.placeholderName.empty() ? slot.placeholderName : "Item";
+                log(name + " is depleted!", COLOR_TEXT_WARNING);
+                return false;
+            }
+
+            // 4. Quick-fire double tap: if targeting is already active for this item
+            if (m_isTargeting && m_targetItem == qIt) {
+                int target = m_targetCell;
+                Char* targetChar = Actor::findChar(target);
+                if (targetChar && targetChar != hero) {
+                    setLastTarget(targetChar);
+                }
+                cancelTargeting();
+                qIt->cast(hero, target);
+                return false;
+            }
+
+            // 5. Activate default action
+            std::string act = !qIt->defaultAction.empty() ? qIt->defaultAction :
+                              (qIt->asWand() ? "ZAP" :
+                              (qIt->asMissile() ? "THROW" :
+                              (qIt->category() == ItemCategory::Potion ? "DRINK" :
+                              (qIt->category() == ItemCategory::Scroll ? "READ" : "USE"))));
+
+            if (act == "THROW" || act == "ZAP") {
+                startTargeting(qIt);
+                log("Aiming " + qIt->displayName() + "...", COLOR_TEXT_ACCENT);
+                return false;
+            } else {
+                log(act + " " + qIt->displayName(), COLOR_TEXT_POSITIVE);
+                bool used = qIt->execute(hero, act);
+                if (used) {
+                    if (qIt->quantity <= 0) hero->belongings.drop(qIt);
+                    Actor::process();
+                    return true;
+                }
+                return false;
+            }
         }
 
         case Toolbar::Action::NONE:

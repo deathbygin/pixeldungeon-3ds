@@ -13,6 +13,28 @@ class Item;
 
 namespace pd::ui {
 
+struct QuickSlot {
+    mutable pd::Item* item = nullptr;
+    std::string itemClass;
+    int placeholderImage = -1;
+    std::string placeholderName;
+    bool isStackable = false;
+    std::unique_ptr<pd::Item> virtualItem = nullptr;
+
+    QuickSlot() = default;
+    ~QuickSlot() = default;
+    QuickSlot(QuickSlot&&) noexcept = default;
+    QuickSlot& operator=(QuickSlot&&) noexcept = default;
+    QuickSlot(const QuickSlot&) = delete;
+    QuickSlot& operator=(const QuickSlot&) = delete;
+
+    void set(pd::Item* it);
+    void clear();
+    bool isEmpty() const;
+    bool isGhost(const pd::Hero* hero = nullptr) const;
+    pd::Item* resolve(const pd::Hero* hero = nullptr) const;
+};
+
 class Toolbar {
 public:
     static constexpr float HEIGHT = 25.0f;
@@ -31,22 +53,32 @@ public:
 
     Toolbar();
     ~Toolbar() = default;
+    Toolbar(Toolbar&&) noexcept = default;
+    Toolbar& operator=(Toolbar&&) noexcept = default;
+    Toolbar(const Toolbar&) = delete;
+    Toolbar& operator=(const Toolbar&) = delete;
 
     Action update(const TouchController& touch, u32 kDown, pd::Hero* hero);
     void draw(const pd::Hero* hero, C2D_TextBuf textBuf, bool isTargeting = false, const pd::Item* targetItem = nullptr, bool isExamining = false) const;
 
-    void setQuickItem1(pd::Item* it) { m_quickItem1 = it; }
-    void setQuickItem2(pd::Item* it) { m_quickItem2 = it; }
-    pd::Item* getQuickItem1() const { return m_quickItem1; }
-    pd::Item* getQuickItem2() const { return m_quickItem2; }
+    void setQuickItem1(pd::Item* it) { m_slot1.set(it); }
+    void setQuickItem2(pd::Item* it) { m_slot2.set(it); }
+    pd::Item* getQuickItem1(const pd::Hero* hero = nullptr) const { return m_slot1.resolve(hero); }
+    pd::Item* getQuickItem2(const pd::Hero* hero = nullptr) const { return m_slot2.resolve(hero); }
+
+    const QuickSlot& getSlot1() const { return m_slot1; }
+    const QuickSlot& getSlot2() const { return m_slot2; }
+    QuickSlot& getSlot1() { return m_slot1; }
+    QuickSlot& getSlot2() { return m_slot2; }
+    void clearQuickslots() { m_slot1.clear(); m_slot2.clear(); }
 
 private:
     std::shared_ptr<noosa::Texture> m_texToolbar;
     std::shared_ptr<noosa::Texture> m_texItems;
     std::shared_ptr<noosa::Texture> m_texIcons;
 
-    pd::Item* m_quickItem1 = nullptr;
-    pd::Item* m_quickItem2 = nullptr;
+    QuickSlot m_slot1;
+    QuickSlot m_slot2;
 
     mutable Tex3DS_SubTexture m_subWait{};
     mutable Tex3DS_SubTexture m_subSearch{};

@@ -43,6 +43,7 @@ public:
     bool cursed = false;
     bool cursedKnown = false;
     bool levelKnown = false;
+    std::string defaultAction = "";
 
     Item() = default;
     virtual ~Item() = default;
@@ -51,6 +52,7 @@ public:
     virtual class PlantSeed* asPlantSeed() { return nullptr; }
     virtual std::vector<std::string> actions(Hero* hero);
     virtual bool execute(Hero* hero, const std::string& action);
+    virtual bool execute(Hero* hero);
 
     virtual void cast(Hero* hero, int targetCell);
     virtual void onThrow(int cell);

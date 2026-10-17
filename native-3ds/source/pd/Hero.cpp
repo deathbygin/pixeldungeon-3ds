@@ -14,6 +14,7 @@
 #include "pd/Sign.h"
 #include "pd/Sample.h"
 #include "pd/Debug.h"
+#include "pd/ui/BottomScreenUI.h"
 #include "noosa/Audio.h"
 #include <algorithm>
 
@@ -268,6 +269,7 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
             waitingForInput = true;
             return false;
         }
+        ui::BottomScreenUI::setLastTarget(enemy);
         attack(enemy);
         next();
         waitingForInput = false;
@@ -718,6 +720,9 @@ float Hero::speed() const {
 }
 
 bool Hero::shoot(Char* enemyChar, MissileWeapon* wep) {
+    if (enemyChar) {
+        ui::BottomScreenUI::setLastTarget(enemyChar);
+    }
     rangedWeapon = wep;
     bool result = attack(enemyChar);
     rangedWeapon = nullptr;

@@ -83,6 +83,8 @@ public:
     LevelTransition getPendingTransition() const { return m_pendingTransition; }
     void clearPendingTransition() { m_pendingTransition = LevelTransition::NONE; }
 
+    void clearQuickslots() { m_toolbar.clearQuickslots(); }
+
     void promptStairs(bool descend);
     void showMessage(std::string text, std::function<void()> onDismiss = nullptr);
     void showOptions(std::string title, std::string message,
@@ -103,6 +105,9 @@ public:
     void cancelTargeting();
     int getTargetCell() const { return m_targetCell; }
     Item* getTargetItem() const { return m_targetItem; }
+
+    static void setLastTarget(Char* target);
+    Char* getLastTarget() const { return m_lastTarget; }
 
     const TouchController& getTouchController() const { return m_touch; }
 
@@ -134,6 +139,7 @@ private:
     bool m_isTargeting = false;
     int m_targetCell = 0;
     Item* m_targetItem = nullptr;
+    Char* m_lastTarget = nullptr;
     int m_targetHoldTimer = 0;
     int m_targetLastDirX = 0;
     int m_targetLastDirY = 0;

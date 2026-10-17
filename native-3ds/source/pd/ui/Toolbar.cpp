@@ -4,10 +4,121 @@
 #include "pd/Item.h"
 #include "pd/Assets.h"
 #include "pd/Sample.h"
+#include "pd/Dungeon.h"
+#include "pd/Belongings.h"
 #include "noosa/Audio.h"
 #include <algorithm>
 
 namespace pd::ui {
+
+void QuickSlot::set(pd::Item* it) {
+    if (!it) {
+        clear();
+        return;
+    }
+    isStackable = it->isStackable();
+    placeholderImage = it->image;
+    placeholderName = it->displayName();
+    if (isStackable) {
+        itemClass = it->name;
+        virtualItem = it->clone(0);
+    } else {
+        itemClass.clear();
+        virtualItem.reset();
+    }
+    item = it;
+}
+
+void QuickSlot::clear() {
+    item = nullptr;
+    itemClass.clear();
+    placeholderImage = -1;
+    placeholderName.clear();
+    isStackable = false;
+    virtualItem.reset();
+}
+
+bool QuickSlot::isEmpty() const {
+    return placeholderImage == -1 && itemClass.empty() && item == nullptr;
+}
+
+bool QuickSlot::isGhost(const pd::Hero* hero) const {
+    if (isEmpty()) return false;
+    pd::Item* it = resolve(hero);
+    return it == nullptr || it->quantity <= 0;
+}
+
+pd::Item* QuickSlot::resolve(const pd::Hero* hero) const {
+    if (isEmpty()) return nullptr;
+
+    const pd::Hero* h = hero ? hero : Dungeon::hero.get();
+
+    if (isStackable) {
+        if (h) {
+            for (const auto& bIt : h->belongings.backpack) {
+                if (!bIt || bIt->quantity <= 0) continue;
+                if (bIt->name == itemClass) {
+                    item = bIt.get();
+                    return item;
+                }
+                if (virtualItem) {
+                    if (Potion* p1 = virtualItem->asPotion()) {
+                        if (Potion* p2 = bIt->asPotion()) {
+                            if (p1->type == p2->type) {
+                                item = bIt.get();
+                                return item;
+                            }
+                        }
+                    } else if (Scroll* s1 = virtualItem->asScroll()) {
+                        if (Scroll* s2 = bIt->asScroll()) {
+                            if (s1->type == s2->type) {
+                                item = bIt.get();
+                                return item;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        item = nullptr;
+        return virtualItem.get();
+    } else {
+        bool valid = false;
+        if (h && item) {
+            if (item == h->belongings.equippedWeapon ||
+                item == h->belongings.equippedArmor ||
+                item == h->belongings.equippedRing1 ||
+                item == h->belongings.equippedRing2) {
+                valid = true;
+            } else {
+                for (const auto& bIt : h->belongings.backpack) {
+                    if (bIt.get() == item) {
+                        valid = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if (valid) return item;
+
+        // If specific pointer was removed (e.g. Boomerang in flight or re-collected), search by name
+        if (h && !placeholderName.empty()) {
+            for (const auto& bIt : h->belongings.backpack) {
+                if (bIt && (bIt->displayName() == placeholderName || (!itemClass.empty() && bIt->name == itemClass))) {
+                    item = bIt.get();
+                    return item;
+                }
+            }
+            if (h->belongings.equippedWeapon &&
+                (h->belongings.equippedWeapon->displayName() == placeholderName ||
+                 (!itemClass.empty() && h->belongings.equippedWeapon->name == itemClass))) {
+                item = h->belongings.equippedWeapon;
+                return item;
+            }
+        }
+        return nullptr;
+    }
+}
 
 static void setupSubTex(Tex3DS_SubTexture& sub, int potW, int potH, int fx, int fy, int fw, int fh) {
     sub.width = static_cast<u16>(fw);
@@ -180,9 +291,14 @@ void Toolbar::draw(const pd::Hero* hero, C2D_TextBuf textBuf, bool isTargeting, 
         int iPotH = m_texItems->potHeight();
         C3D_Tex* iTex = m_texItems->getTex();
 
-        auto drawSlotItem = [&](pd::Item* item, float slotX, Tex3DS_SubTexture& sub, int toolIdx) {
-            if (!item) return;
-            int imgIdx = item->image;
+        auto drawSlotItem = [&](const QuickSlot& slot, float slotX, Tex3DS_SubTexture& sub, int toolIdx) {
+            if (slot.isEmpty()) return;
+
+            pd::Item* item = slot.resolve(hero);
+            bool ghost = slot.isGhost(hero);
+            int imgIdx = item ? item->image : slot.placeholderImage;
+            if (imgIdx < 0) return;
+
             setupSubTex(sub, iPotW, iPotH, (imgIdx % 8) * 16, (imgIdx / 8) * 16, 16, 16);
             C2D_Image img = { iTex, &sub };
             C2D_DrawParams p;
@@ -196,29 +312,40 @@ void Toolbar::draw(const pd::Hero* hero, C2D_TextBuf textBuf, bool isTargeting, 
             p.center.x = p.center.y = 0.0f;
             p.depth = zContent;
             p.angle = 0.0f;
-            C2D_DrawImage(img, &p, nullptr);
 
-            // Stack quantity / wand charge badge in top-left
-            float textY = (m_pressedTool == toolIdx) ? (Y_POS + 1.0f) : Y_POS;
-            if (Wand* w = item->asWand()) {
-                std::string chStr = std::to_string(w->curCharges);
-                u32 col = w->curCharges > 0 ? C2D_Color32(0x99, 0xcc, 0xff, 0xFF) : COLOR_TEXT_WARNING;
-                BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, chStr, slotX + 2.0f, textY + 1.0f, zText, col, COLOR_TEXT_SHADOW);
-            } else if (item->quantity > 1) {
-                std::string qStr = std::to_string(item->quantity);
-                BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, qStr, slotX + 2.0f, textY + 1.0f, zText, COLOR_TEXT_PRIMARY, COLOR_TEXT_SHADOW);
+            if (ghost) {
+                // Dimmed translucent ghost placeholder rendering
+                C2D_ImageTint tint;
+                C2D_PlainImageTint(&tint, C2D_Color32(0xFF, 0xFF, 0xFF, 0x48), 1.0f);
+                C2D_DrawImage(img, &p, &tint);
+            } else {
+                C2D_DrawImage(img, &p, nullptr);
+
+                // Stack quantity / wand charge badge in top-left
+                float textY = (m_pressedTool == toolIdx) ? (Y_POS + 1.0f) : Y_POS;
+                if (item) {
+                    if (Wand* w = item->asWand()) {
+                        std::string chStr = std::to_string(w->curCharges);
+                        u32 col = w->curCharges > 0 ? C2D_Color32(0x99, 0xcc, 0xff, 0xFF) : COLOR_TEXT_WARNING;
+                        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, chStr, slotX + 2.0f, textY + 1.0f, zText, col, COLOR_TEXT_SHADOW);
+                    } else if (item->quantity > 1) {
+                        std::string qStr = std::to_string(item->quantity);
+                        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, qStr, slotX + 2.0f, textY + 1.0f, zText, COLOR_TEXT_PRIMARY, COLOR_TEXT_SHADOW);
+                    }
+                }
             }
         };
 
-        drawSlotItem(m_quickItem1, 272.0f, m_subItem1, 4);
-        drawSlotItem(m_quickItem2, 294.0f, m_subItem2, 5);
+        drawSlotItem(m_slot1, 272.0f, m_subItem1, 4);
+        drawSlotItem(m_slot2, 294.0f, m_subItem2, 5);
     }
 
     // Crosshair target overlay when targeting mode is active
     if (isTargeting && m_texIcons && m_texIcons->isLoaded()) {
         float crossX = 272.0f; // default to quickslot 1
         int crossTool = 4;
-        if (targetItem && targetItem == m_quickItem2) {
+        pd::Item* it2 = m_slot2.resolve(hero);
+        if (targetItem && it2 && targetItem == it2) {
             crossX = 294.0f;
             crossTool = 5;
         }

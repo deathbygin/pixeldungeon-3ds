@@ -67,6 +67,7 @@ public:
 
 private:
     int m_selectedSlot = 0;
+    bool m_longPressTriggered = false;
     WndItem m_wndItem;
 
     Mode m_selectionMode = Mode::ALL;

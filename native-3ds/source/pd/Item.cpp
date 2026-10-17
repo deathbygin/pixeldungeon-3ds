@@ -121,6 +121,7 @@ void Item::onThrow(int cell) {
     if (Dungeon::level) {
         Char* ch = Actor::findChar(cell);
         if (ch && ch != Dungeon::hero.get()) {
+            ui::BottomScreenUI::setLastTarget(ch);
             int dmg = Random::IntRange(1, 2);
             ch->damage(dmg, Dungeon::hero.get());
             FX::floatingText(cell, std::to_string(dmg), 0xe43b44FF);
@@ -175,6 +176,10 @@ bool Item::execute(Hero* hero, const std::string& action) {
         return doThrowItem(hero, this);
     }
     return false;
+}
+
+bool Item::execute(Hero* hero) {
+    return !defaultAction.empty() ? execute(hero, defaultAction) : false;
 }
 
 // -----------------------------------------------------------------------------
@@ -677,6 +682,7 @@ Item* Wand::random() {
 
 Wand::Wand(std::string n, int initialC, WandType tp)
     : Weapon(std::move(n), 1, 6, 10), maxCharges(initialC), curCharges(initialC), wandType(tp) {
+    defaultAction = "ZAP";
     updatePerception();
 }
 
@@ -906,6 +912,10 @@ void Wand::cast(Hero* hero, int targetCell) {
     setKnown();
 
     int cell = Ballistica::cast(hero->pos, targetCell, true, hitChars);
+    Char* hitChar = Actor::findChar(cell);
+    if (hitChar && hitChar != hero) {
+        ui::BottomScreenUI::setLastTarget(hitChar);
+    }
     if (hero->getSprite()) {
         hero->getSprite()->turnTo(hero->pos, cell);
         HeroSprite* hspr = hero->getSprite()->asHeroSprite();
@@ -2145,6 +2155,7 @@ void Potion::restoreStatus(const std::vector<int>& mapping, const std::vector<bo
 }
 
 Potion::Potion(PotionType tp) : type(tp) {
+    defaultAction = "DRINK";
     updatePerception();
 }
 
@@ -2699,6 +2710,7 @@ void Scroll::restoreStatus(const std::vector<int>& mapping, const std::vector<bo
 }
 
 Scroll::Scroll(ScrollType tp) : type(tp) {
+    defaultAction = "READ";
     updatePerception();
 }
 
@@ -3342,6 +3354,7 @@ Torch::Torch() {
     identified = true;
     levelKnown = true;
     cursedKnown = true;
+    defaultAction = "LIGHT";
 }
 
 std::vector<std::string> Torch::actions(Hero* hero) {
@@ -3464,6 +3477,7 @@ std::unique_ptr<Item> SkeletonKey::clone(int qty) const {
 // =============================================================================
 MissileWeapon::MissileWeapon(std::string n, int minD, int maxD, int strReq)
     : Weapon(std::move(n), minD, maxD, strReq) {
+    defaultAction = "THROW";
 }
 
 std::vector<std::string> MissileWeapon::actions(Hero* hero) {
@@ -3756,6 +3770,7 @@ std::unique_ptr<Item> Boomerang::clone(int qty) const {
 // PlantSeed Implementation
 // =============================================================================
 PlantSeed::PlantSeed(PlantType pt) : plantType(pt) {
+    defaultAction = "THROW";
     switch (pt) {
         case PlantType::FIREBLOOM:  name = "Seed of Firebloom";  image = ItemSpriteSheet::SEED_FIREBLOOM;  break;
         case PlantType::ICECAP:     name = "Seed of Icecap";     image = ItemSpriteSheet::SEED_ICECAP;     break;
@@ -4159,6 +4174,7 @@ DewVial::DewVial() {
     identified = true;
     levelKnown = true;
     cursedKnown = true;
+    defaultAction = "DRINK";
 }
 
 void DewVial::collectDew(int count) {
@@ -4246,6 +4262,7 @@ Bomb::Bomb() {
     identified = true;
     levelKnown = true;
     cursedKnown = true;
+    defaultAction = "THROW";
 }
 
 Item* Bomb::random() {
@@ -4322,6 +4339,7 @@ Honeypot::Honeypot() {
     identified = true;
     levelKnown = true;
     cursedKnown = true;
+    defaultAction = "THROW";
 }
 
 std::vector<std::string> Honeypot::actions(Hero* hero) {
