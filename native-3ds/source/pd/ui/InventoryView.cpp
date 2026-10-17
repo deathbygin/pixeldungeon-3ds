@@ -222,11 +222,32 @@ bool InventoryView::update(pd::Hero* hero, const TouchController& touch, u32 kDo
                 const std::string& chosenAction = actions[i];
 
                 // Curse lock check for equipped items
-                bool isEquipped = (it == hero->belongings.equippedWeapon || it == hero->belongings.equippedArmor);
+                bool isEquipped = (it == hero->belongings.equippedWeapon ||
+                                   it == hero->belongings.equippedArmor ||
+                                   it == hero->belongings.equippedRing1 ||
+                                   it == hero->belongings.equippedRing2);
                 if (isEquipped && it->cursed && (chosenAction == "UNEQUIP" || chosenAction == "DROP" || chosenAction == "THROW")) {
                     outMessage = "You can't remove a cursed item!";
                     GLog::w("You can't remove cursed " + it->displayName() + "!");
                     return false;
+                }
+
+                if (chosenAction == "EQUIP") {
+                    if (it->category() == ItemCategory::Weapon && hero->belongings.equippedWeapon && hero->belongings.equippedWeapon->isCursed()) {
+                        outMessage = "You can't remove your cursed weapon!";
+                        GLog::w("You can't remove cursed " + hero->belongings.equippedWeapon->displayName() + "!");
+                        return false;
+                    }
+                    if (it->category() == ItemCategory::Armor && hero->belongings.equippedArmor && hero->belongings.equippedArmor->isCursed()) {
+                        outMessage = "You can't remove your cursed armor!";
+                        GLog::w("You can't remove cursed " + hero->belongings.equippedArmor->displayName() + "!");
+                        return false;
+                    }
+                    if (it->category() == ItemCategory::Ring && hero->belongings.equippedRing1 && hero->belongings.equippedRing1->isCursed() && hero->belongings.equippedRing2 && hero->belongings.equippedRing2->isCursed()) {
+                        outMessage = "You can't remove your cursed rings!";
+                        GLog::w("You can't remove your cursed rings!");
+                        return false;
+                    }
                 }
 
                 // Prompt specifically for Scroll of Upgrade or Scroll of Identify

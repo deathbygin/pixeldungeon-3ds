@@ -287,7 +287,13 @@ std::vector<std::string> Weapon::actions(Hero* hero) {
 bool Weapon::execute(Hero* hero, const std::string& action) {
     if (!hero) return false;
     if (action == "EQUIP") {
-        hero->belongings.equip(this);
+        if (hero->belongings.equippedWeapon && hero->belongings.equippedWeapon != this && hero->belongings.equippedWeapon->isCursed()) {
+            GLog::w("You can't remove cursed " + hero->belongings.equippedWeapon->displayName() + "!");
+            return false;
+        }
+        if (!hero->belongings.equip(this)) {
+            return false;
+        }
         cursedKnown = true;
         if (cursed) {
             FX::burst(hero->pos, 0x550055FFu, 8);
@@ -1907,7 +1913,13 @@ std::vector<std::string> Armor::actions(Hero* hero) {
 bool Armor::execute(Hero* hero, const std::string& action) {
     if (!hero) return false;
     if (action == "EQUIP") {
-        hero->belongings.equip(this);
+        if (hero->belongings.equippedArmor && hero->belongings.equippedArmor != this && hero->belongings.equippedArmor->isCursed()) {
+            GLog::w("You can't remove cursed " + hero->belongings.equippedArmor->displayName() + "!");
+            return false;
+        }
+        if (!hero->belongings.equip(this)) {
+            return false;
+        }
         hero->updateArmorTier();
         cursedKnown = true;
         if (cursed) {
@@ -4089,6 +4101,12 @@ std::vector<std::string> Ring::actions(Hero* hero) {
 bool Ring::execute(Hero* hero, const std::string& action) {
     if (!hero) return false;
     if (action == "EQUIP") {
+        if (hero->belongings.equippedRing1 && hero->belongings.equippedRing2) {
+            if (hero->belongings.equippedRing1->isCursed() && hero->belongings.equippedRing2->isCursed()) {
+                GLog::w("You can't remove your cursed rings!");
+                return false;
+            }
+        }
         if (hero->belongings.equip(this)) {
             cursedKnown = true;
             if (cursed) {

@@ -74,6 +74,9 @@ bool Belongings::equip(std::unique_ptr<Item> item) {
     if (!item || !item->isEquippable() || item->asWand()) return false;
 
     if (item->category() == ItemCategory::Weapon) {
+        if (weaponSlot && weaponSlot->isCursed()) {
+            return false;
+        }
         std::unique_ptr<Weapon> newWeapon(static_cast<Weapon*>(item.release()));
         if (weaponSlot) {
             backpack.push_back(std::move(weaponSlot));
@@ -82,6 +85,9 @@ bool Belongings::equip(std::unique_ptr<Item> item) {
         equippedWeapon = weaponSlot.get();
         return true;
     } else if (item->category() == ItemCategory::Armor) {
+        if (armorSlot && armorSlot->isCursed()) {
+            return false;
+        }
         std::unique_ptr<Armor> newArmor(static_cast<Armor*>(item.release()));
         if (armorSlot) {
             backpack.push_back(std::move(armorSlot));
@@ -99,10 +105,20 @@ bool Belongings::equip(std::unique_ptr<Item> item) {
             equippedRing2 = ring2Slot.get();
             return true;
         } else {
-            backpack.push_back(std::move(ring1Slot));
-            ring1Slot = std::move(item);
-            equippedRing1 = ring1Slot.get();
-            return true;
+            // Both ring slots occupied: replace an uncursed ring if available
+            if (!ring1Slot->isCursed()) {
+                backpack.push_back(std::move(ring1Slot));
+                ring1Slot = std::move(item);
+                equippedRing1 = ring1Slot.get();
+                return true;
+            } else if (!ring2Slot->isCursed()) {
+                backpack.push_back(std::move(ring2Slot));
+                ring2Slot = std::move(item);
+                equippedRing2 = ring2Slot.get();
+                return true;
+            } else {
+                return false;
+            }
         }
     }
     return false;
@@ -114,17 +130,37 @@ bool Belongings::equip(Item* item) {
         return true;
     }
 
+    if (item->category() == ItemCategory::Weapon) {
+        if (weaponSlot && weaponSlot->isCursed()) {
+            return false;
+        }
+    } else if (item->category() == ItemCategory::Armor) {
+        if (armorSlot && armorSlot->isCursed()) {
+            return false;
+        }
+    } else if (item->category() == ItemCategory::Ring) {
+        if (ring1Slot && ring1Slot->isCursed() && ring2Slot && ring2Slot->isCursed()) {
+            return false;
+        }
+    }
+
     auto it = std::find_if(backpack.begin(), backpack.end(), [item](const auto& p) { return p.get() == item; });
     if (it != backpack.end()) {
         std::unique_ptr<Item> itemPtr = std::move(*it);
         backpack.erase(it);
-        return equip(std::move(itemPtr));
+        if (equip(std::move(itemPtr))) {
+            return true;
+        } else {
+            backpack.push_back(std::move(itemPtr));
+            return false;
+        }
     }
     return false;
 }
 
 bool Belongings::unequip(Item* item) {
     if (!item) return false;
+    if (item->isCursed()) return false;
     if (isFull()) return false;
 
     if (weaponSlot && weaponSlot.get() == item) {
@@ -149,6 +185,9 @@ bool Belongings::unequip(Item* item) {
 
 std::unique_ptr<Item> Belongings::drop(Item* item) {
     if (!item) return nullptr;
+    if (item->isCursed() && (item == equippedWeapon || item == equippedArmor || item == equippedRing1 || item == equippedRing2)) {
+        return nullptr;
+    }
 
     if (weaponSlot && weaponSlot.get() == item) {
         std::unique_ptr<Item> dropped = std::move(weaponSlot);
