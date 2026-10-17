@@ -2692,6 +2692,13 @@ bool Scroll::isKnown(ScrollType tp) {
     return idx < RUNIC_SCROLL_COUNT ? s_scrollKnown[idx] : false;
 }
 
+bool Scroll::allKnown() {
+    for (size_t i = 0; i < RUNIC_SCROLL_COUNT; ++i) {
+        if (!s_scrollKnown[i]) return false;
+    }
+    return true;
+}
+
 void Scroll::setKnown(ScrollType tp) {
     if (tp == ScrollType::WIPE_OUT) return;
     size_t idx = static_cast<size_t>(tp);

@@ -531,6 +531,7 @@ public:
     static void initLabels();
     static bool isKnown(ScrollType tp);
     static void setKnown(ScrollType tp);
+    static bool allKnown();
     static const std::string& runeName(ScrollType tp);
     static int imageForType(ScrollType tp);
     static const std::string& trueName(ScrollType tp);

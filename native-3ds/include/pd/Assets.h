@@ -12,6 +12,7 @@ public:
     inline static const std::string DASHBOARD     = "romfs:/dashboard.png";
     inline static const std::string BANNERS       = "romfs:/banners.png";
     inline static const std::string BADGES        = "romfs:/badges.png";
+    inline static const std::string LOCKED        = "romfs:/locked_badge.png";
     inline static const std::string AMULET        = "romfs:/amulet.png";
     inline static const std::string CHROME        = "romfs:/chrome.png";
     inline static const std::string ICONS         = "romfs:/icons.png";

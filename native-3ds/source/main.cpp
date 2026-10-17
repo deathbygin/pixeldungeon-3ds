@@ -69,6 +69,8 @@
 #include "pd/scenes/TitleScene.h"
 #include "pd/scenes/HeroSelectScene.h"
 #include "pd/scenes/RankingsScene.h"
+#include "pd/scenes/BadgesScene.h"
+#include "pd/BadgeBanner.h"
 #include "pd/windows/WndStory.h"
 #include "pd/windows/WndSettings.h"
 #include "pd/Preferences.h"
@@ -353,12 +355,14 @@ int main(int argc, char* argv[]) {
         HERO_SELECT,
         INTERLEVEL,
         GAME,
-        RANKINGS
+        RANKINGS,
+        BADGES
     };
     AppState appState = AppState::TITLE;
     pd::scenes::TitleScene titleScene;
     pd::scenes::HeroSelectScene heroSelectScene;
     pd::scenes::RankingsScene rankingsScene;
+    pd::scenes::BadgesScene badgesScene;
     pd::ui::WndOptions wndOptions;
     pd::windows::WndStory wndStory;
     Hero::HeroClass chosenHeroClass = Hero::HeroClass::Warrior;
@@ -366,6 +370,7 @@ int main(int argc, char* argv[]) {
     wndTitleSettings.setOnDataWiped([&]() {
         heroSelectScene.refreshUnlocked();
         rankingsScene.refresh();
+        badgesScene.refresh();
         chosenHeroClass = Hero::HeroClass::Warrior;
         titleScene.clearAction();
     });
@@ -438,6 +443,7 @@ int main(int argc, char* argv[]) {
 
         pd::Sample::update(dt);
         noosa::Music::update();
+        BadgeBanner::update(dt);
 
         Profiler::beginUpdate();
 
@@ -505,6 +511,10 @@ int main(int argc, char* argv[]) {
                     titleScene.clearAction();
                     rankingsScene.refresh();
                     appState = AppState::RANKINGS;
+                } else if (titleScene.getPendingAction() == pd::scenes::TitleAction::BADGES) {
+                    titleScene.clearAction();
+                    badgesScene.refresh();
+                    appState = AppState::BADGES;
                 } else if (titleScene.getPendingAction() == pd::scenes::TitleAction::SETTINGS) {
                     titleScene.clearAction();
                     wndTitleSettings.show(false);
@@ -618,6 +628,35 @@ int main(int argc, char* argv[]) {
             C2D_TargetClear(bottomTarget, C2D_Color32(0x10, 0x0c, 0x18, 0xFF));
             C2D_SceneBegin(bottomTarget);
             rankingsScene.drawBottom(textBuf);
+
+            C3D_FrameEnd(0);
+            Profiler::endRender();
+            Profiler::endFrame();
+            continue;
+        }
+
+        // ---------------------------------------------------------------------
+        // STATE: BADGES / ACHIEVEMENTS
+        // ---------------------------------------------------------------------
+        if (appState == AppState::BADGES) {
+            badgesScene.update(dt, kDown, kHeld, screenTouch);
+
+            if (badgesScene.getPendingAction() == pd::scenes::BadgesAction::BACK_TO_TITLE) {
+                badgesScene.clearAction();
+                appState = AppState::TITLE;
+            }
+
+            Profiler::beginRender();
+            C2D_TextBufClear(textBuf);
+            C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+
+            C2D_TargetClear(topTarget, C2D_Color32(0x10, 0x0c, 0x18, 0xFF));
+            C2D_SceneBegin(topTarget);
+            badgesScene.drawTop(textBuf);
+
+            C2D_TargetClear(bottomTarget, C2D_Color32(0x10, 0x0c, 0x18, 0xFF));
+            C2D_SceneBegin(bottomTarget);
+            badgesScene.drawBottom(textBuf);
 
             C3D_FrameEnd(0);
             Profiler::endRender();
@@ -1313,6 +1352,11 @@ int main(int argc, char* argv[]) {
                     params.angle = 0.0f;
                     C2D_DrawImage(img, &params, nullptr);
                 }
+            }
+
+            // Real-time Badge Unlock Banner Overlay
+            if (BadgeBanner::isActive()) {
+                BadgeBanner::drawTop(textBuf);
             }
         }
 
