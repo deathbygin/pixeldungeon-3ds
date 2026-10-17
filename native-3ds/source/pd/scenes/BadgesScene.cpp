@@ -376,8 +376,16 @@ void BadgesScene::drawBottom(C2D_TextBuf textBuf) {
         float cellX = gridStartX + col * cellStepX;
         float cellY = gridStartY + row * cellStepY - m_scrollY;
 
-        // Discard any badge slot that would breach or spill out of the interior stone frame
-        if (cellY < listClipY1 || cellY + m_cellH > listClipY2) continue;
+        // Keep badges visible along edges while scrolling until completely past
+        if (cellY + m_cellH < listClipY1 || cellY > listClipY2) continue;
+
+        // Smooth edge alpha fade along top and bottom edges while scrolling
+        float edgeAlpha = 1.0f;
+        if (cellY < listClipY1) {
+            edgeAlpha = std::clamp((cellY + m_cellH - listClipY1) / m_cellH, 0.0f, 1.0f);
+        } else if (cellY + m_cellH > listClipY2) {
+            edgeAlpha = std::clamp((listClipY2 - cellY) / m_cellH, 0.0f, 1.0f);
+        }
 
         const auto& item = m_items[i];
         bool isSel = (static_cast<int>(i) == m_selectedIndex);
@@ -385,22 +393,26 @@ void BadgesScene::drawBottom(C2D_TextBuf textBuf) {
         // Cell background
         if (isSel) {
             // Selected highlight: gold border with subtle fill
-            C2D_DrawRectSolid(cellX, cellY, zContent + 0.01f, m_cellW, m_cellH, C2D_Color32(0x4C, 0x54, 0x47, 0xFF));
-            C2D_DrawRectSolid(cellX, cellY, zContent + 0.02f, m_cellW, 1.0f, C2D_Color32(0xFF, 0xAA, 0x22, 0xFF));
-            C2D_DrawRectSolid(cellX, cellY + m_cellH - 1.0f, zContent + 0.02f, m_cellW, 1.0f, C2D_Color32(0xFF, 0xAA, 0x22, 0xFF));
-            C2D_DrawRectSolid(cellX, cellY, zContent + 0.02f, 1.0f, m_cellH, C2D_Color32(0xFF, 0xAA, 0x22, 0xFF));
-            C2D_DrawRectSolid(cellX + m_cellW - 1.0f, cellY, zContent + 0.02f, 1.0f, m_cellH, C2D_Color32(0xFF, 0xAA, 0x22, 0xFF));
+            u8 selBgA = static_cast<u8>(0xFF * edgeAlpha);
+            u8 selBorderA = static_cast<u8>(0xFF * edgeAlpha);
+            C2D_DrawRectSolid(cellX, cellY, zContent + 0.01f, m_cellW, m_cellH, C2D_Color32(0x4C, 0x54, 0x47, selBgA));
+            C2D_DrawRectSolid(cellX, cellY, zContent + 0.02f, m_cellW, 1.0f, C2D_Color32(0xFF, 0xAA, 0x22, selBorderA));
+            C2D_DrawRectSolid(cellX, cellY + m_cellH - 1.0f, zContent + 0.02f, m_cellW, 1.0f, C2D_Color32(0xFF, 0xAA, 0x22, selBorderA));
+            C2D_DrawRectSolid(cellX, cellY, zContent + 0.02f, 1.0f, m_cellH, C2D_Color32(0xFF, 0xAA, 0x22, selBorderA));
+            C2D_DrawRectSolid(cellX + m_cellW - 1.0f, cellY, zContent + 0.02f, 1.0f, m_cellH, C2D_Color32(0xFF, 0xAA, 0x22, selBorderA));
         } else {
             // Unselected slot background
-            C2D_DrawRectSolid(cellX, cellY, zContent + 0.01f, m_cellW, m_cellH, C2D_Color32(0x28, 0x2B, 0x26, 0xFF));
-            C2D_DrawRectSolid(cellX, cellY, zContent + 0.02f, m_cellW, 1.0f, C2D_Color32(0x38, 0x3C, 0x34, 0xFF));
-            C2D_DrawRectSolid(cellX, cellY, zContent + 0.02f, 1.0f, m_cellH, C2D_Color32(0x38, 0x3C, 0x34, 0xFF));
+            u8 bgA = static_cast<u8>(0xFF * edgeAlpha);
+            u8 borderA = static_cast<u8>(0xFF * edgeAlpha);
+            C2D_DrawRectSolid(cellX, cellY, zContent + 0.01f, m_cellW, m_cellH, C2D_Color32(0x28, 0x2B, 0x26, bgA));
+            C2D_DrawRectSolid(cellX, cellY, zContent + 0.02f, m_cellW, 1.0f, C2D_Color32(0x38, 0x3C, 0x34, borderA));
+            C2D_DrawRectSolid(cellX, cellY, zContent + 0.02f, 1.0f, m_cellH, C2D_Color32(0x38, 0x3C, 0x34, borderA));
         }
 
         // Medal icon (24x24, scale 1.5) centered in cell
         float iconX = std::round(cellX + (m_cellW - 24.0f) * 0.5f);
         float iconY = std::round(cellY + (m_cellH - 24.0f) * 0.5f);
-        BadgeBanner::drawBadge(item.image, iconX, iconY, 1.5f, 1.0f, !item.unlocked, zContent + 0.03f);
+        BadgeBanner::drawBadge(item.image, iconX, iconY, 1.5f, edgeAlpha, !item.unlocked, zContent + 0.03f);
     }
 
     // Scrollbar indicator
@@ -417,21 +429,23 @@ void BadgesScene::drawBottom(C2D_TextBuf textBuf) {
     }
 
     // Bottom Action Buttons
+    float zBtn = 0.45f;
+    float zBtnText = 0.48f;
     const auto& btnPatch = pd::ui::Chrome::get(pd::ui::Chrome::Type::BUTTON);
 
     // Inspect Button
-    btnPatch.draw(m_btnInspectX, m_btnInspectY, m_btnInspectW, m_btnInspectH, zContent, 0xFFFFFFFF, 1.0f);
+    btnPatch.draw(m_btnInspectX, m_btnInspectY, m_btnInspectW, m_btnInspectH, zBtn, 0xFFFFFFFF, 1.0f);
     float inspW = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, "Inspect (A)");
     float inspX = std::round(m_btnInspectX + (m_btnInspectW - inspW) * 0.5f);
     float inspY = std::round(m_btnInspectY + (m_btnInspectH - 8.0f) * 0.5f);
-    pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, "Inspect (A)", inspX, inspY, zText, pd::ui::COLOR_TEXT_PRIMARY, pd::ui::COLOR_TEXT_SHADOW);
+    pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, "Inspect (A)", inspX, inspY, zBtnText, pd::ui::COLOR_TEXT_PRIMARY, pd::ui::COLOR_TEXT_SHADOW);
 
     // Back Button
-    btnPatch.draw(m_btnBackX, m_btnBackY, m_btnBackW, m_btnBackH, zContent, 0xFFFFFFFF, 1.0f);
+    btnPatch.draw(m_btnBackX, m_btnBackY, m_btnBackW, m_btnBackH, zBtn, 0xFFFFFFFF, 1.0f);
     float backW = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, "Back (B)");
     float backX = std::round(m_btnBackX + (m_btnBackW - backW) * 0.5f);
     float backY = std::round(m_btnBackY + (m_btnBackH - 8.0f) * 0.5f);
-    pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, "Back (B)", backX, backY, zText, pd::ui::COLOR_TEXT_PRIMARY, pd::ui::COLOR_TEXT_SHADOW);
+    pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, "Back (B)", backX, backY, zBtnText, pd::ui::COLOR_TEXT_PRIMARY, pd::ui::COLOR_TEXT_SHADOW);
 
     // Modal Badge Window if open
     if (m_wndBadge.isOpen()) {
