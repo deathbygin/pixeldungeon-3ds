@@ -859,13 +859,13 @@ void BottomScreenUI::drawMinimap(const pd::Level* level, const pd::Hero* hero) c
     float zMap = 0.30f;
 
     // 1. Dedicated stone window frame built from chrome.png 9-slice
-    Chrome::get(Chrome::Type::WINDOW).draw(frameX, frameY, frameW, frameH, zMap);
+    Chrome::get(Chrome::Type::TOAST).draw(frameX, frameY, frameW, frameH, zMap);
 
-    // 2. Inner viewport (142x106)
-    float vpX = frameX + 6.0f;
-    float vpY = frameY + 6.0f;
-    float vpW = 142.0f;
-    float vpH = 106.0f;
+    // 2. Inner viewport
+    float vpX = frameX + 5.0f;
+    float vpY = frameY + 5.0f;
+    float vpW = frameW - 10.0f;
+    float vpH = frameH - 10.0f;
 
     C2D_DrawRectSolid(vpX, vpY, zMap + 0.01f, vpW, vpH, C2D_Color32(0x10, 0x0E, 0x17, 0xFF));
 
@@ -1146,7 +1146,7 @@ void BottomScreenUI::draw(const pd::Hero* hero, int depth, C2D_TextBuf textBuf) 
         if (m_isExamining) {
             // Examine Mode Banner / HUD Bar
             float barX = 4.0f;
-            float barY = 158.0f;
+            float barY = 157.0f;
             float barW = 312.0f;
             float barH = 48.0f;
             float zBar = 0.35f;

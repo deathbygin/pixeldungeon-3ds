@@ -33,30 +33,30 @@ StatusPane::StatusPane() {
 
 int StatusPane::update(const TouchController& touch, u32 kDown) {
     (void)kDown;
-    // Avatar shield touch area: (0, 0, 40, HEIGHT)
-    noosa::RectF avatarRect(0.0f, 0.0f, 40.0f, HEIGHT);
+    // Avatar shield touch area: (X_POS, Y_POS, 26, HEIGHT)
+    noosa::RectF avatarRect(X_POS, Y_POS, 26.0f, HEIGHT);
     m_avatarPressed = touch.hitTest(avatarRect);
     if (touch.clicked(avatarRect)) {
         noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
         return 1; // Toggle Hero Info
     }
 
-    // Depth / stairs icon touch area: (188, 0, 44, HEIGHT)
-    noosa::RectF depthRect(188.0f, 0.0f, 44.0f, HEIGHT);
+    // Depth / stairs icon touch area: (X_POS + 144, Y_POS, 44, HEIGHT)
+    noosa::RectF depthRect(X_POS + 144.0f, Y_POS, 44.0f, HEIGHT);
     if (touch.clicked(depthRect)) {
         noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
         return 3; // Stairs / Depth info
     }
 
-    // Gold coins icon touch area: (234, 0, 54, HEIGHT) - Secret Developer / Debug Menu
-    noosa::RectF goldRect(234.0f, 0.0f, 54.0f, HEIGHT);
+    // Gold coins icon touch area: (X_POS + 190, Y_POS, 85, HEIGHT) - Secret Developer / Debug Menu
+    noosa::RectF goldRect(X_POS + 190.0f, Y_POS, 85.0f, HEIGHT);
     if (touch.clicked(goldRect)) {
         noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
         return 4; // Open Developer / Debug Menu
     }
 
-    // Menu button touch area: (290, 0, 30, HEIGHT)
-    noosa::RectF menuRect(290.0f, 0.0f, 30.0f, HEIGHT);
+    // Menu button touch area: (X_POS + WIDTH - 30, Y_POS, 30, HEIGHT)
+    noosa::RectF menuRect(X_POS + WIDTH - 30.0f, Y_POS, 30.0f, HEIGHT);
     m_menuPressed = touch.hitTest(menuRect);
     if (touch.clicked(menuRect)) {
         noosa::Audio::play(noosa::Audio::getSample(Assets::SND_CLICK).get());
@@ -69,8 +69,8 @@ int StatusPane::update(const TouchController& touch, u32 kDown) {
 const pd::Buff* StatusPane::clickedBuff(const pd::Hero* hero, const TouchController& touch) const {
     if (!hero) return nullptr;
 
-    float bx = 44.0f;
-    float by = 21.0f;
+    float bx = X_POS + 26.0f;
+    float by = Y_POS + 19.0f;
 
     for (const pd::Buff* b : hero->buffs) {
         if (!b) continue;
@@ -82,7 +82,7 @@ const pd::Buff* StatusPane::clickedBuff(const pd::Hero* hero, const TouchControl
             return b;
         }
         bx += 10.0f;
-        if (bx > 180.0f) break;
+        if (bx > X_POS + 135.0f) break;
     }
     return nullptr;
 }
@@ -91,39 +91,14 @@ void StatusPane::draw(const pd::Hero* hero, int depth, C2D_TextBuf textBuf) cons
     (void)textBuf;
     if (!hero) return;
 
-    float zHeader = 0.50f;
-    float zContent = 0.52f;
-    float zText = 0.55f;
+    float zHeader = 0.30f;
+    float zContent = 0.35f;
+    float zText = 0.40f;
 
-    // 1. Header base strip (y: 0..32, w: 320, h: 33)
-    C2D_DrawRectSolid(0.0f, 0.0f, zHeader, WIDTH, HEIGHT, C2D_Color32(0x1B, 0x18, 0x22, 0xFF));
+    // 1. Raised 9-slice stone chrome container (matching Hero Stats, Minimap & Log)
+    Chrome::get(Chrome::Type::TOAST).draw(X_POS, Y_POS, WIDTH, HEIGHT, zHeader);
 
-    // 2. Corner Shield Frame from status_pane.png
-    if (m_texStatus && m_texStatus->isLoaded()) {
-        int potW = m_texStatus->potWidth();
-        int potH = m_texStatus->potHeight();
-        C3D_Tex* tex = m_texStatus->getTex();
-
-        // Top horizontal border runner from x=35 to x=320
-        setupSubTex(m_subTopBar, potW, potH, 35, 0, 45, 4);
-        C2D_Image imgTopBar = { tex, &m_subTopBar };
-        C2D_DrawParams pTop;
-        pTop.pos.x = 35.0f; pTop.pos.y = 0.0f;
-        pTop.pos.w = 285.0f; pTop.pos.h = 4.0f;
-        pTop.center.x = pTop.center.y = 0.0f; pTop.depth = zHeader + 0.01f; pTop.angle = 0.0f;
-        C2D_DrawImage(imgTopBar, &pTop, nullptr);
-
-        // Shield frame at (0, 0, 35, 35) - 1:1 pixel mapping with complete corner notch badge
-        setupSubTex(m_subShield, potW, potH, 0, 0, 35, 35);
-        C2D_Image imgShield = { tex, &m_subShield };
-        C2D_DrawParams pShield;
-        pShield.pos.x = 0.0f; pShield.pos.y = 0.0f;
-        pShield.pos.w = 35.0f; pShield.pos.h = 35.0f;
-        pShield.center.x = pShield.center.y = 0.0f; pShield.depth = zHeader + 0.01f; pShield.angle = 0.0f;
-        C2D_DrawImage(imgShield, &pShield, nullptr);
-    }
-
-    // 3. Hero Avatar Sprite seated cleanly inside recessed notch (x=8, y=5, 16x16)
+    // 2. Hero Avatar Sprite seated cleanly inside left margin (x=X_POS + 6, y=Y_POS + 4, 16x16)
     std::string heroSheet = Assets::WARRIOR;
     if (hero->heroClass == Hero::HeroClass::Mage) heroSheet = Assets::MAGE;
     else if (hero->heroClass == Hero::HeroClass::Rogue) heroSheet = Assets::ROGUE;
@@ -135,7 +110,7 @@ void StatusPane::draw(const pd::Hero* hero, int depth, C2D_TextBuf textBuf) cons
         setupSubTex(subHero, texHero->potWidth(), texHero->potHeight(), 0, 0, 12, 15);
         C2D_Image imgHero = { texHero->getTex(), &subHero };
         C2D_DrawParams pHero;
-        pHero.pos.x = 8.0f; pHero.pos.y = 5.0f;
+        pHero.pos.x = X_POS + 6.0f; pHero.pos.y = Y_POS + 4.0f;
         pHero.pos.w = 16.0f; pHero.pos.h = 16.0f;
         pHero.center.x = pHero.center.y = 0.0f; pHero.depth = zContent; pHero.angle = 0.0f;
 
@@ -149,18 +124,18 @@ void StatusPane::draw(const pd::Hero* hero, int depth, C2D_TextBuf textBuf) cons
         }
     }
 
-    // Hero level text badge seated centered directly inside dedicated corner notch (center x=27.0, y=28.0)
+    // Hero level text badge directly below avatar
     std::string lvlStr = std::to_string(hero->level);
     float lvlW = BitmapFont::width(BitmapFont::FontType::Font1x, lvlStr);
-    float lvlX = std::round(27.0f - (lvlW * 0.5f));
-    float lvlY = 25.0f;
+    float lvlX = std::round(X_POS + 14.0f - (lvlW * 0.5f));
+    float lvlY = Y_POS + 20.0f;
     BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, lvlStr, lvlX, lvlY, zText, 0xFFEBA4FF, 0x000000FF);
 
-    // 4. Two-tone HP Bar (x: 44, y: 4, w: 140, h: 14)
-    float barX = 44.0f;
-    float barY = 4.0f;
-    float barW = 140.0f;
-    float barH = 14.0f;
+    // 3. Two-tone HP Bar (x: X_POS + 26, y: Y_POS + 5, w: 114, h: 12)
+    float barX = X_POS + 26.0f;
+    float barY = Y_POS + 5.0f;
+    float barW = 114.0f;
+    float barH = 12.0f;
     float hpPct = std::clamp(static_cast<float>(hero->HP) / std::max(1, hero->HT), 0.0f, 1.0f);
 
     // 1px Outer dark recessed border
@@ -179,17 +154,17 @@ void StatusPane::draw(const pd::Hero* hero, int depth, C2D_TextBuf textBuf) cons
     std::snprintf(hpBuf, sizeof(hpBuf), "%d/%d", hero->HP, hero->HT);
     float hpTextW = BitmapFont::width(BitmapFont::FontType::Font1x, hpBuf);
     float hpTextX = std::floor(barX + (barW - hpTextW) * 0.5f);
-    float hpTextY = 7.0f;
+    float hpTextY = barY + 2.0f;
     BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, hpBuf, hpTextX, hpTextY, zText, 0xFFFFFFFF, 0x000000FF);
 
-    // 5. Status Badges Tray (x: 44, y: 20)
+    // 4. Status Badges Tray (x: X_POS + 26, y: Y_POS + 19)
     if (m_texBuffs && m_texBuffs->isLoaded()) {
         int potW = m_texBuffs->potWidth();
         int potH = m_texBuffs->potHeight();
         C3D_Tex* bTex = m_texBuffs->getTex();
 
-        float bx = 44.0f;
-        float by = 21.0f;
+        float bx = barX;
+        float by = Y_POS + 19.0f;
 
         auto drawBuffIcon = [&](int buffIdx) {
             int sx = (buffIdx % 16) * 7;
@@ -206,13 +181,13 @@ void StatusPane::draw(const pd::Hero* hero, int depth, C2D_TextBuf textBuf) cons
         for (const pd::Buff* b : hero->buffs) {
             if (!b) continue;
             int iconIdx = b->icon();
-            if (iconIdx >= 0 && bx <= 180.0f) {
+            if (iconIdx >= 0 && bx <= (barX + barW - 8.0f)) {
                 drawBuffIcon(iconIdx);
             }
         }
     }
 
-    // 6. Dungeon Info Cluster (x: 190 to 290, y: 4..28)
+    // 5. Dungeon Info Cluster
     // Depth: Staircase icon + text
     if (m_texIcons && m_texIcons->isLoaded()) {
         int potW = m_texIcons->potWidth();
@@ -222,13 +197,13 @@ void StatusPane::draw(const pd::Hero* hero, int depth, C2D_TextBuf textBuf) cons
         setupSubTex(m_subDepthIcon, potW, potH, 45, 12, 9, 8);
         C2D_Image imgDepth = { iTex, &m_subDepthIcon };
         C2D_DrawParams pD;
-        pD.pos.x = 192.0f; pD.pos.y = 8.0f; pD.pos.w = 11.0f; pD.pos.h = 10.0f;
+        pD.pos.x = X_POS + 148.0f; pD.pos.y = Y_POS + 10.0f; pD.pos.w = 11.0f; pD.pos.h = 10.0f;
         pD.center.x = pD.center.y = 0.0f; pD.depth = zContent; pD.angle = 0.0f;
         C2D_DrawImage(imgDepth, &pD, nullptr);
 
         char depthBuf[16];
         std::snprintf(depthBuf, sizeof(depthBuf), "%d", depth);
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, depthBuf, 206.0f, 9.0f, zText, 0xCACFC2FF, 0x000000FF);
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, depthBuf, X_POS + 162.0f, Y_POS + 11.0f, zText, 0xCACFC2FF, 0x000000FF);
     }
 
     // Gold: Coin pile icon + numeric count
@@ -238,16 +213,16 @@ void StatusPane::draw(const pd::Hero* hero, int depth, C2D_TextBuf textBuf) cons
         setupSubTex(m_subGoldIcon, potW, potH, (ItemSpriteSheet::GOLD % 8) * 16, (ItemSpriteSheet::GOLD / 8) * 16, 16, 16);
         C2D_Image imgGold = { m_texItems->getTex(), &m_subGoldIcon };
         C2D_DrawParams pGold;
-        pGold.pos.x = 238.0f; pGold.pos.y = 6.0f; pGold.pos.w = 14.0f; pGold.pos.h = 14.0f;
+        pGold.pos.x = X_POS + 192.0f; pGold.pos.y = Y_POS + 8.0f; pGold.pos.w = 14.0f; pGold.pos.h = 14.0f;
         pGold.center.x = pGold.center.y = 0.0f; pGold.depth = zContent; pGold.angle = 0.0f;
         C2D_DrawImage(imgGold, &pGold, nullptr);
 
         char goldBuf[32];
         std::snprintf(goldBuf, sizeof(goldBuf), "%d", hero->gold);
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, goldBuf, 255.0f, 9.0f, zText, 0xE4A672FF, 0x000000FF);
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, goldBuf, X_POS + 209.0f, Y_POS + 11.0f, zText, 0xE4A672FF, 0x000000FF);
     }
 
-    // 7. Burger Menu Button (x: 298, y: 8, w: 14, h: 13) - Rendered directly without outer red frame
+    // 6. Burger Menu Button (x: X_POS + WIDTH - 22, y: Y_POS + 9, w: 14, h: 13)
     if (m_texStatus && m_texStatus->isLoaded()) {
         int potW = m_texStatus->potWidth();
         int potH = m_texStatus->potHeight();
@@ -255,8 +230,8 @@ void StatusPane::draw(const pd::Hero* hero, int depth, C2D_TextBuf textBuf) cons
         C2D_Image imgMenu = { m_texStatus->getTex(), &m_subBtnMenu };
         C2D_DrawParams pMenu;
         float shift = m_menuPressed ? 1.0f : 0.0f;
-        pMenu.pos.x = 298.0f;
-        pMenu.pos.y = 8.0f + shift;
+        pMenu.pos.x = X_POS + WIDTH - 22.0f;
+        pMenu.pos.y = Y_POS + 9.0f + shift;
         pMenu.pos.w = 14.0f;
         pMenu.pos.h = 13.0f;
         pMenu.center.x = pMenu.center.y = 0.0f;
@@ -270,13 +245,6 @@ void StatusPane::draw(const pd::Hero* hero, int depth, C2D_TextBuf textBuf) cons
         } else {
             C2D_DrawImage(imgMenu, &pMenu, nullptr);
         }
-    }
-
-    // 8. Bottom divider border & EXP Progress line at y: 32
-    C2D_DrawRectSolid(0.0f, 32.0f, zHeader + 0.01f, WIDTH, 1.0f, C2D_Color32(0x30, 0x2C, 0x3E, 0xFF));
-    float expPct = std::clamp(static_cast<float>(hero->exp) / std::max(1, hero->maxExp), 0.0f, 1.0f);
-    if (expPct > 0.0f) {
-        C2D_DrawRectSolid(0.0f, 32.0f, zContent, WIDTH * expPct, 1.0f, C2D_Color32(0x90, 0x40, 0xD0, 0xFF));
     }
 }
 

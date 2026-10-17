@@ -15,8 +15,10 @@ namespace pd::ui {
 
 class StatusPane {
 public:
-    static constexpr float HEIGHT = 33.0f;
-    static constexpr float WIDTH  = 320.0f;
+    static constexpr float HEIGHT = 32.0f;
+    static constexpr float WIDTH  = 312.0f;
+    static constexpr float X_POS  = 4.0f;
+    static constexpr float Y_POS  = 2.0f;
 
     StatusPane();
     ~StatusPane() = default;

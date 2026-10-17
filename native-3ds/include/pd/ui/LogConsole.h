@@ -10,9 +10,9 @@ namespace pd::ui {
 class LogConsole {
 public:
     float x = 4.0f;
-    float y = 158.0f;
+    float y = 157.0f;
     float width = 312.0f;
-    float height = 40.0f;
+    float height = 48.0f;
 
     LogConsole() = default;
 
