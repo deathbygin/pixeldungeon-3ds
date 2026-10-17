@@ -105,6 +105,18 @@ void Item::cast(Hero* hero, int targetCell) {
     Sample::play(Assets::SND_MISS, 0.6f, 1.5f);
 
     float delay = Actor::TICK * speedFactor(hero);
+    if (asMissile() && hero) {
+        Char* enemy = Actor::findChar(cell);
+        if (enemy) {
+            SnipersMark* mark = hero->getBuff<SnipersMark>();
+            if (mark) {
+                if (mark->targetId == enemy->id) {
+                    delay *= 0.5f;
+                }
+                mark->detach();
+            }
+        }
+    }
 
     // Separate 1 unit from stack if stackable
     std::unique_ptr<Item> thrown = nullptr;
@@ -380,10 +392,14 @@ int Weapon::damageRoll() const {
 
 int Weapon::damageRoll(Hero* hero) const {
     int dmg = damageRoll();
-    if (hero && hero->heroClass != Hero::HeroClass::Huntress) {
-        int exStr = hero->STR - STR;
-        if (exStr > 0) {
-            dmg += Random::IntRange(0, exStr);
+    if (hero) {
+        bool isRanged = (hero->rangedWeapon != nullptr);
+        bool isHuntress = (hero->heroClass == Hero::HeroClass::Huntress);
+        if (isRanged == isHuntress) {
+            int exStr = hero->STR - STR;
+            if (exStr > 0) {
+                dmg += Random::IntRange(0, exStr);
+            }
         }
     }
     return dmg;
@@ -3592,6 +3608,10 @@ void MissileWeapon::miss(int cell) {
     }
 }
 
+void MissileWeapon::proc(Char* attacker, Char* defender, int damage) {
+    Weapon::proc(attacker, defender, damage);
+}
+
 // Dart
 Dart::Dart(int number) : MissileWeapon("dart", 1, 4, 10) {
     image = ItemSpriteSheet::DART;
@@ -3633,8 +3653,7 @@ void IncendiaryDart::onThrow(int cell) {
 }
 
 void IncendiaryDart::proc(Char* attacker, Char* defender, int damage) {
-    (void)attacker;
-    (void)damage;
+    Weapon::proc(attacker, defender, damage);
     if (defender) {
         defender->affect<Burning>(4);
     }
@@ -3660,8 +3679,7 @@ Item* CurareDart::random() {
 }
 
 void CurareDart::proc(Char* attacker, Char* defender, int damage) {
-    (void)attacker;
-    (void)damage;
+    Weapon::proc(attacker, defender, damage);
     if (defender) {
         defender->affect<Paralysis>(3);
     }
@@ -3687,8 +3705,7 @@ Item* Javelin::random() {
 }
 
 void Javelin::proc(Char* attacker, Char* defender, int damage) {
-    (void)attacker;
-    (void)damage;
+    Weapon::proc(attacker, defender, damage);
     if (defender) {
         defender->affect<Cripple>();
     }
@@ -3742,7 +3759,7 @@ Item* Tamahawk::random() {
 }
 
 void Tamahawk::proc(Char* attacker, Char* defender, int damage) {
-    (void)attacker;
+    Weapon::proc(attacker, defender, damage);
     if (defender) {
         defender->affect<Bleeding>(damage);
     }
@@ -3767,13 +3784,30 @@ Boomerang::Boomerang() : MissileWeapon("boomerang", 1, 4, 10) {
     quantity = 1;
 }
 
+int Boomerang::min() const {
+    return isBroken() ? 1 : 1 + level;
+}
+
+int Boomerang::max() const {
+    return isBroken() ? 4 : 4 + 2 * level;
+}
+
+int Boomerang::damageRoll() const {
+    return Random::NormalIntRange(min(), max());
+}
+
+void Boomerang::cast(Hero* hero, int targetCell) {
+    throwEquipped = (hero && hero->belongings.equippedWeapon == this);
+    Item::cast(hero, targetCell);
+}
+
 void Boomerang::onThrow(int cell) {
     Char* enemy = Actor::findChar(cell);
     if (!enemy || enemy == Dungeon::hero.get()) {
-        circleBack(cell, Dungeon::hero.get());
+        miss(cell);
     } else {
         if (!Dungeon::hero->shoot(enemy, this)) {
-            circleBack(cell, Dungeon::hero.get());
+            miss(cell);
         }
     }
 }
@@ -3783,9 +3817,9 @@ void Boomerang::miss(int cell) {
 }
 
 void Boomerang::proc(Char* attacker, Char* defender, int damage) {
-    (void)damage;
+    Weapon::proc(attacker, defender, damage);
     if (attacker && defender) {
-        Hero* h = attacker == Dungeon::hero.get() ? Dungeon::hero.get() : nullptr;
+        Hero* h = (attacker == Dungeon::hero.get()) ? Dungeon::hero.get() : nullptr;
         if (h && h->rangedWeapon == this) {
             circleBack(defender->pos, h);
         }
@@ -3801,13 +3835,35 @@ void Boomerang::circleBack(int fromCell, Hero* owner) {
     if (!owner) return;
     int heroCell = owner->pos;
 
-    // Launch return missile sprite arc backwards to hero
-    FX::missile(fromCell, heroCell, image, [this, owner, heroCell]() {
+    int returnCell = Ballistica::cast(fromCell, heroCell, false, false);
+
+    // Launch return missile sprite arc backwards along path
+    FX::missile(fromCell, returnCell, image, [this, owner, heroCell, returnCell]() {
         std::unique_ptr<Item> self(this);
-        if (!owner->belongings.collect(self)) {
-            GLog::w("Your backpack is too full for " + displayName());
+        if (returnCell == heroCell) {
+            Sample::play(Assets::SND_ITEM);
+            if (throwEquipped) {
+                if (!owner->belongings.weaponSlot) {
+                    owner->belongings.weaponSlot = std::unique_ptr<Weapon>(static_cast<Weapon*>(self.release()));
+                    owner->belongings.equippedWeapon = owner->belongings.weaponSlot.get();
+                } else {
+                    if (!owner->belongings.collect(self)) {
+                        if (Dungeon::level) {
+                            Dungeon::level->drop(std::move(self), heroCell);
+                        }
+                    }
+                }
+                throwEquipped = false;
+            } else if (!owner->belongings.collect(self)) {
+                GLog::w("Your backpack is too full for " + displayName());
+                if (Dungeon::level) {
+                    Dungeon::level->drop(std::move(self), heroCell);
+                }
+            }
+        } else {
+            throwEquipped = false;
             if (Dungeon::level) {
-                Dungeon::level->drop(std::move(self), heroCell);
+                Dungeon::level->drop(std::move(self), returnCell);
             }
         }
     });

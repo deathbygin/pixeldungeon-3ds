@@ -836,12 +836,6 @@ int Hero::damageRoll() {
     int dmg = 0;
     if (rangedWeapon) {
         dmg = rangedWeapon->damageRoll(this);
-        if (heroClass == HeroClass::Huntress) {
-            int exStr = STR - rangedWeapon->STR;
-            if (exStr > 0) {
-                dmg += Random::IntRange(0, exStr);
-            }
-        }
     } else if (belongings.equippedWeapon) {
         dmg = belongings.equippedWeapon->damageRoll(this);
     } else {
@@ -851,6 +845,15 @@ int Hero::damageRoll() {
         dmg = static_cast<int>(dmg * 1.5f);
     }
     return dmg;
+}
+
+float Hero::attackDelay() const {
+    if (rangedWeapon) {
+        return rangedWeapon->speedFactor(const_cast<Hero*>(this));
+    } else if (belongings.equippedWeapon) {
+        return belongings.equippedWeapon->speedFactor(const_cast<Hero*>(this));
+    }
+    return 1.0f;
 }
 
 int Hero::stealth() const {
@@ -868,9 +871,10 @@ int Hero::attackProc(Char* enemy, int damage) {
     if (rangedWeapon) {
         rangedWeapon->proc(this, enemy, damage);
         if (subClass == HeroSubClass::Sniper) {
-            SnipersMark* sm = affect<SnipersMark>();
+            SnipersMark* sm = prolong<SnipersMark>(attackDelay() * 1.1f);
             if (sm) {
                 sm->targetId = enemy->id;
+                sm->dur = attackDelay() * 1.1f;
             }
         }
     } else if (belongings.equippedWeapon) {

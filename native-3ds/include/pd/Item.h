@@ -151,7 +151,7 @@ public:
     float speedFactor(Hero* hero) const override;
     virtual int damageRoll() const;
     virtual int damageRoll(Hero* hero) const;
-    void proc(Char* attacker, Char* defender, int damage);
+    virtual void proc(Char* attacker, Char* defender, int damage);
 };
 
 class ShortSword : public Weapon {
@@ -642,6 +642,7 @@ public:
     std::vector<std::string> actions(Hero* hero) override;
     void onThrow(int cell) override;
     virtual void miss(int cell);
+    void proc(Char* attacker, Char* defender, int damage) override;
     float acuracyFactor(Hero* hero) const override;
     float speedFactor(Hero* hero) const override;
     int maxDistance(const Hero* hero = nullptr) const override;
@@ -661,7 +662,7 @@ public:
     IncendiaryDart(int number = 1);
     Item* random() override;
     void onThrow(int cell) override;
-    void proc(Char* attacker, Char* defender, int damage);
+    void proc(Char* attacker, Char* defender, int damage) override;
     std::string info() const override;
     std::unique_ptr<Item> clone(int qty = 1) const override;
 };
@@ -670,7 +671,7 @@ class CurareDart : public MissileWeapon {
 public:
     CurareDart(int number = 1);
     Item* random() override;
-    void proc(Char* attacker, Char* defender, int damage);
+    void proc(Char* attacker, Char* defender, int damage) override;
     std::string info() const override;
     std::unique_ptr<Item> clone(int qty = 1) const override;
 };
@@ -679,7 +680,7 @@ class Javelin : public MissileWeapon {
 public:
     Javelin(int number = 1);
     Item* random() override;
-    void proc(Char* attacker, Char* defender, int damage);
+    void proc(Char* attacker, Char* defender, int damage) override;
     int maxDistance(const Hero* hero = nullptr) const override;
     std::string info() const override;
     std::unique_ptr<Item> clone(int qty = 1) const override;
@@ -698,7 +699,7 @@ class Tamahawk : public MissileWeapon {
 public:
     Tamahawk(int number = 1);
     Item* random() override;
-    void proc(Char* attacker, Char* defender, int damage);
+    void proc(Char* attacker, Char* defender, int damage) override;
     int maxDistance(const Hero* hero = nullptr) const override;
     std::string info() const override;
     std::unique_ptr<Item> clone(int qty = 1) const override;
@@ -712,12 +713,16 @@ public:
     bool isUpgradable() const override { return true; }
     bool isEquippable() const override { return true; }
 
-    int minDamage = 1;
-    int maxDamage = 4;
+    bool throwEquipped = false;
 
+    int min() const;
+    int max() const;
+    int damageRoll() const override;
+
+    void cast(Hero* hero, int targetCell) override;
     void onThrow(int cell) override;
     void miss(int cell) override;
-    void proc(Char* attacker, Char* defender, int damage);
+    void proc(Char* attacker, Char* defender, int damage) override;
     void circleBack(int fromCell, Hero* owner);
     int maxDistance(const Hero* hero = nullptr) const override;
     std::string info() const override;

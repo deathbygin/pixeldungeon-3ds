@@ -83,6 +83,7 @@ public:
 
     // Combat skill calculations
     int attackSkill(Char* target) override;
+    float attackDelay() const;
     int defenseSkill(Char* attacker) override;
     int dr() override;
     int damageRoll() override;
