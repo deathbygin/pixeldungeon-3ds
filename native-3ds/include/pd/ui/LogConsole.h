@@ -16,7 +16,7 @@ public:
 
     LogConsole() = default;
 
-    void addMessage(std::string msg, u32 color = C2D_Color32(0xe4, 0xa6, 0x72, 0xFF));
+    void addMessage(std::string msg, u32 color = C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF));
     void clear();
 
     void draw(C2D_TextBuf textBuf) const;

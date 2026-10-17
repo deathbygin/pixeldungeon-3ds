@@ -867,7 +867,7 @@ void BottomScreenUI::drawMinimap(const pd::Level* level, const pd::Hero* hero) c
     float vpW = frameW - 10.0f;
     float vpH = frameH - 10.0f;
 
-    C2D_DrawRectSolid(vpX, vpY, zMap + 0.01f, vpW, vpH, C2D_Color32(0x10, 0x0E, 0x17, 0xFF));
+    C2D_DrawRectSolid(vpX, vpY, zMap + 0.01f, vpW, vpH, C2D_Color32(0x14, 0x14, 0x14, 0xFF));
 
     // 3. Render 3x3 pixel cells centered around hero
     float cellSize = 3.0f;
@@ -894,9 +894,9 @@ void BottomScreenUI::drawMinimap(const pd::Level* level, const pd::Hero* hero) c
             float py = vpY + (y - startY) * cellSize;
 
             int terr = level->map[cell];
-            u32 col = C2D_Color32(0x38, 0x34, 0x44, 0xFF); // explored floor/corridor
+            u32 col = C2D_Color32(0x36, 0x36, 0x36, 0xFF); // explored floor/corridor (neutral dark gray)
 
-            if (terr == Terrain::WALL || terr == Terrain::WALL_DECO) col = C2D_Color32(0x58, 0x52, 0x64, 0xFF);
+            if (terr == Terrain::WALL || terr == Terrain::WALL_DECO) col = C2D_Color32(0x56, 0x56, 0x56, 0xFF); // neutral medium gray
             else if (terr == Terrain::DOOR || terr == Terrain::OPEN_DOOR) col = C2D_Color32(0x99, 0x77, 0x44, 0xFF);
             else if (terr == Terrain::WATER) col = C2D_Color32(0x33, 0x55, 0x99, 0xFF);
             else if (terr == Terrain::EXIT || terr == Terrain::ENTRANCE) col = C2D_Color32(0xAA, 0x55, 0xAA, 0xFF);
@@ -949,7 +949,7 @@ void BottomScreenUI::drawMinimap(const pd::Level* level, const pd::Hero* hero) c
 
     // 7. Depth indicator tag on upper-left border
     std::string depthTag = std::to_string(Dungeon::depth) + "F";
-    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, depthTag, frameX + 8.0f, frameY + 2.0f, zMap + 0.10f, 0xCACFC2FF, 0x000000FF);
+    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, depthTag, frameX + 8.0f, frameY + 2.0f, zMap + 0.10f, C2D_Color32(0xFF, 0xAA, 0x22, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
 }
 
 void BottomScreenUI::drawRightGlanceCard(const pd::Hero* hero, C2D_TextBuf textBuf) const {
@@ -993,28 +993,29 @@ void BottomScreenUI::drawRightGlanceCard(const pd::Hero* hero, C2D_TextBuf textB
         if (cell != hero->pos) {
             // --- MODE C: EXAMINE TILE / ITEM / FEATURE ---
             std::string previewTitle = getHoverPreviewText(cell, level);
-            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, previewTitle, cardX + 8.0f, cardY + 8.0f, zText, 0xFFEBA4FF, 0x000000FF);
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, previewTitle, cardX + 8.0f, cardY + 8.0f, zText, C2D_Color32(0xFF, 0xAA, 0x22, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
 
             int dist = PathFinder::distanceChebyshev(hero->pos, cell);
-            std::string distStr = "Distance: " + std::to_string(dist) + " tiles";
-            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, distStr, cardX + 8.0f, cardY + 22.0f, zText, 0xCACFC2FF, 0x000000FF);
+            float curX = cardX + 8.0f;
+            float curY = cardY + 22.0f;
+            curX = BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "Distance: ", curX, curY, zText, C2D_Color32(0xFF, 0xAA, 0x22, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, std::to_string(dist) + " tiles", curX, curY, zText, C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
 
             std::string visStr = Dungeon::visible[cell] ? "Visible (in LOS)" : "Remembered";
-            u32 visCol = Dungeon::visible[cell] ? 0x56BB77FF : 0x888899FF;
-            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, visStr, cardX + 8.0f, cardY + 36.0f, zText, visCol, 0x000000FF);
+            u32 visCol = Dungeon::visible[cell] ? C2D_Color32(0x56, 0xBB, 0x77, 0xFF) : C2D_Color32(0x88, 0x88, 0x88, 0xFF);
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, visStr, cardX + 8.0f, cardY + 36.0f, zText, visCol, C2D_Color32(0, 0, 0, 0xFF));
 
             Heap* heap = level ? level->getHeap(cell) : nullptr;
             if (heap && (level->visited[cell] || Dungeon::visible[cell])) {
-                BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "Contains Item", cardX + 8.0f, cardY + 52.0f, zText, 0xE4A672FF, 0x000000FF);
+                BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "Contains Item", cardX + 8.0f, cardY + 52.0f, zText, C2D_Color32(0xFF, 0xAA, 0x22, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
             } else if (level) {
-                int t = level->map[cell];
                 std::string attr = level->isPassable(cell) ? "Passable" : "Impassable";
                 if (level->avoid[cell]) attr += " (Hazard)";
-                BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, attr, cardX + 8.0f, cardY + 52.0f, zText, 0xCACFC2FF, 0x000000FF);
+                BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, attr, cardX + 8.0f, cardY + 52.0f, zText, C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
             }
 
-            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "[A] View Details", cardX + 8.0f, cardY + 74.0f, zText, 0x56BB77FF, 0x000000FF);
-            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "[B] Exit Examine", cardX + 8.0f, cardY + 88.0f, zText, 0xA5CDE4FF, 0x000000FF);
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "[A] View Details", cardX + 8.0f, cardY + 74.0f, zText, C2D_Color32(0x56, 0xBB, 0x77, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "[B] Exit Examine", cardX + 8.0f, cardY + 88.0f, zText, C2D_Color32(0xA5, 0xCD, 0xE4, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
             return;
         }
     }
@@ -1022,12 +1023,14 @@ void BottomScreenUI::drawRightGlanceCard(const pd::Hero* hero, C2D_TextBuf textB
     if (targetChar && targetChar != hero) {
         // --- MODE A: TARGET MOB IN VIEW ---
         // Header: Mob Name in Font1x with shadow
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, targetChar->name, cardX + 8.0f, cardY + 8.0f, zText, 0xFFFFFFFF, 0x000000FF);
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, targetChar->name, cardX + 8.0f, cardY + 8.0f, zText, C2D_Color32(0xFF, 0xAA, 0x22, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
 
         // Distance
         int dist = PathFinder::distanceChebyshev(hero->pos, targetChar->pos);
-        std::string distStr = "Dist: " + std::to_string(dist) + " tiles";
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, distStr, cardX + 8.0f, cardY + 22.0f, zText, 0xCACFC2FF, 0x000000FF);
+        float curX = cardX + 8.0f;
+        float curY = cardY + 22.0f;
+        curX = BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "Dist: ", curX, curY, zText, C2D_Color32(0xFF, 0xAA, 0x22, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, std::to_string(dist) + " tiles", curX, curY, zText, C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
 
         // Mob Health Bar
         float barX = cardX + 8.0f;
@@ -1036,7 +1039,7 @@ void BottomScreenUI::drawRightGlanceCard(const pd::Hero* hero, C2D_TextBuf textB
         float barH = 10.0f;
         float hpRatio = targetChar->HT > 0 ? std::clamp(static_cast<float>(targetChar->HP) / static_cast<float>(targetChar->HT), 0.0f, 1.0f) : 0.0f;
 
-        C2D_DrawRectSolid(barX - 1.0f, barY - 1.0f, zText - 0.02f, barW + 2.0f, barH + 2.0f, C2D_Color32(0x14, 0x10, 0x18, 0xFF));
+        C2D_DrawRectSolid(barX - 1.0f, barY - 1.0f, zText - 0.02f, barW + 2.0f, barH + 2.0f, C2D_Color32(0x10, 0x10, 0x10, 0xFF));
         C2D_DrawRectSolid(barX, barY, zText - 0.01f, barW, barH, C2D_Color32(0x3D, 0x11, 0x11, 0xFF));
         if (hpRatio > 0.0f) {
             u32 mobHpCol = hpRatio > 0.5f ? C2D_Color32(0x22, 0xCC, 0x44, 0xFF) : (hpRatio > 0.25f ? C2D_Color32(0xEE, 0xCC, 0x22, 0xFF) : C2D_Color32(0xEE, 0x33, 0x33, 0xFF));
@@ -1046,31 +1049,34 @@ void BottomScreenUI::drawRightGlanceCard(const pd::Hero* hero, C2D_TextBuf textB
         char mobHpBuf[32];
         std::snprintf(mobHpBuf, sizeof(mobHpBuf), "%d / %d", targetChar->HP, targetChar->HT);
         float thW = BitmapFont::width(BitmapFont::FontType::Font1x, mobHpBuf);
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, mobHpBuf, std::floor(barX + (barW - thW) * 0.5f), barY + 1.0f, zText + 0.01f, 0xFFFFFFFF, 0x000000FF);
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, mobHpBuf, std::floor(barX + (barW - thW) * 0.5f), barY + 1.0f, zText + 0.01f, C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
 
         // Mob State / Awareness & Active Buffs
-        std::string statusStr = "Status: Hunting";
+        std::string previewState = "Hunting";
         u32 statusCol = C2D_Color32(0xEE, 0x44, 0x44, 0xFF);
         if (Mob* mobTarget = targetChar->asMob()) {
-            statusStr = "Status: " + mobTarget->statePreview();
+            previewState = mobTarget->statePreview();
             if (mobTarget->state == Mob::State::SLEEPING) statusCol = C2D_Color32(0x88, 0xAA, 0xEE, 0xFF);
             else if (mobTarget->state == Mob::State::WANDERING) statusCol = C2D_Color32(0xEE, 0xCC, 0x22, 0xFF);
             else if (mobTarget->state == Mob::State::FLEEING) statusCol = C2D_Color32(0xCC, 0x88, 0xEE, 0xFF);
         }
         if (targetChar->buff(BuffType::Paralysis)) {
-            statusStr = "Status: Paralyzed";
+            previewState = "Paralyzed";
             statusCol = C2D_Color32(0xEE, 0xCC, 0x22, 0xFF);
         } else if (targetChar->buff(BuffType::Frost)) {
-            statusStr = "Status: Frozen";
+            previewState = "Frozen";
             statusCol = C2D_Color32(0x64, 0xBE, 0xFF, 0xFF);
         } else if (targetChar->buff(BuffType::Roots)) {
-            statusStr = "Status: Rooted";
+            previewState = "Rooted";
             statusCol = C2D_Color32(0x88, 0xBB, 0x44, 0xFF);
         }
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, statusStr, cardX + 8.0f, cardY + 50.0f, zText, statusCol, 0x000000FF);
+        curX = cardX + 8.0f;
+        curY = cardY + 50.0f;
+        curX = BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "Status: ", curX, curY, zText, C2D_Color32(0xFF, 0xAA, 0x22, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, previewState, curX, curY, zText, statusCol, C2D_Color32(0, 0, 0, 0xFF));
 
         // List active buffs affecting target mob
-        std::string buffList = "Buffs: ";
+        std::string buffList;
         bool first = true;
         for (const pd::Buff* b : targetChar->buffs) {
             if (!b) continue;
@@ -1078,45 +1084,59 @@ void BottomScreenUI::drawRightGlanceCard(const pd::Hero* hero, C2D_TextBuf textB
             buffList += b->name();
             first = false;
         }
-        if (first) buffList += "None";
+        if (first) buffList = "None";
         if (buffList.length() > 22) buffList = buffList.substr(0, 19) + "...";
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, buffList, cardX + 8.0f, cardY + 64.0f, zText, 0xE4A672FF, 0x000000FF);
+        curX = cardX + 8.0f;
+        curY = cardY + 64.0f;
+        curX = BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "Buffs: ", curX, curY, zText, C2D_Color32(0xFF, 0xAA, 0x22, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, buffList, curX, curY, zText, C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
 
         if (m_isExamining) {
-            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "[A] View Lore & Stats", cardX + 8.0f, cardY + 76.0f, zText, 0x56BB77FF, 0x000000FF);
-            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "[B] Exit Examine", cardX + 8.0f, cardY + 88.0f, zText, 0xA5CDE4FF, 0x000000FF);
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "[A] View Lore & Stats", cardX + 8.0f, cardY + 76.0f, zText, C2D_Color32(0x56, 0xBB, 0x77, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "[B] Exit Examine", cardX + 8.0f, cardY + 88.0f, zText, C2D_Color32(0xA5, 0xCD, 0xE4, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
         } else {
-            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "[A] View Lore & Stats", cardX + 8.0f, cardY + 76.0f, zText, 0xCACFC2FF, 0x000000FF);
-            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "Tap to target/shoot", cardX + 8.0f, cardY + 88.0f, zText, 0x888899FF, 0x000000FF);
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "[A] View Lore & Stats", cardX + 8.0f, cardY + 76.0f, zText, C2D_Color32(0xCC, 0xCC, 0xCC, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "Tap to target/shoot", cardX + 8.0f, cardY + 88.0f, zText, C2D_Color32(0x88, 0x88, 0x88, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
         }
     } else {
         // --- MODE B: HERO QUICK STATS (EXPLORATION) ---
         std::string titleStr = hero->name + " (" + hero->className() + ")";
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, titleStr, cardX + 8.0f, cardY + 8.0f, zText, 0xFFEBA4FF, 0x000000FF);
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, titleStr, cardX + 8.0f, cardY + 8.0f, zText, C2D_Color32(0xFF, 0xAA, 0x22, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
 
-        // Stats summary
-        std::string statStr = "STR: " + std::to_string(hero->STR) + "   LVL: " + std::to_string(hero->level);
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, statStr, cardX + 8.0f, cardY + 22.0f, zText, 0xCACFC2FF, 0x000000FF);
+        // Stats summary: STR: <val>   LVL: <val>
+        float curX = cardX + 8.0f;
+        float curY = cardY + 22.0f;
+        curX = BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "STR: ", curX, curY, zText, C2D_Color32(0xFF, 0xAA, 0x22, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
+        curX = BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, std::to_string(hero->STR) + "   ", curX, curY, zText, C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
+        curX = BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "LVL: ", curX, curY, zText, C2D_Color32(0xFF, 0xAA, 0x22, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, std::to_string(hero->level), curX, curY, zText, C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
 
         // Weapon
-        std::string weapStr = "WEAP: ";
-        if (hero->belongings.equippedWeapon) weapStr += hero->belongings.equippedWeapon->displayName();
-        else weapStr += "None (Fists)";
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, weapStr, cardX + 8.0f, cardY + 36.0f, zText, 0xE4A672FF, 0x000000FF);
+        curX = cardX + 8.0f;
+        curY = cardY + 36.0f;
+        curX = BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "WEAP: ", curX, curY, zText, C2D_Color32(0xFF, 0xAA, 0x22, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
+        std::string weapVal = hero->belongings.equippedWeapon ? hero->belongings.equippedWeapon->displayName() : "None (Fists)";
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, weapVal, curX, curY, zText, C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
 
         // Armor
-        std::string armStr = "ARM: ";
-        if (hero->belongings.equippedArmor) armStr += hero->belongings.equippedArmor->displayName();
-        else armStr += "Cloth (+0)";
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, armStr, cardX + 8.0f, cardY + 50.0f, zText, 0xCACFC2FF, 0x000000FF);
+        curX = cardX + 8.0f;
+        curY = cardY + 50.0f;
+        curX = BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "ARM: ", curX, curY, zText, C2D_Color32(0xFF, 0xAA, 0x22, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
+        std::string armVal = hero->belongings.equippedArmor ? hero->belongings.equippedArmor->displayName() : "Cloth (+0)";
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, armVal, curX, curY, zText, C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
 
         // Gold
-        std::string invStr = "GOLD: " + std::to_string(hero->gold);
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, invStr, cardX + 8.0f, cardY + 64.0f, zText, 0xFFCC33FF, 0x000000FF);
+        curX = cardX + 8.0f;
+        curY = cardY + 64.0f;
+        curX = BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "GOLD: ", curX, curY, zText, C2D_Color32(0xFF, 0xAA, 0x22, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, std::to_string(hero->gold), curX, curY, zText, C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
 
         // XP Progress
-        std::string expLabel = "EXP: " + std::to_string(hero->exp) + "/" + std::to_string(hero->maxExp);
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, expLabel, cardX + 8.0f, cardY + 80.0f, zText, 0xCACFC2FF, 0x000000FF);
+        curX = cardX + 8.0f;
+        curY = cardY + 80.0f;
+        curX = BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "EXP: ", curX, curY, zText, C2D_Color32(0xFF, 0xAA, 0x22, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
+        std::string expVal = std::to_string(hero->exp) + "/" + std::to_string(hero->maxExp);
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, expVal, curX, curY, zText, C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
 
         float barX = cardX + 8.0f;
         float barY = cardY + 94.0f;
@@ -1124,10 +1144,10 @@ void BottomScreenUI::drawRightGlanceCard(const pd::Hero* hero, C2D_TextBuf textB
         float barH = 8.0f;
         float expRatio = hero->maxExp > 0 ? std::clamp(static_cast<float>(hero->exp) / static_cast<float>(hero->maxExp), 0.0f, 1.0f) : 0.0f;
 
-        C2D_DrawRectSolid(barX - 1.0f, barY - 1.0f, zText - 0.02f, barW + 2.0f, barH + 2.0f, C2D_Color32(0x14, 0x10, 0x18, 0xFF));
-        C2D_DrawRectSolid(barX, barY, zText - 0.01f, barW, barH, C2D_Color32(0x22, 0x14, 0x30, 0xFF));
+        C2D_DrawRectSolid(barX - 1.0f, barY - 1.0f, zText - 0.02f, barW + 2.0f, barH + 2.0f, C2D_Color32(0x10, 0x10, 0x10, 0xFF));
+        C2D_DrawRectSolid(barX, barY, zText - 0.01f, barW, barH, C2D_Color32(0x18, 0x18, 0x18, 0xFF));
         if (expRatio > 0.0f) {
-            C2D_DrawRectSolid(barX, barY, zText, std::floor(barW * expRatio), barH, C2D_Color32(0x90, 0x40, 0xD0, 0xFF));
+            C2D_DrawRectSolid(barX, barY, zText, std::floor(barW * expRatio), barH, C2D_Color32(0x8A, 0x48, 0xC4, 0xFF));
         }
     }
 }

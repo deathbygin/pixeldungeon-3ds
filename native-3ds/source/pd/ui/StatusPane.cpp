@@ -129,7 +129,7 @@ void StatusPane::draw(const pd::Hero* hero, int depth, C2D_TextBuf textBuf) cons
     float lvlW = BitmapFont::width(BitmapFont::FontType::Font1x, lvlStr);
     float lvlX = std::round(X_POS + 14.0f - (lvlW * 0.5f));
     float lvlY = Y_POS + 20.0f;
-    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, lvlStr, lvlX, lvlY, zText, 0xFFEBA4FF, 0x000000FF);
+    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, lvlStr, lvlX, lvlY, zText, C2D_Color32(0xFF, 0xAA, 0x22, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
 
     // 3. Two-tone HP Bar (x: X_POS + 26, y: Y_POS + 5, w: 114, h: 12)
     float barX = X_POS + 26.0f;
@@ -155,7 +155,7 @@ void StatusPane::draw(const pd::Hero* hero, int depth, C2D_TextBuf textBuf) cons
     float hpTextW = BitmapFont::width(BitmapFont::FontType::Font1x, hpBuf);
     float hpTextX = std::floor(barX + (barW - hpTextW) * 0.5f);
     float hpTextY = barY + 2.0f;
-    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, hpBuf, hpTextX, hpTextY, zText, 0xFFFFFFFF, 0x000000FF);
+    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, hpBuf, hpTextX, hpTextY, zText, C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
 
     // 4. Status Badges Tray (x: X_POS + 26, y: Y_POS + 19)
     if (m_texBuffs && m_texBuffs->isLoaded()) {
@@ -203,7 +203,7 @@ void StatusPane::draw(const pd::Hero* hero, int depth, C2D_TextBuf textBuf) cons
 
         char depthBuf[16];
         std::snprintf(depthBuf, sizeof(depthBuf), "%d", depth);
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, depthBuf, X_POS + 162.0f, Y_POS + 11.0f, zText, 0xCACFC2FF, 0x000000FF);
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, depthBuf, X_POS + 162.0f, Y_POS + 11.0f, zText, C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
     }
 
     // Gold: Coin pile icon + numeric count
@@ -219,7 +219,7 @@ void StatusPane::draw(const pd::Hero* hero, int depth, C2D_TextBuf textBuf) cons
 
         char goldBuf[32];
         std::snprintf(goldBuf, sizeof(goldBuf), "%d", hero->gold);
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, goldBuf, X_POS + 209.0f, Y_POS + 11.0f, zText, 0xE4A672FF, 0x000000FF);
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, goldBuf, X_POS + 209.0f, Y_POS + 11.0f, zText, C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
     }
 
     // 6. Burger Menu Button (x: X_POS + WIDTH - 22, y: Y_POS + 9, w: 14, h: 13)
