@@ -3,22 +3,44 @@
 #include "pd/ui/BitmapFont.h"
 #include "pd/Assets.h"
 #include "pd/Sample.h"
+#include "pd/Dungeon.h"
+#include "pd/Hero.h"
 #include "noosa/Audio.h"
 
 namespace pd::windows {
 
 WndGame::WndGame() {
+    show();
+    m_open = false;
+}
+
+void WndGame::show() {
+    m_open = true;
+    m_selected = 0;
+    m_buttons.clear();
+
     m_w = 160.0f;
     float btnW = m_w - 24.0f;
     float btnH = 22.0f;
     float btnSpacing = 6.0f;
 
-    std::vector<std::pair<std::string, GameAction>> items = {
-        { "Return to Game",     GameAction::RESUME },
-        { "Settings",           GameAction::SETTINGS },
-        { "Main Menu",          GameAction::MAIN_MENU },
-        { "Exit Pixel Dungeon", GameAction::EXIT_GAME }
-    };
+    std::vector<std::pair<std::string, GameAction>> items;
+    if (Dungeon::hero && !Dungeon::hero->isAlive()) {
+        items = {
+            { "Return to Game",     GameAction::RESUME },
+            { "Rankings",           GameAction::RANKINGS },
+            { "Start New Game",     GameAction::START_NEW_GAME },
+            { "Settings",           GameAction::SETTINGS },
+            { "Main Menu",          GameAction::MAIN_MENU }
+        };
+    } else {
+        items = {
+            { "Return to Game",     GameAction::RESUME },
+            { "Settings",           GameAction::SETTINGS },
+            { "Main Menu",          GameAction::MAIN_MENU },
+            { "Exit Pixel Dungeon", GameAction::EXIT_GAME }
+        };
+    }
 
     m_h = 16.0f + items.size() * btnH + (items.size() - 1) * btnSpacing + 16.0f;
     m_x = (320.0f - m_w) * 0.5f;
@@ -36,11 +58,6 @@ WndGame::WndGame() {
         });
         curY += btnH + btnSpacing;
     }
-}
-
-void WndGame::show() {
-    m_open = true;
-    m_selected = 0;
 }
 
 GameAction WndGame::update(const pd::ui::TouchController& touch, u32 kDown) {

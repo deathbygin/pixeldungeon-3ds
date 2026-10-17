@@ -36,14 +36,23 @@ int Dungeon::scrollsOfUpgrade = 0;
 int Dungeon::scrollsOfEnchantment = 0;
 int Dungeon::potionOfStrength = 0;
 
+static bool s_gameEnded = false;
+
 void Dungeon::fail(const std::string& desc) {
+    if (s_gameEnded) return;
+    s_gameEnded = true;
     if (!desc.empty()) {
         resultDescription = desc;
+    }
+    if (hero) {
+        hero->belongings.identify();
     }
     Rankings::instance().submit(false, resultDescription);
 }
 
 void Dungeon::win(const std::string& desc) {
+    if (s_gameEnded) return;
+    s_gameEnded = true;
     if (!desc.empty()) {
         resultDescription = desc;
     }
@@ -163,6 +172,7 @@ void Dungeon::announceLevelEntrance() {
 }
 
 void Dungeon::newGame() {
+    s_gameEnded = false;
     s_cachedLevels.clear();
     s_cachedMobs.clear();
     depth = 1;

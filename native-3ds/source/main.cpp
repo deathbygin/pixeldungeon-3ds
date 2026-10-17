@@ -225,6 +225,10 @@ int main(int argc, char* argv[]) {
     auto mimicTex = Texture::get(Assets::MIMIC);
     auto itemsTex = Texture::get(Assets::ITEMS);
     auto plantsTex = Texture::get(Assets::PLANTS);
+    auto bannersTex = Texture::get(Assets::BANNERS);
+
+    Tex3DS_SubTexture subGameOverBanner;
+    bool subGameOverBannerInit = false;
 
     std::shared_ptr<TextureFilm> heroFilm;
     std::shared_ptr<TextureFilm> ratFilm;
@@ -826,17 +830,30 @@ int main(int argc, char* argv[]) {
                 continue;
             }
 
-            // Handle pause menu actions (Main Menu or Exit to 3DS Home Menu)
+            // Handle pause menu actions (Main Menu, Exit, Rankings, or Start New Game)
             if (bottomUI.getPendingGameAction() == pd::windows::GameAction::MAIN_MENU) {
                 bottomUI.clearPendingGameAction();
-                SaveManager::saveGame();
+                if (Dungeon::hero && Dungeon::hero->isAlive()) {
+                    SaveManager::saveGame();
+                }
                 appState = AppState::TITLE;
                 noosa::Music::play(pd::Assets::THEME, true);
                 continue;
             } else if (bottomUI.getPendingGameAction() == pd::windows::GameAction::EXIT_GAME) {
                 bottomUI.clearPendingGameAction();
-                SaveManager::saveGame();
+                if (Dungeon::hero && Dungeon::hero->isAlive()) {
+                    SaveManager::saveGame();
+                }
                 break; // Terminate cleanly to Home Menu
+            } else if (bottomUI.getPendingGameAction() == pd::windows::GameAction::RANKINGS) {
+                bottomUI.clearPendingGameAction();
+                rankingsScene.refresh();
+                appState = AppState::RANKINGS;
+                continue;
+            } else if (bottomUI.getPendingGameAction() == pd::windows::GameAction::START_NEW_GAME) {
+                bottomUI.clearPendingGameAction();
+                appState = AppState::HERO_SELECT;
+                continue;
             }
 
             if (actionConsumed) {
@@ -869,23 +886,7 @@ int main(int argc, char* argv[]) {
                         Dungeon::mobs.end()
                     );
                     if (!hero->isAlive()) {
-                        Sample::play(Assets::SND_DEATH);
-                        SaveManager::deleteSave();
-                        GLog::n("HERO PERISHED! Save erased.");
-                        wndOptions.show("GAME OVER",
-                            "You have perished in the dungeon. View your final score and rankings, or return to title.",
-                            { "View Rankings", "Return to Title" },
-                            [&](int optIdx) {
-                                if (optIdx == 0) {
-                                    rankingsScene.refresh();
-                                    appState = AppState::RANKINGS;
-                                } else {
-                                    appState = AppState::TITLE;
-                                    noosa::Music::play(pd::Assets::THEME, true);
-                                }
-                            });
-                        appState = AppState::PROMPT_LOAD;
-                        continue;
+                        hero->restoreHealth = false;
                     }
                     if (Dungeon::pendingTransition == LevelTransition::FALL) {
                         bottomUI.clearPendingTransition();
@@ -970,23 +971,7 @@ int main(int argc, char* argv[]) {
                         );
 
                         if (!hero->isAlive()) {
-                            Sample::play(Assets::SND_DEATH);
-                            SaveManager::deleteSave();
-                            GLog::n("HERO PERISHED! Save erased.");
-                            wndOptions.show("GAME OVER",
-                                "You have perished in the dungeon. View your final score and rankings, or return to title.",
-                                { "View Rankings", "Return to Title" },
-                                [&](int optIdx) {
-                                    if (optIdx == 0) {
-                                        rankingsScene.refresh();
-                                        appState = AppState::RANKINGS;
-                                    } else {
-                                        appState = AppState::TITLE;
-                                        noosa::Music::play(pd::Assets::THEME, true);
-                                    }
-                                });
-                            appState = AppState::PROMPT_LOAD;
-                            continue;
+                            // Dead hero remains on gameplay screen with full UI inspection access
                         } else if (level) {
                             if (level->map[hero->pos] == Terrain::EXIT || level->map[hero->pos] == Terrain::UNLOCKED_EXIT) {
                                 bottomUI.promptStairs(true);
@@ -1293,6 +1278,41 @@ int main(int argc, char* argv[]) {
             // Full-Screen Flash Overlay (Psionic Blast, Wipe Out, etc.)
             if (FX::isFlashing()) {
                 C2D_DrawRectSolid(0.0f, 0.0f, 0.88f, 400.0f, 240.0f, FX::getFlashColor());
+            }
+
+            // Game Over Banner overlay if hero perished
+            if (hero && !hero->isAlive()) {
+                if (!subGameOverBannerInit && bannersTex && bannersTex->isLoaded()) {
+                    float potW = static_cast<float>(bannersTex->potWidth());
+                    float potH = static_cast<float>(bannersTex->potHeight());
+                    subGameOverBanner.width = 128;
+                    subGameOverBanner.height = 35;
+                    subGameOverBanner.left = 0.0f;
+                    subGameOverBanner.right = 128.0f / potW;
+                    subGameOverBanner.top = 1.0f - (105.0f / potH);
+                    subGameOverBanner.bottom = 1.0f - (140.0f / potH);
+                    subGameOverBannerInit = true;
+                }
+
+                if (bannersTex && bannersTex->isLoaded() && bannersTex->getTex() && subGameOverBannerInit) {
+                    C2D_Image img;
+                    img.tex = bannersTex->getTex();
+                    img.subtex = &subGameOverBanner;
+
+                    float bScale = 1.5f;
+                    float bW = 128.0f * bScale;
+                    float bH = 35.0f * bScale;
+                    C2D_DrawParams params;
+                    params.pos.x = (400.0f - bW) * 0.5f;
+                    params.pos.y = (240.0f - bH) / 3.0f;
+                    params.pos.w = bW;
+                    params.pos.h = bH;
+                    params.center.x = 0.0f;
+                    params.center.y = 0.0f;
+                    params.depth = 0.90f;
+                    params.angle = 0.0f;
+                    C2D_DrawImage(img, &params, nullptr);
+                }
             }
         }
 

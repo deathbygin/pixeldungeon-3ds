@@ -30,7 +30,9 @@ void CharSprite::init(const std::string& texturePath, int frameWidth, int frameH
         if (m_state == State::Attack || m_state == State::Operate || m_state == State::Zap) {
             idle();
         } else if (m_state == State::Die) {
-            m_isDead = true;
+            if (!(m_char && m_char->asHero())) {
+                m_isDead = true;
+            }
         }
     });
 }
@@ -96,8 +98,13 @@ void CharSprite::attack(int targetCell) {
 
 void CharSprite::die() {
     m_state = State::Die;
-    m_isDying = true;
-    m_fadeTimer = FADE_TIME;
+    if (m_char && m_char->asHero()) {
+        m_isDying = false;
+        m_movieClip.alpha = 1.0f;
+    } else {
+        m_isDying = true;
+        m_fadeTimer = FADE_TIME;
+    }
     if (!m_die.frames.empty()) {
         m_movieClip.play(m_die, true);
     }

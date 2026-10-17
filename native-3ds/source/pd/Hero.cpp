@@ -15,6 +15,7 @@
 #include "pd/Sample.h"
 #include "pd/Debug.h"
 #include "pd/Statistics.h"
+#include "pd/SaveManager.h"
 #include "pd/ui/BottomScreenUI.h"
 #include "noosa/Audio.h"
 #include <algorithm>
@@ -737,7 +738,9 @@ void Hero::die(Actor* src) {
             deathReason = "Died on level " + std::to_string(Dungeon::depth);
         }
     }
+    belongings.identify();
     Dungeon::fail(deathReason);
+    SaveManager::deleteSave();
     Char::die(src);
 }
 

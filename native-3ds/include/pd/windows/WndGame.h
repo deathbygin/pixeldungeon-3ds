@@ -11,6 +11,8 @@ enum class GameAction {
     NONE,
     RESUME,
     SETTINGS,
+    RANKINGS,
+    START_NEW_GAME,
     MAIN_MENU,
     EXIT_GAME
 };
