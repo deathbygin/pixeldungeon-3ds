@@ -666,6 +666,7 @@ void CityBossLevel::decorate() {
 HallsLevel::HallsLevel() {
     minRoomSize = 6;
     viewDistance = std::max(25 - Dungeon::depth, 1);
+    addItemToSpawn(std::make_unique<Torch>());
 }
 
 std::vector<bool> HallsLevel::createWater() {

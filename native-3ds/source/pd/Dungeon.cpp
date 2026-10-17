@@ -155,9 +155,6 @@ void Dungeon::announceLevelEntrance() {
     case Level::Feeling::GRASS:
         GLog::w("The smell of vegetation is thick in the air.");
         break;
-    case Level::Feeling::DARK:
-        GLog::w("The darkness here is oppressive and suffocating...");
-        break;
     default:
         break;
     }
@@ -469,7 +466,7 @@ void Dungeon::spawnMobs(int count) {
     }
 
     int mobCount = count;
-    if (level && (level->feeling == Level::Feeling::DARK || (nightMode && !bossLevel()))) {
+    if (nightMode && !bossLevel()) {
         mobCount = count + 2;
     }
 

@@ -668,17 +668,9 @@ std::unique_ptr<Level> Level::create(int depth) {
         case 2:
             level->feeling = Level::Feeling::GRASS;
             break;
-        case 3:
-            level->feeling = Level::Feeling::DARK;
-            break;
         default:
             level->feeling = Level::Feeling::NONE;
             break;
-        }
-
-        if (level->feeling == Level::Feeling::DARK) {
-            level->viewDistance = 3;
-            level->addItemToSpawn(std::make_unique<Torch>());
         }
     }
 
