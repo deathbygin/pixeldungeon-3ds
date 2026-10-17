@@ -59,7 +59,7 @@ void LogConsole::draw(C2D_TextBuf textBuf) const {
 
     float lineY = y + 7.0f;
     for (const auto& line : linesToDraw) {
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, line.text, textX, lineY, zText, line.color, C2D_Color32(0, 0, 0, 0xFF));
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, line.text, textX, lineY, zText, line.color, COLOR_TEXT_SHADOW);
         lineY += lineH;
     }
 }

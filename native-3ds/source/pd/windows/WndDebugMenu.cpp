@@ -176,11 +176,11 @@ void WndDebugMenu::draw(C2D_TextBuf textBuf, float baseDepth) {
     // 2. 9-slice stone window chrome
     Chrome::get(Chrome::Type::WINDOW).draw(m_x, m_y, m_w, m_h, baseDepth + 0.02f);
 
-    // 3. Title text in golden yellow
+    // 3. Title text in warm orange / gold
     std::string title = "DEVELOPER MENU";
     float titleW = BitmapFont::width(BitmapFont::FontType::Font1x, title);
     float titleX = std::round(m_x + (m_w - titleW) * 0.5f);
-    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, title, titleX, m_y + 12.0f, baseDepth + 0.06f, 0xFFEBA4FF, 0x000000FF);
+    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, title, titleX, m_y + 12.0f, baseDepth + 0.06f, COLOR_TEXT_ACCENT, COLOR_TEXT_SHADOW);
 
     // 4. Buttons
     const auto& btnPatch = Chrome::get(Chrome::Type::BUTTON);
@@ -192,26 +192,26 @@ void WndDebugMenu::draw(C2D_TextBuf textBuf, float baseDepth) {
         btnPatch.draw(b.x, b.y, b.w, b.h, baseDepth + 0.04f, 0xFFFFFFFF, brightness);
 
         std::string displayLabel = b.label;
-        u32 textColor = isSel ? 0xFFEE88FF : 0xFFFFFFFF;
+        u32 textColor = isSel ? COLOR_TEXT_ACCENT : COLOR_TEXT_PRIMARY;
 
         if (b.action == DebugMenuAction::TOGGLE_GOD_MODE) {
             displayLabel = std::string("God Mode: ") + (Debug::godMode ? "[ ON ]" : "[ OFF ]");
             if (Debug::godMode) {
-                textColor = 0x55FF55FF; // Bright green
+                textColor = COLOR_TEXT_POSITIVE;
             }
         } else if (b.action == DebugMenuAction::TOGGLE_ONE_HIT_KILL) {
             displayLabel = std::string("One-Hit Kill: ") + (Debug::oneHitKill ? "[ ON ]" : "[ OFF ]");
             if (Debug::oneHitKill) {
-                textColor = 0x55FF55FF; // Bright green
+                textColor = COLOR_TEXT_POSITIVE;
             }
         } else if (b.action == DebugMenuAction::CLOSE) {
-            textColor = isSel ? 0xFFEE88FF : 0xFFEBA4FF;
+            textColor = isSel ? COLOR_TEXT_ACCENT : COLOR_TEXT_PRIMARY;
         }
 
         float textW = BitmapFont::width(BitmapFont::FontType::Font1x, displayLabel);
         float textX = std::round(b.x + (b.w - textW) * 0.5f);
         float textY = std::round(b.y + (b.h - 8.0f) * 0.5f);
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, displayLabel, textX, textY, baseDepth + 0.06f, textColor, 0x000000FF);
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, displayLabel, textX, textY, baseDepth + 0.06f, textColor, COLOR_TEXT_SHADOW);
     }
 }
 

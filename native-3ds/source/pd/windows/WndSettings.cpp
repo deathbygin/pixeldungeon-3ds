@@ -264,7 +264,7 @@ void WndSettings::draw(C2D_TextBuf textBuf) {
     float titleW = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, title);
     float titleX = std::round(m_x + (m_w - titleW) * 0.5f);
     float titleY = m_y + 10.0f;
-    pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, title, titleX, titleY, 0.86f, 0xFFEBA4FF, 0x000000FF);
+    pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, title, titleX, titleY, 0.86f, pd::ui::COLOR_TEXT_ACCENT, pd::ui::COLOR_TEXT_SHADOW);
 
     const auto& btnPatch = pd::ui::Chrome::get(pd::ui::Chrome::Type::BUTTON);
     float rowW = m_w - 28.0f;
@@ -278,8 +278,8 @@ void WndSettings::draw(C2D_TextBuf textBuf) {
         // Text label on left
         float tx = rowX + 10.0f;
         float ty = std::round(by + (22.0f - 8.0f) * 0.5f);
-        u32 col = isFocus ? 0xFFEE88FF : 0xFFFFFFFF;
-        pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, label, tx, ty, 0.86f, col, 0x000000FF);
+        u32 col = isFocus ? pd::ui::COLOR_TEXT_ACCENT : pd::ui::COLOR_TEXT_PRIMARY;
+        pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, label, tx, ty, 0.86f, col, pd::ui::COLOR_TEXT_SHADOW);
 
         // Checkbox icon on right
         if (m_texIcons && m_texIcons->isLoaded() && m_subIconsInit) {
@@ -318,8 +318,8 @@ void WndSettings::draw(C2D_TextBuf textBuf) {
             float tw = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, lbl);
             float tx = std::round(bx + (bw - tw) * 0.5f);
             float ty = std::round(zBtnY + (zH - 8.0f) * 0.5f);
-            u32 col = isCurZoom ? 0xFFEE88FF : (isFocus ? 0xFFFFAAFF : 0xFFFFFFFF);
-            pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, lbl, tx, ty, 0.86f, col, 0x000000FF);
+            u32 col = isCurZoom ? pd::ui::COLOR_TEXT_ACCENT : (isFocus ? pd::ui::COLOR_TEXT_ACCENT : pd::ui::COLOR_TEXT_PRIMARY);
+            pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, lbl, tx, ty, 0.86f, col, pd::ui::COLOR_TEXT_SHADOW);
         };
 
         drawZoomBtn(z1X, z1W, "1x", std::abs(curZoom - 1.0f) < 0.1f, 0);
@@ -343,7 +343,7 @@ void WndSettings::draw(C2D_TextBuf textBuf) {
         float rtx = std::round(retX + (retW - rtw) * 0.5f);
         float rty = std::round(retY + (retH - 8.0f) * 0.5f);
         pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, retLabel, rtx, rty, 0.86f,
-                                          isRetFocus ? 0xFFEE88FF : 0xFFFFFFFF, 0x000000FF);
+                                          isRetFocus ? pd::ui::COLOR_TEXT_ACCENT : pd::ui::COLOR_TEXT_PRIMARY, pd::ui::COLOR_TEXT_SHADOW);
     } else {
         // Title Screen layout
         drawCheckBox(m_y + 26.0f, "Music", Preferences::music(), 0);
@@ -358,9 +358,9 @@ void WndSettings::draw(C2D_TextBuf textBuf) {
         float wtw = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, wipeLabel);
         float wtx = std::round(rowX + (rowW - wtw) * 0.5f);
         float wty = std::round(wipeY + (22.0f - 8.0f) * 0.5f);
-        u32 wipeCol = isWipeFocus ? 0xFFFFAAFF : 0xFFFFFFFF;
+        u32 wipeCol = isWipeFocus ? pd::ui::COLOR_TEXT_WARNING : pd::ui::COLOR_TEXT_PRIMARY;
         pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, wipeLabel, wtx, wty, 0.86f,
-                                          wipeCol, 0x000000FF);
+                                          wipeCol, pd::ui::COLOR_TEXT_SHADOW);
 
         // Return Button
         float retX = m_x + 24.0f;
@@ -374,7 +374,7 @@ void WndSettings::draw(C2D_TextBuf textBuf) {
         float rtx = std::round(retX + (retW - rtw) * 0.5f);
         float rty = std::round(retY + (retH - 8.0f) * 0.5f);
         pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, retLabel, rtx, rty, 0.86f,
-                                          isRetFocus ? 0xFFEE88FF : 0xFFFFFFFF, 0x000000FF);
+                                          isRetFocus ? pd::ui::COLOR_TEXT_ACCENT : pd::ui::COLOR_TEXT_PRIMARY, pd::ui::COLOR_TEXT_SHADOW);
     }
 
     // Confirmation Modal on top

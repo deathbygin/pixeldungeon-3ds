@@ -1,4 +1,5 @@
 #include "pd/ui/UIButton.h"
+#include "pd/ui/ColorPalette.h"
 #include "pd/Sample.h"
 #include "pd/Assets.h"
 
@@ -28,8 +29,8 @@ bool UIButton::update(const TouchController& touch, u32 kDown) {
 void UIButton::draw(C2D_TextBuf textBuf) const {
     if (!enabled) return;
 
-    u32 fillColor = customFill != 0 ? customFill : (active ? C2D_Color32(0x76, 0x42, 0x8a, 0xFF) : C2D_Color32(0x32, 0x2b, 0x44, 0xFF));
-    u32 borderColor = customBorder != 0 ? customBorder : (active ? C2D_Color32(0xe4, 0xa6, 0x72, 0xFF) : C2D_Color32(0x63, 0x48, 0x3d, 0xFF));
+    u32 fillColor = customFill != 0 ? customFill : (active ? C2D_Color32(0x55, 0x55, 0x55, 0xFF) : C2D_Color32(0x33, 0x33, 0x33, 0xFF));
+    u32 borderColor = customBorder != 0 ? customBorder : (active ? COLOR_TEXT_ACCENT : C2D_Color32(0x66, 0x66, 0x66, 0xFF));
 
     // Button fill
     C2D_DrawRectSolid(x, y, z, width, height, fillColor);
@@ -54,7 +55,7 @@ void UIButton::draw(C2D_TextBuf textBuf) const {
     float textX = x + 6.0f;
     float textY = y + (height - 12.0f) * 0.5f;
 
-    u32 textColor = active ? C2D_Color32(0xe4, 0xa6, 0x72, 0xFF) : C2D_Color32(0xff, 0xff, 0xff, 0xFF);
+    u32 textColor = active ? COLOR_TEXT_ACCENT : COLOR_TEXT_PRIMARY;
     C2D_DrawText(&textObj, C2D_WithColor, textX, textY, z + 0.05f, textScale, textScale, textColor);
 }
 

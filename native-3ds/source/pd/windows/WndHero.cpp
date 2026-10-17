@@ -113,8 +113,8 @@ static void drawStoneTabButton(float x, float y, float w, float h, float z, bool
     float txtW = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, label);
     float txtX = std::round(x + (w - txtW) * 0.5f);
     float txtY = std::round(y + (h - 7.0f) * 0.5f);
-    u32 txtColor = selected ? 0xFFEE88FF : 0x889988FF;
-    pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, label, txtX, txtY, z + 0.02f, txtColor, 0x000000FF);
+    u32 txtColor = selected ? pd::ui::COLOR_TEXT_ACCENT : pd::ui::COLOR_TEXT_MUTED;
+    pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, label, txtX, txtY, z + 0.02f, txtColor, pd::ui::COLOR_TEXT_SHADOW);
 }
 
 void WndHero::draw(const pd::Hero* hero, C2D_TextBuf textBuf) {
@@ -151,7 +151,7 @@ void WndHero::draw(const pd::Hero* hero, C2D_TextBuf textBuf) {
 
         float titleW = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, title);
         float titleX = std::round(m_x + (m_w - titleW) * 0.5f);
-        pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, title, titleX, curY, zText, 0xFFFF44FF, 0x000000FF);
+        pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, title, titleX, curY, zText, pd::ui::COLOR_TEXT_ACCENT, pd::ui::COLOR_TEXT_SHADOW);
         curY += 14.0f;
 
         // Subclass description if active
@@ -159,7 +159,7 @@ void WndHero::draw(const pd::Hero* hero, C2D_TextBuf textBuf) {
             std::string desc = subClassDesc(hero->subClass);
             float descW = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, desc);
             float descX = std::round(m_x + (m_w - descW) * 0.5f);
-            pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, desc, descX, curY, zText, 0xCACFC2FF, 0x000000FF);
+            pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, desc, descX, curY, zText, pd::ui::COLOR_TEXT_PRIMARY, pd::ui::COLOR_TEXT_SHADOW);
             curY += 12.0f;
         }
 
@@ -176,23 +176,23 @@ void WndHero::draw(const pd::Hero* hero, C2D_TextBuf textBuf) {
         };
 
         std::vector<StatRow> stats = {
-            { "Health:",        std::to_string(hero->HP) + " / " + std::to_string(hero->HT), (hero->HP == hero->HT) ? 0x56BB77FF : 0xFFFFFFFF },
-            { "Strength:",      std::to_string(hero->STR), 0xFFFFFFFF },
-            { "Experience:",    std::to_string(hero->exp) + " / " + std::to_string(hero->maxExp), 0xBBAAFFFF },
-            { "Gold Collected:",std::to_string(hero->gold > 0 ? hero->gold : Dungeon::gold), 0xFFD700FF },
-            { "Dungeon Depth:", std::to_string(Dungeon::depth), 0x55AAFFFF },
-            { "Attack Skill:",  std::to_string(const_cast<Hero*>(hero)->attackSkill(nullptr)), 0xCACFC2FF },
-            { "Defense Skill:", std::to_string(const_cast<Hero*>(hero)->defenseSkill(nullptr)), 0xCACFC2FF }
+            { "Health:",        std::to_string(hero->HP) + " / " + std::to_string(hero->HT), (hero->HP == hero->HT) ? pd::ui::COLOR_TEXT_POSITIVE : pd::ui::COLOR_TEXT_PRIMARY },
+            { "Strength:",      std::to_string(hero->STR), pd::ui::COLOR_TEXT_PRIMARY },
+            { "Experience:",    std::to_string(hero->exp) + " / " + std::to_string(hero->maxExp), pd::ui::COLOR_TEXT_PRIMARY },
+            { "Gold Collected:",std::to_string(hero->gold > 0 ? hero->gold : Dungeon::gold), pd::ui::COLOR_TEXT_ACCENT },
+            { "Dungeon Depth:", std::to_string(Dungeon::depth), pd::ui::COLOR_TEXT_PRIMARY },
+            { "Attack Skill:",  std::to_string(const_cast<Hero*>(hero)->attackSkill(nullptr)), pd::ui::COLOR_TEXT_PRIMARY },
+            { "Defense Skill:", std::to_string(const_cast<Hero*>(hero)->defenseSkill(nullptr)), pd::ui::COLOR_TEXT_PRIMARY }
         };
 
         float leftX = m_x + 22.0f;
         float rightX = m_x + m_w - 22.0f;
 
         for (const auto& row : stats) {
-            pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, row.label, leftX, curY, zText, 0xCACFC2FF, 0x000000FF);
+            pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, row.label, leftX, curY, zText, pd::ui::COLOR_TEXT_ACCENT, pd::ui::COLOR_TEXT_SHADOW);
 
             float vw = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, row.value);
-            pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, row.value, rightX - vw, curY, zText, row.valColor, 0x000000FF);
+            pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, row.value, rightX - vw, curY, zText, row.valColor, pd::ui::COLOR_TEXT_SHADOW);
 
             curY += 13.0f;
         }
@@ -200,7 +200,7 @@ void WndHero::draw(const pd::Hero* hero, C2D_TextBuf textBuf) {
         // Buffs & Status Title
         float titleW = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, "BUFFS & CONDITIONS");
         float titleX = std::round(m_x + (m_w - titleW) * 0.5f);
-        pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, "BUFFS & CONDITIONS", titleX, curY, zText, 0xFFFF44FF, 0x000000FF);
+        pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, "BUFFS & CONDITIONS", titleX, curY, zText, pd::ui::COLOR_TEXT_ACCENT, pd::ui::COLOR_TEXT_SHADOW);
         curY += 14.0f;
 
         // Horizontal divider
@@ -217,7 +217,7 @@ void WndHero::draw(const pd::Hero* hero, C2D_TextBuf textBuf) {
             if (!b) continue;
             std::string bName = b->name();
             std::string bDesc = "";
-            uint32_t col = 0xCACFC2FF;
+            uint32_t col = pd::ui::COLOR_TEXT_PRIMARY;
             int iconIndex = -1;
 
             switch (b->type()) {
@@ -352,8 +352,8 @@ void WndHero::draw(const pd::Hero* hero, C2D_TextBuf textBuf) {
             }
 
             // Buff Title & short description
-            pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, bName, slotX, curY, zText, col, 0x000000FF);
-            pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, bDesc, slotX, curY + 9.0f, zText, 0xCACFC2FF, 0x000000FF);
+            pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, bName, slotX, curY, zText, col, pd::ui::COLOR_TEXT_SHADOW);
+            pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, bDesc, slotX, curY + 9.0f, zText, pd::ui::COLOR_TEXT_PRIMARY, pd::ui::COLOR_TEXT_SHADOW);
 
             curY += 21.0f;
             buffCount++;
@@ -361,7 +361,7 @@ void WndHero::draw(const pd::Hero* hero, C2D_TextBuf textBuf) {
         }
 
         if (buffCount == 0) {
-            pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, "No active status effects.", m_x + 24.0f, curY + 16.0f, zText, 0x889988FF, 0x000000FF);
+            pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, "No active status effects.", m_x + 24.0f, curY + 16.0f, zText, pd::ui::COLOR_TEXT_MUTED, pd::ui::COLOR_TEXT_SHADOW);
         }
     }
 
@@ -377,7 +377,7 @@ void WndHero::draw(const pd::Hero* hero, C2D_TextBuf textBuf) {
     float btnTxtW = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, "Close [B]");
     float btnTxtX = std::round(btnX + (btnW - btnTxtW) * 0.5f);
     float btnTxtY = std::round(btnY + (btnH - 8.0f) * 0.5f);
-    pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, "Close [B]", btnTxtX, btnTxtY, zWin + 0.05f, 0xFFFFFFFF, 0x000000FF);
+    pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, "Close [B]", btnTxtX, btnTxtY, zWin + 0.05f, pd::ui::COLOR_TEXT_PRIMARY, pd::ui::COLOR_TEXT_SHADOW);
 }
 
 } // namespace pd::windows

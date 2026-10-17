@@ -5,6 +5,7 @@
 #include <vector>
 #include <memory>
 #include <cstdint>
+#include "pd/ui/ColorPalette.h"
 
 namespace pd::ui {
 
@@ -21,19 +22,19 @@ public:
 
     // Draws a single line of text with the exact Pixel Dungeon bitmap font.
     // Supports tracking, spaces, and color tinting.
-    static float draw(FontType font, const std::string& text, float x, float y, float z = 0.6f, u32 color = 0xFFFFFFFF, float scale = 1.0f);
+    static float draw(FontType font, const std::string& text, float x, float y, float z = 0.6f, u32 color = COLOR_TEXT_PRIMARY, float scale = 1.0f);
 
     // Draws text with a 1-pixel drop shadow.
-    static float drawWithShadow(FontType font, const std::string& text, float x, float y, float z = 0.6f, u32 color = 0xFFFFFFFF, u32 shadowColor = 0x000000FF, float scale = 1.0f);
+    static float drawWithShadow(FontType font, const std::string& text, float x, float y, float z = 0.6f, u32 color = COLOR_TEXT_PRIMARY, u32 shadowColor = COLOR_TEXT_SHADOW, float scale = 1.0f);
 
     // Draws multiline text wrapped to maxWidth.
-    static float drawMultiline(FontType font, const std::string& text, float x, float y, float maxWidth, float z = 0.6f, u32 color = 0xFFFFFFFF, float scale = 1.0f);
+    static float drawMultiline(FontType font, const std::string& text, float x, float y, float maxWidth, float z = 0.6f, u32 color = COLOR_TEXT_PRIMARY, float scale = 1.0f);
 
     // Splits text into multiline wrapped strings respecting newlines and maxWidth.
     static std::vector<std::string> splitMultiline(FontType font, const std::string& text, float maxWidth, float scale = 1.0f);
 
     // Draws text vertically clipped between clipTop and clipBottom (software glyph clipping).
-    static float drawClipped(FontType font, const std::string& text, float x, float y, float clipTop, float clipBottom, float z = 0.6f, u32 color = 0xFFFFFFFF, float scale = 1.0f);
+    static float drawClipped(FontType font, const std::string& text, float x, float y, float clipTop, float clipBottom, float z = 0.6f, u32 color = COLOR_TEXT_PRIMARY, float scale = 1.0f);
 
     // Measures the width of a single line of text.
     static float width(FontType font, const std::string& text, float scale = 1.0f);

@@ -155,18 +155,18 @@ void WndOptions::draw(C2D_TextBuf textBuf, float baseDepth) {
     // 2. 9-slice stone window chrome from chrome.png
     Chrome::get(Chrome::Type::WINDOW).draw(m_x, m_y, m_w, m_h, baseDepth + 0.02f);
 
-    // 3. Title text in golden yellow with 1px drop-shadow
+    // 3. Title text in warm orange / gold with 1px drop-shadow
     float titleW = BitmapFont::width(BitmapFont::FontType::Font1x, m_title);
     float titleX = std::round(m_x + (m_w - titleW) * 0.5f);
     float titleY = m_y + 14.0f;
-    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, m_title, titleX, titleY, baseDepth + 0.06f, 0xFFEBA4FF, 0x000000FF);
+    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, m_title, titleX, titleY, baseDepth + 0.06f, COLOR_TEXT_ACCENT, COLOR_TEXT_SHADOW);
 
-    // 4. Message text lines in readable light grey with 1px drop-shadow
+    // 4. Message text lines in readable white with 1px drop-shadow
     float curMsgY = titleY + 16.0f;
     for (const auto& line : m_messageLines) {
         float lineW = BitmapFont::width(BitmapFont::FontType::Font1x, line);
         float lineX = std::round(m_x + (m_w - lineW) * 0.5f);
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, line, lineX, curMsgY, baseDepth + 0.06f, 0xCACFC2FF, 0x000000FF);
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, line, lineX, curMsgY, baseDepth + 0.06f, COLOR_TEXT_PRIMARY, COLOR_TEXT_SHADOW);
         curMsgY += 11.0f;
     }
 
@@ -183,8 +183,8 @@ void WndOptions::draw(C2D_TextBuf textBuf, float baseDepth) {
         float textX = std::round(b.x + (b.w - textW) * 0.5f);
         float textY = std::round(b.y + (b.h - 8.0f) * 0.5f);
 
-        u32 textColor = isSel ? 0xFFEE88FF : 0xFFFFFFFF;
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, m_options[i], textX, textY, baseDepth + 0.06f, textColor, 0x000000FF);
+        u32 textColor = isSel ? COLOR_TEXT_ACCENT : COLOR_TEXT_PRIMARY;
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, m_options[i], textX, textY, baseDepth + 0.06f, textColor, COLOR_TEXT_SHADOW);
     }
 }
 

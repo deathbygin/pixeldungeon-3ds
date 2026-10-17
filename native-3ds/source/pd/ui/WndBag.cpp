@@ -315,7 +315,7 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
 
     float textX = contentX + iconW + iconSpacing;
     float textY = tabY + std::floor((tabH - 8.0f) * 0.5f);
-    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, titleStr, textX, textY, zContent, C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
+    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, titleStr, textX, textY, zContent, COLOR_TEXT_ACCENT, COLOR_TEXT_SHADOW);
 
     // 5. 4x5 Recessed Item Grid (Slot size 28x28, margin 2px)
     int potW = m_texItems ? m_texItems->potWidth() : 128;
@@ -381,7 +381,7 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
 
                 char gBuf[16];
                 std::snprintf(gBuf, sizeof(gBuf), "%d", hero->gold);
-                BitmapFont::draw(BitmapFont::FontType::Font1x, gBuf, sx + 2.0f, sy + 18.0f, zText, C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF));
+                BitmapFont::draw(BitmapFont::FontType::Font1x, gBuf, sx + 2.0f, sy + 18.0f, zText, COLOR_TEXT_PRIMARY);
             } else if (it && iTex) {
                 // Render Item Icon (16x16)
                 int imgIdx = it->image;
@@ -395,7 +395,7 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
                 // Top-Left Badge: Stack count (e.g., 8)
                 if (it->quantity > 1) {
                     std::string qStr = std::to_string(it->quantity);
-                    BitmapFont::draw(BitmapFont::FontType::Font1x, qStr, sx + 2.0f, sy + 1.0f, zText, C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF));
+                    BitmapFont::draw(BitmapFont::FontType::Font1x, qStr, sx + 2.0f, sy + 1.0f, zText, COLOR_TEXT_PRIMARY);
                 }
 
                 // Top-Right Badge: Strength requirement (:10 or ?10)
@@ -411,11 +411,11 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
                     std::string strBadge = identified ? (":" + std::to_string(reqStr)) : ("?" + std::to_string(reqStr));
                     u32 strCol;
                     if (!identified) {
-                        strCol = C2D_Color32(0xFF, 0xAA, 0x22, 0xFF); // Warning orange for typical/unidentified strength
+                        strCol = COLOR_TEXT_ACCENT; // Warning orange for typical/unidentified strength
                     } else if (reqStr > hero->STR) {
-                        strCol = C2D_Color32(0xFF, 0x44, 0x44, 0xFF); // Red if hero strength is insufficient
+                        strCol = COLOR_TEXT_WARNING; // Red if hero strength is insufficient
                     } else {
-                        strCol = C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF); // Clean white
+                        strCol = COLOR_TEXT_PRIMARY; // Clean white
                     }
                     float bw = BitmapFont::width(BitmapFont::FontType::Font1x, strBadge);
                     float bx = sx + SLOT_SIZE - bw - 2.0f;
@@ -427,12 +427,12 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
                     std::string lvlBadge = (it->level > 0 ? "+" : "") + std::to_string(it->level);
                     float lw = BitmapFont::width(BitmapFont::FontType::Font1x, lvlBadge);
                     float lx = sx + SLOT_SIZE - lw - 2.0f;
-                    u32 lCol = (it->level > 0) ? C2D_Color32(0x44, 0xFF, 0x44, 0xFF) : C2D_Color32(0xFF, 0x44, 0x44, 0xFF);
+                    u32 lCol = (it->level > 0) ? COLOR_TEXT_POSITIVE : COLOR_TEXT_WARNING;
                     BitmapFont::draw(BitmapFont::FontType::Font1x, lvlBadge, lx, sy + 18.0f, zText, lCol);
                 } else if (it->cursed && it->cursedKnown) {
                     float cw = BitmapFont::width(BitmapFont::FontType::Font1x, "C");
                     float cx = sx + SLOT_SIZE - cw - 2.0f;
-                    BitmapFont::draw(BitmapFont::FontType::Font1x, "C", cx, sy + 18.0f, zText, C2D_Color32(0xFF, 0x44, 0x44, 0xFF));
+                    BitmapFont::draw(BitmapFont::FontType::Font1x, "C", cx, sy + 18.0f, zText, COLOR_TEXT_WARNING);
                 }
 
                 // Bottom-Left Ticks: Durability

@@ -105,14 +105,14 @@ void WndMessage::draw(C2D_TextBuf textBuf, float baseDepth) {
     // 2. 9-slice stone window chrome from chrome.png
     Chrome::get(Chrome::Type::WINDOW).draw(m_x, m_y, m_w, m_h, baseDepth + 0.02f);
 
-    // 3. Narrative / message text lines in readable light grey with 1px black drop-shadow
+    // 3. Narrative / message text lines in high-contrast white with 1px black drop-shadow
     float curY = m_y + 16.0f;
     float lineH = 12.0f;
     for (const auto& line : m_lines) {
         if (!line.empty()) {
             float lineW = BitmapFont::width(BitmapFont::FontType::Font1x, line);
             float lineX = std::round(m_x + (m_w - lineW) * 0.5f);
-            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, line, lineX, curY, baseDepth + 0.06f, 0xCACFC2FF, 0x000000FF);
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, line, lineX, curY, baseDepth + 0.06f, COLOR_TEXT_PRIMARY, COLOR_TEXT_SHADOW);
         }
         curY += lineH;
     }

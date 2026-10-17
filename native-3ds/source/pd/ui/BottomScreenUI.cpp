@@ -1088,55 +1088,55 @@ void BottomScreenUI::drawRightGlanceCard(const pd::Hero* hero, C2D_TextBuf textB
         if (buffList.length() > 22) buffList = buffList.substr(0, 19) + "...";
         curX = cardX + 8.0f;
         curY = cardY + 64.0f;
-        curX = BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "Buffs: ", curX, curY, zText, C2D_Color32(0xFF, 0xAA, 0x22, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, buffList, curX, curY, zText, C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
+        curX = BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "Buffs: ", curX, curY, zText, COLOR_TEXT_ACCENT, COLOR_TEXT_SHADOW);
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, buffList, curX, curY, zText, COLOR_TEXT_PRIMARY, COLOR_TEXT_SHADOW);
 
         if (m_isExamining) {
-            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "[A] View Lore & Stats", cardX + 8.0f, cardY + 76.0f, zText, C2D_Color32(0x56, 0xBB, 0x77, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
-            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "[B] Exit Examine", cardX + 8.0f, cardY + 88.0f, zText, C2D_Color32(0xA5, 0xCD, 0xE4, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "[A] View Lore & Stats", cardX + 8.0f, cardY + 76.0f, zText, COLOR_TEXT_POSITIVE, COLOR_TEXT_SHADOW);
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "[B] Exit Examine", cardX + 8.0f, cardY + 88.0f, zText, C2D_Color32(0xA5, 0xCD, 0xE4, 0xFF), COLOR_TEXT_SHADOW);
         } else {
-            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "[A] View Lore & Stats", cardX + 8.0f, cardY + 76.0f, zText, C2D_Color32(0xCC, 0xCC, 0xCC, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
-            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "Tap to target/shoot", cardX + 8.0f, cardY + 88.0f, zText, C2D_Color32(0x88, 0x88, 0x88, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "[A] View Lore & Stats", cardX + 8.0f, cardY + 76.0f, zText, COLOR_TEXT_PRIMARY, COLOR_TEXT_SHADOW);
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "Tap to target/shoot", cardX + 8.0f, cardY + 88.0f, zText, COLOR_TEXT_MUTED, COLOR_TEXT_SHADOW);
         }
     } else {
         // --- MODE B: HERO QUICK STATS (EXPLORATION) ---
         std::string titleStr = hero->name + " (" + hero->className() + ")";
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, titleStr, cardX + 8.0f, cardY + 8.0f, zText, C2D_Color32(0xFF, 0xAA, 0x22, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, titleStr, cardX + 8.0f, cardY + 8.0f, zText, COLOR_TEXT_ACCENT, COLOR_TEXT_SHADOW);
 
         // Stats summary: STR: <val>   LVL: <val>
         float curX = cardX + 8.0f;
         float curY = cardY + 22.0f;
-        curX = BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "STR: ", curX, curY, zText, C2D_Color32(0xFF, 0xAA, 0x22, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
-        curX = BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, std::to_string(hero->STR) + "   ", curX, curY, zText, C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
-        curX = BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "LVL: ", curX, curY, zText, C2D_Color32(0xFF, 0xAA, 0x22, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, std::to_string(hero->level), curX, curY, zText, C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
+        curX = BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "STR: ", curX, curY, zText, COLOR_TEXT_ACCENT, COLOR_TEXT_SHADOW);
+        curX = BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, std::to_string(hero->STR) + "   ", curX, curY, zText, COLOR_TEXT_PRIMARY, COLOR_TEXT_SHADOW);
+        curX = BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "LVL: ", curX, curY, zText, COLOR_TEXT_ACCENT, COLOR_TEXT_SHADOW);
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, std::to_string(hero->level), curX, curY, zText, COLOR_TEXT_PRIMARY, COLOR_TEXT_SHADOW);
 
         // Weapon
         curX = cardX + 8.0f;
         curY = cardY + 36.0f;
-        curX = BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "WEAP: ", curX, curY, zText, C2D_Color32(0xFF, 0xAA, 0x22, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
+        curX = BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "WEAP: ", curX, curY, zText, COLOR_TEXT_ACCENT, COLOR_TEXT_SHADOW);
         std::string weapVal = hero->belongings.equippedWeapon ? hero->belongings.equippedWeapon->displayName() : "None (Fists)";
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, weapVal, curX, curY, zText, C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, weapVal, curX, curY, zText, COLOR_TEXT_PRIMARY, COLOR_TEXT_SHADOW);
 
         // Armor
         curX = cardX + 8.0f;
         curY = cardY + 50.0f;
-        curX = BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "ARM: ", curX, curY, zText, C2D_Color32(0xFF, 0xAA, 0x22, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
+        curX = BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "ARM: ", curX, curY, zText, COLOR_TEXT_ACCENT, COLOR_TEXT_SHADOW);
         std::string armVal = hero->belongings.equippedArmor ? hero->belongings.equippedArmor->displayName() : "Cloth (+0)";
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, armVal, curX, curY, zText, C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, armVal, curX, curY, zText, COLOR_TEXT_PRIMARY, COLOR_TEXT_SHADOW);
 
         // Gold
         curX = cardX + 8.0f;
         curY = cardY + 64.0f;
-        curX = BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "GOLD: ", curX, curY, zText, C2D_Color32(0xFF, 0xAA, 0x22, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, std::to_string(hero->gold), curX, curY, zText, C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
+        curX = BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "GOLD: ", curX, curY, zText, COLOR_TEXT_ACCENT, COLOR_TEXT_SHADOW);
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, std::to_string(hero->gold), curX, curY, zText, COLOR_TEXT_PRIMARY, COLOR_TEXT_SHADOW);
 
         // XP Progress
         curX = cardX + 8.0f;
         curY = cardY + 80.0f;
-        curX = BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "EXP: ", curX, curY, zText, C2D_Color32(0xFF, 0xAA, 0x22, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
+        curX = BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "EXP: ", curX, curY, zText, COLOR_TEXT_ACCENT, COLOR_TEXT_SHADOW);
         std::string expVal = std::to_string(hero->exp) + "/" + std::to_string(hero->maxExp);
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, expVal, curX, curY, zText, C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF), C2D_Color32(0, 0, 0, 0xFF));
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, expVal, curX, curY, zText, COLOR_TEXT_PRIMARY, COLOR_TEXT_SHADOW);
 
         float barX = cardX + 8.0f;
         float barY = cardY + 94.0f;
@@ -1183,13 +1183,13 @@ void BottomScreenUI::draw(const pd::Hero* hero, int depth, C2D_TextBuf textBuf) 
             u8 b = static_cast<u8>(0 * p + 255 * (1.0f - p));
             u32 titleCol = C2D_Color32(r, g, b, 0xFF);
 
-            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "EXAMINE MODE", barX + 8.0f, barY + 6.0f, zText, titleCol, 0x000000FF);
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "EXAMINE MODE", barX + 8.0f, barY + 6.0f, zText, titleCol, COLOR_TEXT_SHADOW);
 
             std::string preview = getHoverPreviewText(m_examineCell, Dungeon::level.get());
-            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, preview, barX + 8.0f, barY + 20.0f, zText, 0xFFFFFFFF, 0x000000FF);
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, preview, barX + 8.0f, barY + 20.0f, zText, COLOR_TEXT_PRIMARY, COLOR_TEXT_SHADOW);
 
             std::string hint = "[A] Inspect Details    [B] Cancel Examine";
-            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, hint, barX + 8.0f, barY + 34.0f, zText, 0x56BB77FF, 0x000000FF);
+            BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, hint, barX + 8.0f, barY + 34.0f, zText, COLOR_TEXT_POSITIVE, COLOR_TEXT_SHADOW);
         } else {
             m_logConsole.draw(textBuf);
         }

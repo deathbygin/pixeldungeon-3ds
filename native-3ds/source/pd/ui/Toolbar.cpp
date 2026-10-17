@@ -202,11 +202,11 @@ void Toolbar::draw(const pd::Hero* hero, C2D_TextBuf textBuf, bool isTargeting, 
             float textY = (m_pressedTool == toolIdx) ? (Y_POS + 1.0f) : Y_POS;
             if (Wand* w = item->asWand()) {
                 std::string chStr = std::to_string(w->curCharges);
-                u32 col = w->curCharges > 0 ? C2D_Color32(0x99, 0xcc, 0xff, 0xFF) : C2D_Color32(0xee, 0x44, 0x44, 0xFF);
-                BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, chStr, slotX + 2.0f, textY + 1.0f, zText, col, 0x000000FF);
+                u32 col = w->curCharges > 0 ? C2D_Color32(0x99, 0xcc, 0xff, 0xFF) : COLOR_TEXT_WARNING;
+                BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, chStr, slotX + 2.0f, textY + 1.0f, zText, col, COLOR_TEXT_SHADOW);
             } else if (item->quantity > 1) {
                 std::string qStr = std::to_string(item->quantity);
-                BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, qStr, slotX + 2.0f, textY + 1.0f, zText, 0xFFFFFFFF, 0x000000FF);
+                BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, qStr, slotX + 2.0f, textY + 1.0f, zText, COLOR_TEXT_PRIMARY, COLOR_TEXT_SHADOW);
             }
         };
 

@@ -271,6 +271,7 @@ void TitleScene::drawTop(C2D_TextBuf textBuf) {
 }
 
 void TitleScene::drawBottom(C2D_TextBuf textBuf) {
+    (void)textBuf;
     // 1. Draw Colonnade Parallax continuation
     m_archs.drawBottom(0.05f);
 
@@ -361,7 +362,7 @@ void TitleScene::drawBottom(C2D_TextBuf textBuf) {
         float labelX = btn.x + (btn.w - textW) * 0.5f;
         float labelY = btn.y + 34.0f;
 
-        u32 textCol = isFocused ? 0xFFFFAAFF : 0xFFFFFFFF;
+        u32 textCol = isFocused ? ui::COLOR_TEXT_ACCENT : ui::COLOR_TEXT_PRIMARY;
         ui::BitmapFont::draw(ui::BitmapFont::FontType::Font2x, btn.label, labelX, labelY, 0.25f, textCol);
     };
 
@@ -370,10 +371,10 @@ void TitleScene::drawBottom(C2D_TextBuf textBuf) {
     drawDashBtn(m_btnBadges, m_subDashBadges, m_selectedGrid == 2);
     drawDashBtn(m_btnAbout, m_subDashAbout, m_selectedGrid == 3);
 
-    // 4. Version string: bottom-right corner ("v 1.0-alpha") using authentic Font1x in 0x888888 grey
+    // 4. Version string: bottom-right corner ("v 1.0-alpha") using authentic Font1x in muted gray
     std::string verStr = "v 1.0-alpha";
     float vW = ui::BitmapFont::width(ui::BitmapFont::FontType::Font1x, verStr);
-    ui::BitmapFont::draw(ui::BitmapFont::FontType::Font1x, verStr, 320.0f - vW - 4.0f, 240.0f - 10.0f, 0.25f, 0x888888FF);
+    ui::BitmapFont::draw(ui::BitmapFont::FontType::Font1x, verStr, 320.0f - vW - 4.0f, 240.0f - 10.0f, 0.25f, ui::COLOR_TEXT_MUTED);
 }
 
 } // namespace pd::scenes

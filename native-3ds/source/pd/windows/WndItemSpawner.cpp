@@ -353,7 +353,7 @@ void WndItemSpawner::draw(C2D_TextBuf textBuf, float baseDepth) {
     std::string title = "ITEM SPAWNER";
     float titleW = BitmapFont::width(BitmapFont::FontType::Font1x, title);
     float titleX = std::round(m_x + (m_w - titleW) * 0.5f);
-    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, title, titleX, m_y + 11.0f, baseDepth + 0.06f, 0xFFEBA4FF, 0x000000FF);
+    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, title, titleX, m_y + 11.0f, baseDepth + 0.06f, COLOR_TEXT_ACCENT, COLOR_TEXT_SHADOW);
 
     // 4. Category selector bar
     const auto& cat = m_categories[m_currentCategory];
@@ -361,16 +361,16 @@ void WndItemSpawner::draw(C2D_TextBuf textBuf, float baseDepth) {
 
     // "<" button
     btnPatch.draw(m_x + 10.0f, m_y + 28.0f, 26.0f, 20.0f, baseDepth + 0.04f);
-    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "<", m_x + 20.0f, m_y + 33.0f, baseDepth + 0.06f, 0xFFFFFFFF, 0x000000FF);
+    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "<", m_x + 20.0f, m_y + 33.0f, baseDepth + 0.06f, COLOR_TEXT_PRIMARY, COLOR_TEXT_SHADOW);
 
     // Category title
     float catW = BitmapFont::width(BitmapFont::FontType::Font1x, cat.name);
     float catX = std::round(m_x + (m_w - catW) * 0.5f);
-    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, cat.name, catX, m_y + 33.0f, baseDepth + 0.06f, 0x55FF55FF, 0x000000FF);
+    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, cat.name, catX, m_y + 33.0f, baseDepth + 0.06f, COLOR_TEXT_ACCENT, COLOR_TEXT_SHADOW);
 
     // ">" button
     btnPatch.draw(m_x + m_w - 36.0f, m_y + 28.0f, 26.0f, 20.0f, baseDepth + 0.04f);
-    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, ">", m_x + m_w - 24.0f, m_y + 33.0f, baseDepth + 0.06f, 0xFFFFFFFF, 0x000000FF);
+    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, ">", m_x + m_w - 24.0f, m_y + 33.0f, baseDepth + 0.06f, COLOR_TEXT_PRIMARY, COLOR_TEXT_SHADOW);
 
     // 5. Items Grid
     int totalItems = static_cast<int>(cat.items.size());
@@ -417,28 +417,28 @@ void WndItemSpawner::draw(C2D_TextBuf textBuf, float baseDepth) {
         }
 
         // Draw item name text
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, itemEntry.name, btnX + 23.0f, btnY + 7.0f, baseDepth + 0.06f, 0xFFFFFFFF, 0x000000FF);
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, itemEntry.name, btnX + 23.0f, btnY + 7.0f, baseDepth + 0.06f, COLOR_TEXT_PRIMARY, COLOR_TEXT_SHADOW);
     }
 
     // 6. Pagination & Return row
     if (m_currentPage > 0) {
         btnPatch.draw(m_x + 12.0f, m_y + 190.0f, 50.0f, 20.0f, baseDepth + 0.04f);
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "< Prev", m_x + 20.0f, m_y + 195.0f, baseDepth + 0.06f, 0xFFFFFFFF, 0x000000FF);
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "< Prev", m_x + 20.0f, m_y + 195.0f, baseDepth + 0.06f, COLOR_TEXT_PRIMARY, COLOR_TEXT_SHADOW);
     }
 
     std::string pageStr = std::to_string(m_currentPage + 1) + "/" + std::to_string(totalPages);
     float pW = BitmapFont::width(BitmapFont::FontType::Font1x, pageStr);
     float pX = std::round(m_x + 70.0f + (60.0f - pW) * 0.5f);
-    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, pageStr, pX, m_y + 195.0f, baseDepth + 0.06f, 0xCACFC2FF, 0x000000FF);
+    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, pageStr, pX, m_y + 195.0f, baseDepth + 0.06f, COLOR_TEXT_PRIMARY, COLOR_TEXT_SHADOW);
 
     if (m_currentPage + 1 < totalPages) {
         btnPatch.draw(m_x + 140.0f, m_y + 190.0f, 50.0f, 20.0f, baseDepth + 0.04f);
-        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "Next >", m_x + 148.0f, m_y + 195.0f, baseDepth + 0.06f, 0xFFFFFFFF, 0x000000FF);
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "Next >", m_x + 148.0f, m_y + 195.0f, baseDepth + 0.06f, COLOR_TEXT_PRIMARY, COLOR_TEXT_SHADOW);
     }
 
     // Return button
     btnPatch.draw(m_x + 208.0f, m_y + 190.0f, 70.0f, 20.0f, baseDepth + 0.04f);
-    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "Return", m_x + 225.0f, m_y + 195.0f, baseDepth + 0.06f, 0xFFEBA4FF, 0x000000FF);
+    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "Return", m_x + 225.0f, m_y + 195.0f, baseDepth + 0.06f, COLOR_TEXT_ACCENT, COLOR_TEXT_SHADOW);
 }
 
 } // namespace pd::windows

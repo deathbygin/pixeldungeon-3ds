@@ -154,6 +154,7 @@ void HeroSelectScene::update(float dt, u32 kDown, u32 kHeld, const pd::ui::Touch
 }
 
 void HeroSelectScene::drawTop(C2D_TextBuf textBuf) {
+    (void)textBuf;
     // 1. Draw Colonnade Parallax
     m_archs.drawTop(0.05f);
 
@@ -280,23 +281,24 @@ void HeroSelectScene::drawTop(C2D_TextBuf textBuf) {
     }
 
     // Title using authentic Font2x
-    u32 titleCol = isLocked ? 0xFF5555FF : 0xE4A672FF;
+    u32 titleCol = isLocked ? ui::COLOR_TEXT_WARNING : ui::COLOR_TEXT_ACCENT;
     ui::BitmapFont::draw(ui::BitmapFont::FontType::Font2x, titleStr, panelX + 16.0f, panelY + 12.0f, 0.30f, titleCol);
 
     // HP / STR Header using authentic Font1x
-    u32 hpCol = isLocked ? 0xFFDD44FF : 0x56BB77FF;
+    u32 hpCol = isLocked ? ui::COLOR_TEXT_MUTED : ui::COLOR_TEXT_POSITIVE;
     ui::BitmapFont::draw(ui::BitmapFont::FontType::Font1x, hpStr, panelX + 16.0f, panelY + 34.0f, 0.30f, hpCol);
 
     // Perks Bullets using authentic Font1x
     float lineY = panelY + 54.0f;
     for (const auto& perk : perksList) {
-        u32 col = isLocked ? 0xFFFF44FF : 0xDDDDDDFF;
+        u32 col = isLocked ? ui::COLOR_TEXT_MUTED : ui::COLOR_TEXT_PRIMARY;
         ui::BitmapFont::draw(ui::BitmapFont::FontType::Font1x, perk, panelX + 16.0f, lineY, 0.30f, col);
         lineY += 14.0f;
     }
 }
 
 void HeroSelectScene::drawBottom(C2D_TextBuf textBuf) {
+    (void)textBuf;
     // 1. Draw Colonnade Parallax continuation
     m_archs.drawBottom(0.05f);
 
@@ -326,8 +328,8 @@ void HeroSelectScene::drawBottom(C2D_TextBuf textBuf) {
         const auto& tab = m_tabs[i];
         bool isSelected = (m_currentClass == tab.cl);
 
-        u32 tabBg = isSelected ? C2D_Color32(0x56, 0x30, 0x64, 0xEE) : C2D_Color32(0x22, 0x1d, 0x2a, 0xCC);
-        u32 tabBorder = isSelected ? C2D_Color32(0xe4, 0xa6, 0x72, 0xFF) : C2D_Color32(0x50, 0x42, 0x58, 0xAA);
+        u32 tabBg = isSelected ? C2D_Color32(0x38, 0x38, 0x38, 0xEE) : C2D_Color32(0x20, 0x20, 0x20, 0xCC);
+        u32 tabBorder = isSelected ? C2D_Color32(0xFF, 0xAA, 0x22, 0xFF) : C2D_Color32(0x55, 0x55, 0x55, 0xAA);
 
         C2D_DrawRectSolid(tab.x, tab.y, 0.15f, tab.w, tab.h, tabBg);
         C2D_DrawRectSolid(tab.x, tab.y, 0.16f, tab.w, 1.5f, tabBorder);
@@ -365,13 +367,13 @@ void HeroSelectScene::drawBottom(C2D_TextBuf textBuf) {
         float nameX = tab.x + (tab.w - nW) * 0.5f;
         float nameY = tab.y + 38.0f;
 
-        u32 nameCol = tab.locked ? 0x888888FF : (isSelected ? 0xFFFF88FF : 0xCACFC2FF);
+        u32 nameCol = tab.locked ? ui::COLOR_TEXT_MUTED : (isSelected ? ui::COLOR_TEXT_ACCENT : ui::COLOR_TEXT_PRIMARY);
         ui::BitmapFont::draw(ui::BitmapFont::FontType::Font1x, tab.name, nameX, nameY, 0.25f, nameCol);
 
         if (tab.locked) {
             std::string lockStr = "[LOCKED]";
             float lW = ui::BitmapFont::width(ui::BitmapFont::FontType::Font1x, lockStr);
-            ui::BitmapFont::draw(ui::BitmapFont::FontType::Font1x, lockStr, tab.x + (tab.w - lW) * 0.5f, tab.y + 48.0f, 0.26f, 0xFF4444FF);
+            ui::BitmapFont::draw(ui::BitmapFont::FontType::Font1x, lockStr, tab.x + (tab.w - lW) * 0.5f, tab.y + 48.0f, 0.26f, ui::COLOR_TEXT_WARNING);
         }
     }
 
@@ -385,7 +387,7 @@ void HeroSelectScene::drawBottom(C2D_TextBuf textBuf) {
 
     std::string backStr = "< Back [B]";
     float bW = ui::BitmapFont::width(ui::BitmapFont::FontType::Font1x, backStr);
-    ui::BitmapFont::draw(ui::BitmapFont::FontType::Font1x, backStr, m_btnBackX + (m_btnBackW - bW) * 0.5f, m_btnBackY + 7.0f, 0.25f, 0xEEDDDDFF);
+    ui::BitmapFont::draw(ui::BitmapFont::FontType::Font1x, backStr, m_btnBackX + (m_btnBackW - bW) * 0.5f, m_btnBackY + 7.0f, 0.25f, ui::COLOR_TEXT_PRIMARY);
 
     // Start Button
     bool isCurLocked = (m_currentClass == Hero::HeroClass::Huntress && !m_huntressUnlocked);
@@ -400,7 +402,7 @@ void HeroSelectScene::drawBottom(C2D_TextBuf textBuf) {
 
     std::string startStr = isCurLocked ? "Locked" : "Start Game [A]";
     float sW = ui::BitmapFont::width(ui::BitmapFont::FontType::Font1x, startStr);
-    u32 startCol = isCurLocked ? 0x888888FF : 0xFFFFFFFF;
+    u32 startCol = isCurLocked ? ui::COLOR_TEXT_MUTED : ui::COLOR_TEXT_PRIMARY;
     ui::BitmapFont::draw(ui::BitmapFont::FontType::Font1x, startStr, m_btnStartX + (m_btnStartW - sW) * 0.5f, m_btnStartY + 7.0f, 0.25f, startCol);
 }
 

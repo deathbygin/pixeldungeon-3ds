@@ -323,8 +323,8 @@ void WndItem::draw(C2D_TextBuf textBuf, float baseDepth) const {
 
     // 4. Header: Item Display Name and Subheader
     std::string dName = m_item->displayName();
-    u32 nameCol = (m_item->levelKnown && m_item->level > 0) ? 0x44FF44FF :
-                  (m_item->cursed && m_item->cursedKnown ? 0xFF4444FF : 0xFFEBA4FF);
+    u32 nameCol = (m_item->levelKnown && m_item->level > 0) ? COLOR_TEXT_POSITIVE :
+                  (m_item->cursed && m_item->cursedKnown ? COLOR_TEXT_WARNING : COLOR_TEXT_ACCENT);
 
     float nameX = m_bodyX + 22.0f;
     float titleMaxW = m_usableTextW - 24.0f;
@@ -337,7 +337,7 @@ void WndItem::draw(C2D_TextBuf textBuf, float baseDepth) const {
     }
 
     if (!m_subHeader.empty()) {
-        BitmapFont::draw(BitmapFont::FontType::Font1x, m_subHeader, nameX, m_headerY + 16.0f, zText, 0x8A938CFF);
+        BitmapFont::draw(BitmapFont::FontType::Font1x, m_subHeader, nameX, m_headerY + 16.0f, zText, COLOR_TEXT_MUTED);
     }
 
     // 5. Divider line between header and description body
@@ -352,7 +352,7 @@ void WndItem::draw(C2D_TextBuf textBuf, float baseDepth) const {
     for (size_t i = 0; i < m_descLines.size(); ++i) {
         float lineY = startY + i * lineH;
         if (!m_descLines[i].empty()) {
-            BitmapFont::drawClipped(BitmapFont::FontType::Font1x, m_descLines[i], m_bodyX, lineY, clipTop, clipBottom, zText, 0xCACFC2FF);
+            BitmapFont::drawClipped(BitmapFont::FontType::Font1x, m_descLines[i], m_bodyX, lineY, clipTop, clipBottom, zText, COLOR_TEXT_PRIMARY);
         }
     }
 
@@ -382,7 +382,7 @@ void WndItem::draw(C2D_TextBuf textBuf, float baseDepth) const {
         Chrome::get(Chrome::Type::BUTTON).draw(bx, by, m_btnW, m_btnH, zContent,
                                                0xFFFFFFFF, isSelected ? 1.4f : 1.0f);
 
-        u32 btnCol = (i == 0) ? 0xFFFF44FF : 0xFFFFFFFF;
+        u32 btnCol = (i == 0) ? COLOR_TEXT_ACCENT : COLOR_TEXT_PRIMARY;
         float tw = BitmapFont::width(BitmapFont::FontType::Font1x, m_actions[i]);
         float tx = bx + (m_btnW - tw) * 0.5f;
         BitmapFont::draw(BitmapFont::FontType::Font1x, m_actions[i], tx, by + 5.0f, zText, btnCol);

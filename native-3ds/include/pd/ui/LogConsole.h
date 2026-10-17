@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <deque>
+#include "pd/ui/ColorPalette.h"
 
 namespace pd::ui {
 
@@ -16,7 +17,7 @@ public:
 
     LogConsole() = default;
 
-    void addMessage(std::string msg, u32 color = C2D_Color32(0xFF, 0xFF, 0xFF, 0xFF));
+    void addMessage(std::string msg, u32 color = COLOR_TEXT_PRIMARY);
     void clear();
 
     void draw(C2D_TextBuf textBuf) const;

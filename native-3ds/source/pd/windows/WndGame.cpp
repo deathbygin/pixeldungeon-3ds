@@ -120,8 +120,8 @@ void WndGame::draw(C2D_TextBuf textBuf) {
         float textX = std::round(b.x + (b.w - textW) * 0.5f);
         float textY = std::round(b.y + (b.h - 8.0f) * 0.5f);
 
-        u32 textColor = isSel ? 0xFFEE88FF : 0xFFFFFFFF;
-        pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, b.label, textX, textY, 0.86f, textColor, 0x000000FF);
+        u32 textColor = isSel ? pd::ui::COLOR_TEXT_ACCENT : pd::ui::COLOR_TEXT_PRIMARY;
+        pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, b.label, textX, textY, 0.86f, textColor, pd::ui::COLOR_TEXT_SHADOW);
     }
 }
 
