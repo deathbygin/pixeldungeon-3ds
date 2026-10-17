@@ -434,7 +434,7 @@ void InventoryView::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
             }
 
             // Top-Right: Strength required for weapons and armors
-            if (item->category() == ItemCategory::Weapon) {
+            if (item->category() == ItemCategory::Weapon && !item->asWand()) {
                 auto* w = static_cast<Weapon*>(item);
                 if (w->levelKnown || w->isIdentified()) {
                     int req = std::max(1, w->STR - w->level);

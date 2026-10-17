@@ -64,7 +64,7 @@ bool WndBag::isItemEligible(const pd::Item* it) const {
         case Mode::UPGRADEABLE:
             return it->isUpgradable();
         case Mode::ENCHANTABLE:
-            return (it->category() == ItemCategory::Weapon || it->category() == ItemCategory::Armor);
+            return ((it->category() == ItemCategory::Weapon && !const_cast<Item*>(it)->asWand()) || it->category() == ItemCategory::Armor);
         case Mode::ALL:
         default:
             return true;

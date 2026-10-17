@@ -71,7 +71,7 @@ bool Belongings::collect(std::unique_ptr<Item>& item) {
 }
 
 bool Belongings::equip(std::unique_ptr<Item> item) {
-    if (!item) return false;
+    if (!item || !item->isEquippable() || item->asWand()) return false;
 
     if (item->category() == ItemCategory::Weapon) {
         std::unique_ptr<Weapon> newWeapon(static_cast<Weapon*>(item.release()));
@@ -109,7 +109,7 @@ bool Belongings::equip(std::unique_ptr<Item> item) {
 }
 
 bool Belongings::equip(Item* item) {
-    if (!item) return false;
+    if (!item || !item->isEquippable() || item->asWand()) return false;
     if (item == equippedWeapon || item == equippedArmor || item == equippedRing1 || item == equippedRing2) {
         return true;
     }

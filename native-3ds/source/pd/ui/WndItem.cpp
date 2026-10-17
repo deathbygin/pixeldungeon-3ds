@@ -98,7 +98,11 @@ void WndItem::calculateLayout(pd::Hero* hero) {
 
     // 2. Subheader information (Tier, Strength requirement, Damage, Armor absorbtion, Charges)
     m_subHeader.clear();
-    if (Weapon* w = m_item->asWeapon()) {
+    if (Wand* wand = m_item->asWand()) {
+        if (wand->levelKnown) {
+            m_subHeader = "Charges: " + (wand->curChargeKnown ? std::to_string(wand->curCharges) : "?") + "/" + std::to_string(wand->maxCharges);
+        }
+    } else if (Weapon* w = m_item->asWeapon()) {
         bool identified = w->levelKnown;
         int reqStr = identified ? w->STR : w->typicalSTR();
         m_subHeader = "STR: " + (identified ? std::to_string(reqStr) : ("?" + std::to_string(reqStr)));
@@ -112,10 +116,6 @@ void WndItem::calculateLayout(pd::Hero* hero) {
         if (identified) {
             int maxDr = a->tier * 2 + a->level;
             m_subHeader += "  DR: 0-" + std::to_string(maxDr);
-        }
-    } else if (Wand* wand = m_item->asWand()) {
-        if (wand->levelKnown) {
-            m_subHeader = "Charges: " + (wand->curChargeKnown ? std::to_string(wand->curCharges) : "?") + "/" + std::to_string(wand->maxCharges);
         }
     } else if (m_item->quantity > 1) {
         m_subHeader = "Quantity: " + std::to_string(m_item->quantity);

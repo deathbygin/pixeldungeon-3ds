@@ -712,20 +712,10 @@ void Wand::setKnown() {
     setKnown(wandType);
 }
 
-bool Wand::isEquippable() const {
-    return Dungeon::hero && Dungeon::hero->heroClass == Hero::HeroClass::Mage;
-}
-
 std::vector<std::string> Wand::actions(Hero* hero) {
+    (void)hero;
     std::vector<std::string> acts;
     acts.push_back("ZAP");
-    if (hero && hero->heroClass == Hero::HeroClass::Mage) {
-        if (hero->belongings.equippedWeapon == this) {
-            acts.push_back("UNEQUIP");
-        } else {
-            acts.push_back("EQUIP");
-        }
-    }
     acts.push_back("THROW");
     acts.push_back("DROP");
     return acts;
@@ -747,6 +737,9 @@ bool Wand::execute(Hero* hero, const std::string& action) {
         }
         cast(hero, targetCell);
         return true;
+    }
+    if (action == "EQUIP" || action == "UNEQUIP") {
+        return false;
     }
     return Weapon::execute(hero, action);
 }

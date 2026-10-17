@@ -199,8 +199,9 @@ public:
 
     explicit Wand(std::string n = "Wand", int initialC = 2, WandType tp = WandType::Teleportation);
     Wand* asWand() override { return this; }
+    Weapon* asWeapon() override { return nullptr; }
     ItemCategory category() const override { return ItemCategory::Weapon; }
-    bool isEquippable() const override;
+    bool isEquippable() const override { return false; }
     bool isUpgradable() const override { return true; }
     bool isIdentified() const override { return Weapon::isIdentified() && isKnown() && curChargeKnown; }
     bool isKnown() const;

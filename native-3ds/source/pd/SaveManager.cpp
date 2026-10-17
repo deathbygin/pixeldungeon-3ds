@@ -758,7 +758,7 @@ bool SaveManager::loadGame(const std::string& customPath) {
             } else if (item->asWand()) {
                 item->asWand()->updatePerception();
             }
-            if (isEquippedWeapon == 1 && item->category() == ItemCategory::Weapon) {
+            if (isEquippedWeapon == 1 && item->category() == ItemCategory::Weapon && !item->asWand()) {
                 hero->belongings.weaponSlot = std::unique_ptr<Weapon>(static_cast<Weapon*>(item.release()));
                 hero->belongings.equippedWeapon = hero->belongings.weaponSlot.get();
             } else if (isEquippedArmor == 1 && item->category() == ItemCategory::Armor) {
