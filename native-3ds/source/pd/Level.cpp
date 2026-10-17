@@ -394,22 +394,19 @@ void Level::affectWell(int cell, Char* ch) {
             if (Weapon* w = item->asWeapon()) {
                 if (w->category() == Item::ItemCategory::Weapon) {
                     std::string newName;
-                    int newMin = w->minDamage;
-                    int newMax = w->maxDamage;
-                    int newStr = w->STR;
-                    if (w->name == "Knuckles" || w->name == "Knuckleduster") { newName = "Dagger"; newMin = 2; newMax = 5; newStr = 10; }
-                    else if (w->name == "Dagger") { newName = "Knuckles"; newMin = 1; newMax = 6; newStr = 10; }
-                    else if (w->name == "Spear") { newName = "Quarterstaff"; newMin = 2; newMax = 8; newStr = 12; }
-                    else if (w->name == "Quarterstaff" || w->name == "Shortsword") { newName = "Spear"; newMin = 2; newMax = 9; newStr = 12; }
-                    else if (w->name == "Sword") { newName = "Mace"; newMin = 4; newMax = 10; newStr = 14; }
-                    else if (w->name == "Mace") { newName = "Sword"; newMin = 3; newMax = 11; newStr = 14; }
-                    else if (w->name == "Longsword") { newName = "Battle Axe"; newMin = 5; newMax = 14; newStr = 16; }
-                    else if (w->name == "Battle Axe") { newName = "Longsword"; newMin = 4; newMax = 15; newStr = 16; }
-                    else if (w->name == "Glaive") { newName = "War Hammer"; newMin = 7; newMax = 17; newStr = 18; }
-                    else if (w->name == "War Hammer") { newName = "Glaive"; newMin = 6; newMax = 18; newStr = 18; }
-                    else { newName = "Sword"; newMin = 3; newMax = 11; newStr = 14; }
+                    if (w->name == "Knuckles" || w->name == "Knuckleduster" || w->name == "knuckleduster") { newName = "Dagger"; }
+                    else if (w->name == "Dagger" || w->name == "dagger") { newName = "Knuckles"; }
+                    else if (w->name == "Spear" || w->name == "spear") { newName = "Quarterstaff"; }
+                    else if (w->name == "Quarterstaff" || w->name == "quarterstaff" || w->name == "Shortsword" || w->name == "short sword") { newName = "Spear"; }
+                    else if (w->name == "Sword" || w->name == "sword") { newName = "Mace"; }
+                    else if (w->name == "Mace" || w->name == "mace") { newName = "Sword"; }
+                    else if (w->name == "Longsword" || w->name == "longsword") { newName = "Battle Axe"; }
+                    else if (w->name == "Battle Axe" || w->name == "battle axe") { newName = "Longsword"; }
+                    else if (w->name == "Glaive" || w->name == "glaive") { newName = "War Hammer"; }
+                    else if (w->name == "War Hammer" || w->name == "war hammer") { newName = "Glaive"; }
+                    else { newName = "Sword"; }
 
-                    auto nw = std::make_unique<Weapon>(newName, newMin, newMax, newStr);
+                    auto nw = Weapon::createByName(newName);
                     nw->level = w->level;
                     nw->cursed = w->cursed;
                     nw->enchantment = w->enchantment;

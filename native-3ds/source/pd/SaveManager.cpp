@@ -730,8 +730,10 @@ bool SaveManager::loadGame(const std::string& customPath) {
                 wand->usagesToKnow = htk;
                 item = std::move(wand);
             } else {
-                auto weapon = std::make_unique<Weapon>(iName, minD, maxD, sReq);
+                auto weapon = Weapon::createByName(iName);
+                if (!weapon) weapon = std::make_unique<Weapon>(iName, minD, maxD, sReq);
                 weapon->hitsToKnow = htk;
+                weapon->STR = sReq;
                 item = std::move(weapon);
             }
         } else if (cat == ItemCategory::Armor) {
@@ -936,8 +938,10 @@ bool SaveManager::loadGame(const std::string& customPath) {
                         wand->usagesToKnow = htk;
                         item = std::move(wand);
                     } else {
-                        auto weapon = std::make_unique<Weapon>(iName, minD, maxD, sReq);
+                        auto weapon = Weapon::createByName(iName);
+                        if (!weapon) weapon = std::make_unique<Weapon>(iName, minD, maxD, sReq);
                         weapon->hitsToKnow = htk;
+                        weapon->STR = sReq;
                         item = std::move(weapon);
                     }
                 } else if (cat == ItemCategory::Armor) {

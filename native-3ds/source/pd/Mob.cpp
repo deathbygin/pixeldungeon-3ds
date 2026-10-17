@@ -1065,7 +1065,7 @@ Statue::Statue() {
     };
     int tier = std::min(5, 1 + Dungeon::depth / 5);
     int idx = std::min(static_cast<int>(sizeof(s_weapons)/sizeof(s_weapons[0]) - 1), (tier - 1) * 2 + Random::Int(2));
-    auto w = std::make_unique<Weapon>(s_weapons[idx].name, s_weapons[idx].min, s_weapons[idx].max, s_weapons[idx].str);
+    auto w = Weapon::createByName(s_weapons[idx].name);
     w->random();
     if (w->level < 0) w->level = 0;
     w->identify();
@@ -1817,7 +1817,7 @@ std::unique_ptr<Item> Mimic::createChestDrop() {
     } else if (roll < 0.85f) {
         item = std::make_unique<Gold>(Random::IntRange(10 * Dungeon::depth, 30 * Dungeon::depth));
     } else if (roll < 0.93f) {
-        auto w = std::make_unique<Weapon>("Sword", 3, 8 + Dungeon::depth, 10 + Dungeon::depth);
+        auto w = Weapon::createByName("Sword");
         w->random();
         item = std::move(w);
     } else {

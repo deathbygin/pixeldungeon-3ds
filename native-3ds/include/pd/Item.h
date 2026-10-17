@@ -89,14 +89,20 @@ public:
     }
 
     virtual std::string info() const;
+    virtual std::string desc() const { return ""; }
     virtual std::string displayName() const;
     virtual int price() const { return 0; }
+    int considerState(int basePrice) const;
     void notifyIdentified(Hero* hero = nullptr);
+    int visiblyUpgraded() const { return levelKnown ? level : 0; }
+    bool visiblyCursed() const { return cursed && cursedKnown; }
+    bool visiblyBroken() const { return levelKnown && isBroken(); }
 
     virtual Weapon* asWeapon() { return nullptr; }
     virtual Armor* asArmor() { return nullptr; }
     virtual Wand* asWand() { return nullptr; }
     virtual MissileWeapon* asMissile() { return nullptr; }
+    virtual const MissileWeapon* asMissile() const { return nullptr; }
     virtual Boomerang* asBoomerang() { return nullptr; }
     virtual Dart* asDart() { return nullptr; }
     virtual ShortSword* asShortSword() { return nullptr; }
@@ -111,11 +117,22 @@ class Weapon : public Item {
 public:
     static constexpr int HITS_TO_KNOW = 20;
 
+    int tier = 1;
     int minDamage = 1;
     int maxDamage = 6;
     int STR = 10;
+    float ACU = 1.0f;
+    float DLY = 1.0f;
     int hitsToKnow = HITS_TO_KNOW;
 
+    enum class Imbue {
+        NONE,
+        SPEED,
+        ACCURACY
+    };
+    Imbue imbue = Imbue::NONE;
+
+    Weapon() = default;
     Weapon(std::string n, int minD, int maxD, int strReq);
     Weapon* asWeapon() override { return this; }
     ItemCategory category() const override { return ItemCategory::Weapon; }
@@ -132,6 +149,14 @@ public:
     std::string info() const override;
     std::string displayName() const override;
     virtual int typicalSTR() const;
+
+    virtual int min0() const;
+    virtual int max0() const;
+    virtual int min() const;
+    virtual int max() const;
+    virtual int reach() const { return 1; }
+    virtual int defenseBonus() const { return 0; }
+    virtual int maxDurability(int lvl) const { return 5 * (lvl < 16 ? 16 - lvl : 1); }
 
     enum class Enchantment {
         NONE,
@@ -152,15 +177,100 @@ public:
     virtual int damageRoll() const;
     virtual int damageRoll(Hero* hero) const;
     virtual void proc(Char* attacker, Char* defender, int damage);
+
+    static std::unique_ptr<Weapon> createByName(const std::string& name);
 };
 
-class ShortSword : public Weapon {
+class MeleeWeapon : public Weapon {
+public:
+    MeleeWeapon(std::string n, int t, float acu = 1.0f, float dly = 1.0f);
+    std::string info() const override;
+    int price() const override;
+};
+
+class Dagger : public MeleeWeapon {
+public:
+    Dagger();
+    std::string desc() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class Knuckles : public MeleeWeapon {
+public:
+    Knuckles();
+    std::string desc() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class ShortSword : public MeleeWeapon {
 public:
     ShortSword();
     ShortSword* asShortSword() override { return this; }
+    int max0() const override { return 12; }
     std::vector<std::string> actions(Hero* hero) override;
     bool execute(Hero* hero, const std::string& action) override;
+    std::string desc() const override;
     std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class Quarterstaff : public MeleeWeapon {
+public:
+    Quarterstaff();
+    int defenseBonus() const override { return 2 + std::max(0, level) / 2; }
+    std::string desc() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class Spear : public MeleeWeapon {
+public:
+    Spear();
+    int reach() const override { return 2; }
+    std::string desc() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class Sword : public MeleeWeapon {
+public:
+    Sword();
+    std::string desc() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class Mace : public MeleeWeapon {
+public:
+    Mace();
+    std::string desc() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class Longsword : public MeleeWeapon {
+public:
+    Longsword();
+    std::string desc() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class BattleAxe : public MeleeWeapon {
+public:
+    BattleAxe();
+    std::string desc() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class WarHammer : public MeleeWeapon {
+public:
+    WarHammer();
+    std::string desc() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class Glaive : public MeleeWeapon {
+public:
+    Glaive();
+    int reach() const override { return 2; }
+    int max0() const override { return 30; }
+    std::string desc() const override;
     std::unique_ptr<Item> clone(int qty = 1) const override;
 };
 
@@ -634,6 +744,7 @@ class MissileWeapon : public Weapon {
 public:
     MissileWeapon(std::string n, int minD, int maxD, int strReq);
     MissileWeapon* asMissile() override { return this; }
+    const MissileWeapon* asMissile() const override { return this; }
 
     bool isEquippable() const override { return false; }
     bool isStackable() const override { return true; }
@@ -647,62 +758,82 @@ public:
     float acuracyFactor(Hero* hero) const override;
     float speedFactor(Hero* hero) const override;
     int maxDistance(const Hero* hero = nullptr) const override;
+    std::string info() const override;
+    std::string desc() const override { return ""; }
 };
 
 class Dart : public MissileWeapon {
 public:
     Dart(int number = 1);
     Dart* asDart() override { return this; }
+    int min0() const override { return 1; }
+    int max0() const override { return 4; }
+    int price() const override { return 2 * quantity; }
     Item* random() override;
-    std::string info() const override;
+    std::string desc() const override;
     std::unique_ptr<Item> clone(int qty = 1) const override;
 };
 
 class IncendiaryDart : public MissileWeapon {
 public:
     IncendiaryDart(int number = 1);
+    int min0() const override { return 1; }
+    int max0() const override { return 2; }
+    int price() const override { return 10 * quantity; }
     Item* random() override;
     void onThrow(int cell) override;
     void proc(Char* attacker, Char* defender, int damage) override;
-    std::string info() const override;
+    std::string desc() const override;
     std::unique_ptr<Item> clone(int qty = 1) const override;
 };
 
 class CurareDart : public MissileWeapon {
 public:
     CurareDart(int number = 1);
+    int min0() const override { return 1; }
+    int max0() const override { return 3; }
+    int price() const override { return 12 * quantity; }
     Item* random() override;
     void proc(Char* attacker, Char* defender, int damage) override;
-    std::string info() const override;
+    std::string desc() const override;
     std::unique_ptr<Item> clone(int qty = 1) const override;
 };
 
 class Javelin : public MissileWeapon {
 public:
     Javelin(int number = 1);
+    int min0() const override { return 2; }
+    int max0() const override { return 15; }
+    int price() const override { return 15 * quantity; }
     Item* random() override;
     void proc(Char* attacker, Char* defender, int damage) override;
     int maxDistance(const Hero* hero = nullptr) const override;
-    std::string info() const override;
+    std::string desc() const override;
     std::unique_ptr<Item> clone(int qty = 1) const override;
 };
 
 class Shuriken : public MissileWeapon {
 public:
     Shuriken(int number = 1);
+    int min0() const override { return 2; }
+    int max0() const override { return 6; }
+    int price() const override { return 15 * quantity; }
     Item* random() override;
     float speedFactor(Hero* hero) const override;
-    std::string info() const override;
+    std::string desc() const override;
     std::unique_ptr<Item> clone(int qty = 1) const override;
 };
 
 class Tamahawk : public MissileWeapon {
 public:
     Tamahawk(int number = 1);
+    int min0() const override { return 4; }
+    int max0() const override { return 20; }
+    int price() const override { return 20 * quantity; }
     Item* random() override;
     void proc(Char* attacker, Char* defender, int damage) override;
     int maxDistance(const Hero* hero = nullptr) const override;
-    std::string info() const override;
+    std::string desc() const override;
     std::unique_ptr<Item> clone(int qty = 1) const override;
 };
 
@@ -716,9 +847,12 @@ public:
 
     bool throwEquipped = false;
 
-    int min() const;
-    int max() const;
+    int min0() const override { return 1; }
+    int max0() const override { return 4; }
+    int min() const override;
+    int max() const override;
     int damageRoll() const override;
+    int price() const override;
 
     void cast(Hero* hero, int targetCell) override;
     void onThrow(int cell) override;
@@ -726,6 +860,7 @@ public:
     void proc(Char* attacker, Char* defender, int damage) override;
     void circleBack(int fromCell, Hero* owner);
     int maxDistance(const Hero* hero = nullptr) const override;
+    std::string desc() const override;
     std::string info() const override;
     std::unique_ptr<Item> clone(int qty = 1) const override;
 };

@@ -58,6 +58,7 @@ public:
     virtual void place(int cell);
     virtual int stealth() const { return 0; }
     virtual float speed() const;
+    virtual float attackDelay() const { return 1.0f; }
     bool isAlive() const { return HP > 0; }
     bool isCharmedBy(Char* ch) const;
     void unfreeze();

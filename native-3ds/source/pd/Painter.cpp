@@ -598,7 +598,7 @@ static std::unique_ptr<Item> randomWeapon(int minTier = 1, int maxTier = 5) {
     }
     if (candidates.empty()) candidates.push_back(&s_weapons[0]);
     const WeapDef* chosen = candidates[Random::Int(static_cast<int>(candidates.size()))];
-    auto w = std::make_unique<Weapon>(chosen->name, chosen->min, chosen->max, chosen->str);
+    auto w = Weapon::createByName(chosen->name);
     w->random();
     return w;
 }

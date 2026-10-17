@@ -509,7 +509,7 @@ void RegularLevel::createItems() {
         } else if (roll < 0.85f) {
             item = std::make_unique<Gold>(Random::IntRange(10 * Dungeon::depth, 30 * Dungeon::depth));
         } else if (roll < 0.93f) {
-            auto w = std::make_unique<Weapon>("Sword", 3, 8 + Dungeon::depth, 10 + Dungeon::depth);
+            auto w = Weapon::createByName("Sword");
             w->random();
             item = std::move(w);
         } else {

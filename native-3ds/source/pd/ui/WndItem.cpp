@@ -105,10 +105,15 @@ void WndItem::calculateLayout(pd::Hero* hero) {
     } else if (Weapon* w = m_item->asWeapon()) {
         bool identified = w->levelKnown;
         int reqStr = identified ? w->STR : w->typicalSTR();
-        m_subHeader = "STR: " + (identified ? std::to_string(reqStr) : ("?" + std::to_string(reqStr)));
-        if (identified) {
-            m_subHeader += "  Dmg: " + std::to_string(w->minDamage) + "-" + std::to_string(w->maxDamage);
+        std::string sub;
+        if (w->tier > 0) {
+            sub += "Tier " + std::to_string(w->tier) + "  ";
         }
+        sub += "STR: " + (identified ? std::to_string(reqStr) : ("?" + std::to_string(reqStr)));
+        if (identified) {
+            sub += "  Dmg: " + std::to_string(w->min()) + "-" + std::to_string(w->max());
+        }
+        m_subHeader = sub;
     } else if (Armor* a = m_item->asArmor()) {
         bool identified = a->levelKnown;
         int reqStr = identified ? a->STR : a->typicalSTR();

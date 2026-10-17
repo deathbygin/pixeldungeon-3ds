@@ -46,6 +46,24 @@ void Item::notifyIdentified(Hero* hero) {
     GLog::i("You are now familiar enough with your " + displayName() + " to identify it.");
 }
 
+int Item::considerState(int basePrice) const {
+    int p = basePrice;
+    if (cursed && cursedKnown) {
+        p /= 2;
+    }
+    if (levelKnown) {
+        if (level > 0) {
+            p *= (level + 1);
+            if (isBroken()) {
+                p /= 2;
+            }
+        } else if (level < 0) {
+            p /= (1 - level);
+        }
+    }
+    return p < 1 ? 1 : p;
+}
+
 bool Item::isEquipped(const Hero* hero) const {
     if (!hero) return false;
     return (this == hero->belongings.equippedWeapon ||
@@ -218,17 +236,17 @@ bool Item::execute(Hero* hero) {
 Weapon::Weapon(std::string n, int minD, int maxD, int strReq)
     : minDamage(minD), maxDamage(maxD), STR(strReq) {
     name = std::move(n);
-    if (name == "Shortsword") image = ItemSpriteSheet::SHORT_SWORD;
-    else if (name == "Longsword") image = ItemSpriteSheet::LONG_SWORD;
-    else if (name == "Dagger") image = ItemSpriteSheet::DAGGER;
-    else if (name == "Mace") image = ItemSpriteSheet::MACE;
-    else if (name == "Battle Axe") image = ItemSpriteSheet::BATTLE_AXE;
-    else if (name == "War Hammer") image = ItemSpriteSheet::WAR_HAMMER;
-    else if (name == "Sword") image = ItemSpriteSheet::SWORD;
-    else if (name == "Knuckles" || name == "Knuckleduster") image = ItemSpriteSheet::KNUCKLEDUSTER;
-    else if (name == "Quarterstaff") image = ItemSpriteSheet::QUARTERSTAFF;
-    else if (name == "Spear") image = ItemSpriteSheet::SPEAR;
-    else if (name == "Glaive") image = ItemSpriteSheet::GLAIVE;
+    if (name == "Shortsword" || name == "short sword") image = ItemSpriteSheet::SHORT_SWORD;
+    else if (name == "Longsword" || name == "longsword") image = ItemSpriteSheet::LONG_SWORD;
+    else if (name == "Dagger" || name == "dagger") image = ItemSpriteSheet::DAGGER;
+    else if (name == "Mace" || name == "mace") image = ItemSpriteSheet::MACE;
+    else if (name == "Battle Axe" || name == "battle axe") image = ItemSpriteSheet::BATTLE_AXE;
+    else if (name == "War Hammer" || name == "war hammer") image = ItemSpriteSheet::WAR_HAMMER;
+    else if (name == "Sword" || name == "sword") image = ItemSpriteSheet::SWORD;
+    else if (name == "Knuckles" || name == "Knuckleduster" || name == "knuckleduster") image = ItemSpriteSheet::KNUCKLEDUSTER;
+    else if (name == "Quarterstaff" || name == "quarterstaff") image = ItemSpriteSheet::QUARTERSTAFF;
+    else if (name == "Spear" || name == "spear") image = ItemSpriteSheet::SPEAR;
+    else if (name == "Glaive" || name == "glaive") image = ItemSpriteSheet::GLAIVE;
     else {
         if (STR <= 10) image = ItemSpriteSheet::DAGGER;
         else if (STR <= 12) image = ItemSpriteSheet::SHORT_SWORD;
@@ -238,12 +256,34 @@ Weapon::Weapon(std::string n, int minD, int maxD, int strReq)
     }
 }
 
+int Weapon::min0() const {
+    return tier > 0 ? tier : minDamage;
+}
+
+int Weapon::max0() const {
+    if (tier > 0) {
+        return static_cast<int>((tier * tier - tier + 10) / ACU * DLY);
+    }
+    return maxDamage;
+}
+
+int Weapon::min() const {
+    return isBroken() ? min0() : min0() + level;
+}
+
+int Weapon::max() const {
+    return isBroken() ? max0() : max0() + level * (tier > 0 ? tier : 1);
+}
+
 int Weapon::typicalSTR() const {
-    if (name == "Dagger" || name == "Knuckles" || name == "Knuckleduster") return 10;
-    if (name == "Shortsword" || name == "Spear" || name == "Quarterstaff") return 12;
-    if (name == "Sword" || name == "Mace") return 14;
-    if (name == "Longsword" || name == "Battle Axe") return 16;
-    if (name == "War Hammer" || name == "Glaive") return 18;
+    if (tier > 0) {
+        return 8 + tier * 2;
+    }
+    if (name == "Dagger" || name == "Knuckles" || name == "Knuckleduster" || name == "knuckleduster" || name == "dagger") return 10;
+    if (name == "Shortsword" || name == "short sword" || name == "Spear" || name == "spear" || name == "Quarterstaff" || name == "quarterstaff") return 12;
+    if (name == "Sword" || name == "sword" || name == "Mace" || name == "mace") return 14;
+    if (name == "Longsword" || name == "longsword" || name == "Battle Axe" || name == "battle axe") return 16;
+    if (name == "War Hammer" || name == "war hammer" || name == "Glaive" || name == "glaive") return 18;
     return STR + (levelKnown ? level : 0);
 }
 
@@ -366,28 +406,42 @@ bool Weapon::execute(Hero* hero, const std::string& action) {
 
 std::string Weapon::info() const {
     if (levelKnown) {
-        return "Damage: " + std::to_string(minDamage + level) + "-" + std::to_string(maxDamage + level) +
-               " | STR required: " + std::to_string(std::max(1, STR - level));
+        return "Damage: " + std::to_string(min()) + "-" + std::to_string(max()) +
+               " | STR required: " + std::to_string(std::max(1, STR));
     } else {
-        return "Typical " + name + " deals " + std::to_string(minDamage) + "-" + std::to_string(maxDamage) +
-               " damage and requires " + std::to_string(STR) + " points of strength.";
+        return "Typical " + name + " deals " + std::to_string(min0()) + "-" + std::to_string(max0()) +
+               " damage and requires " + std::to_string(typicalSTR()) + " points of strength.";
     }
 }
 
 float Weapon::acuracyFactor(Hero* hero) const {
-    if (!hero) return 1.0f;
+    if (!hero) return ACU;
     int encumbrance = STR - hero->STR;
-    return (encumbrance > 0) ? static_cast<float>(1.0 / std::pow(1.5, encumbrance)) : 1.0f;
+    if (asMissile()) {
+        if (hero->heroClass == Hero::HeroClass::Warrior) {
+            encumbrance += 3;
+        } else if (hero->heroClass == Hero::HeroClass::Huntress) {
+            encumbrance -= 2;
+        }
+    }
+    float factor = (encumbrance > 0) ? static_cast<float>(ACU / std::pow(1.5, encumbrance)) : ACU;
+    if (imbue == Imbue::ACCURACY) factor *= 1.5f;
+    return factor;
 }
 
 float Weapon::speedFactor(Hero* hero) const {
-    if (!hero) return 1.0f;
+    if (!hero) return DLY;
     int encumbrance = STR - hero->STR;
-    return (encumbrance > 0) ? static_cast<float>(std::pow(1.2, encumbrance)) : 1.0f;
+    if (asMissile() && hero->heroClass == Hero::HeroClass::Huntress) {
+        encumbrance -= 2;
+    }
+    float factor = (encumbrance > 0) ? static_cast<float>(DLY * std::pow(1.2, encumbrance)) : DLY;
+    if (imbue == Imbue::SPEED) factor *= 0.6f;
+    return factor;
 }
 
 int Weapon::damageRoll() const {
-    return Random::IntRange(minDamage, maxDamage) + level;
+    return Random::NormalIntRange(min(), max());
 }
 
 int Weapon::damageRoll(Hero* hero) const {
@@ -403,6 +457,30 @@ int Weapon::damageRoll(Hero* hero) const {
         }
     }
     return dmg;
+}
+
+std::unique_ptr<Weapon> Weapon::createByName(const std::string& rawName) {
+    std::string n = rawName;
+    std::transform(n.begin(), n.end(), n.begin(), ::tolower);
+    if (n.find("dagger") != std::string::npos) return std::make_unique<Dagger>();
+    if (n.find("knuckle") != std::string::npos) return std::make_unique<Knuckles>();
+    if (n.find("short") != std::string::npos && n.find("sword") != std::string::npos) return std::make_unique<ShortSword>();
+    if (n.find("quarterstaff") != std::string::npos) return std::make_unique<Quarterstaff>();
+    if (n.find("spear") != std::string::npos) return std::make_unique<Spear>();
+    if (n.find("longsword") != std::string::npos) return std::make_unique<Longsword>();
+    if (n.find("sword") != std::string::npos) return std::make_unique<Sword>();
+    if (n.find("mace") != std::string::npos) return std::make_unique<Mace>();
+    if (n.find("battle") != std::string::npos || n.find("axe") != std::string::npos) return std::make_unique<BattleAxe>();
+    if (n.find("hammer") != std::string::npos) return std::make_unique<WarHammer>();
+    if (n.find("glaive") != std::string::npos) return std::make_unique<Glaive>();
+    if (n.find("boomerang") != std::string::npos) return std::make_unique<Boomerang>();
+    if (n.find("incendiary") != std::string::npos) return std::make_unique<IncendiaryDart>();
+    if (n.find("curare") != std::string::npos) return std::make_unique<CurareDart>();
+    if (n.find("dart") != std::string::npos) return std::make_unique<Dart>();
+    if (n.find("javelin") != std::string::npos) return std::make_unique<Javelin>();
+    if (n.find("shuriken") != std::string::npos) return std::make_unique<Shuriken>();
+    if (n.find("tomahawk") != std::string::npos || n.find("tamahawk") != std::string::npos) return std::make_unique<Tamahawk>();
+    return std::make_unique<Weapon>(rawName, 3, 8, 12);
 }
 
 void Weapon::upgrade(bool enchant) {
@@ -507,10 +585,132 @@ void Weapon::proc(Char* attacker, Char* defender, int damage) {
 }
 
 // -----------------------------------------------------------------------------
-// ShortSword
+// MeleeWeapon
 // -----------------------------------------------------------------------------
-ShortSword::ShortSword() : Weapon("Shortsword", 3, 8, 11) {
+MeleeWeapon::MeleeWeapon(std::string n, int t, float acu, float dly) {
+    name = std::move(n);
+    tier = t;
+    ACU = acu;
+    DLY = dly;
+    STR = typicalSTR();
+}
+
+int MeleeWeapon::price() const {
+    int basePrice = 20 * (1 << (tier - 1));
+    if (isEnchanted()) {
+        basePrice = static_cast<int>(basePrice * 1.5f);
+    }
+    return considerState(basePrice);
+}
+
+std::string MeleeWeapon::info() const {
+    std::string s = desc();
+    s += "\n\n";
+
+    int lvl = visiblyUpgraded();
+    std::string quality = (lvl != 0) ? ((lvl > 0) ? (isBroken() ? "broken" : "upgraded") : "degraded") : "";
+    std::string indef = quality.empty() ? "a" : ((quality[0] == 'u' || quality[0] == 'a' || quality[0] == 'e' || quality[0] == 'i' || quality[0] == 'o') ? "an " + quality : "a " + quality);
+    s += "This " + name + " is " + indef + " tier-" + std::to_string(tier) + " melee weapon. ";
+
+    if (levelKnown) {
+        int mn = min();
+        int mx = max();
+        s += "Its average damage is " + std::to_string(mn + (mx - mn) / 2) + " points per hit. ";
+    } else {
+        int mn = min0();
+        int mx = max0();
+        s += "Its typical average damage is " + std::to_string(mn + (mx - mn) / 2) + " points per hit and usually it requires " + std::to_string(typicalSTR()) + " points of strength. ";
+        if (Dungeon::hero && typicalSTR() > Dungeon::hero->STR) {
+            s += "Probably this weapon is too heavy for you. ";
+        }
+    }
+
+    if (DLY != 1.0f) {
+        s += "This is a rather " + std::string(DLY < 1.0f ? "fast" : "slow");
+        if (ACU != 1.0f) {
+            if ((ACU > 1.0f) == (DLY < 1.0f)) {
+                s += " and ";
+            } else {
+                s += " but ";
+            }
+            s += (ACU > 1.0f ? "accurate" : "inaccurate");
+        }
+        s += " weapon. ";
+    } else if (ACU != 1.0f) {
+        s += "This is a rather " + std::string(ACU > 1.0f ? "accurate" : "inaccurate") + " weapon. ";
+    }
+
+    if (imbue == Imbue::SPEED) {
+        s += "It was balanced to make it faster. ";
+    } else if (imbue == Imbue::ACCURACY) {
+        s += "It was balanced to make it more accurate. ";
+    }
+
+    if (isEnchanted()) {
+        s += "It is enchanted. ";
+    }
+
+    if (levelKnown && Dungeon::hero) {
+        if (STR > Dungeon::hero->STR) {
+            s += "\n\nBecause of your inadequate strength the accuracy and speed of your attack with this " + name + " is decreased.";
+        } else if (STR < Dungeon::hero->STR) {
+            s += "\n\nBecause of your excess strength the damage of your attack with this " + name + " is increased.";
+        }
+    }
+
+    if (Dungeon::hero && Dungeon::hero->belongings.equippedWeapon == this) {
+        s += "\n\nYou hold the " + name + " at the ready" + (cursed ? ", and because it is cursed, you are powerless to let go." : ".");
+    } else if (cursedKnown && cursed) {
+        s += "\n\nYou can feel a malevolent magic lurking within " + name + ".";
+    }
+
+    return s;
+}
+
+// Dagger
+Dagger::Dagger() : MeleeWeapon("dagger", 1, 1.2f, 1.0f) {
+    image = ItemSpriteSheet::DAGGER;
+}
+std::string Dagger::desc() const {
+    return "A simple iron dagger with a well worn wooden handle.";
+}
+std::unique_ptr<Item> Dagger::clone(int qty) const {
+    auto d = std::make_unique<Dagger>();
+    d->level = level;
+    d->quantity = qty;
+    d->identified = identified;
+    d->levelKnown = levelKnown;
+    d->cursed = cursed;
+    d->cursedKnown = cursedKnown;
+    d->enchantment = enchantment;
+    d->imbue = imbue;
+    return d;
+}
+
+// Knuckles
+Knuckles::Knuckles() : MeleeWeapon("knuckleduster", 1, 1.0f, 0.5f) {
+    image = ItemSpriteSheet::KNUCKLEDUSTER;
+}
+std::string Knuckles::desc() const {
+    return "A piece of iron shaped to fit around the knuckles.";
+}
+std::unique_ptr<Item> Knuckles::clone(int qty) const {
+    auto k = std::make_unique<Knuckles>();
+    k->level = level;
+    k->quantity = qty;
+    k->identified = identified;
+    k->levelKnown = levelKnown;
+    k->cursed = cursed;
+    k->cursedKnown = cursedKnown;
+    k->enchantment = enchantment;
+    k->imbue = imbue;
+    return k;
+}
+
+// ShortSword
+ShortSword::ShortSword() : MeleeWeapon("short sword", 1, 1.0f, 1.0f) {
     image = ItemSpriteSheet::SHORT_SWORD;
+    STR = 11;
 }
 
 std::vector<std::string> ShortSword::actions(Hero* hero) {
@@ -560,8 +760,14 @@ bool ShortSword::execute(Hero* hero, const std::string& action) {
     return Weapon::execute(hero, action);
 }
 
+std::string ShortSword::desc() const {
+    return "It is indeed quite short, just a few inches longer, than a dagger.";
+}
+
 std::string ShortSword::info() const {
-    return "It is indeed quite short, just a few inches longer than a dagger. When upgraded, it can be reforged to upgrade another melee weapon.";
+    std::string s = MeleeWeapon::info();
+    s += "\n\nWhen upgraded, it can be reforged to upgrade another melee weapon.";
+    return s;
 }
 
 std::unique_ptr<Item> ShortSword::clone(int qty) const {
@@ -570,7 +776,171 @@ std::unique_ptr<Item> ShortSword::clone(int qty) const {
     s->quantity = qty;
     s->identified = identified;
     s->levelKnown = levelKnown;
+    s->cursed = cursed;
+    s->cursedKnown = cursedKnown;
+    s->enchantment = enchantment;
+    s->imbue = imbue;
     return s;
+}
+
+// Quarterstaff
+Quarterstaff::Quarterstaff() : MeleeWeapon("quarterstaff", 2, 1.0f, 1.0f) {
+    image = ItemSpriteSheet::QUARTERSTAFF;
+}
+std::string Quarterstaff::desc() const {
+    return "A staff of hardwood, its ends are shod with iron.";
+}
+std::unique_ptr<Item> Quarterstaff::clone(int qty) const {
+    auto q = std::make_unique<Quarterstaff>();
+    q->level = level;
+    q->quantity = qty;
+    q->identified = identified;
+    q->levelKnown = levelKnown;
+    q->cursed = cursed;
+    q->cursedKnown = cursedKnown;
+    q->enchantment = enchantment;
+    q->imbue = imbue;
+    return q;
+}
+
+// Spear
+Spear::Spear() : MeleeWeapon("spear", 2, 1.0f, 1.5f) {
+    image = ItemSpriteSheet::SPEAR;
+}
+std::string Spear::desc() const {
+    return "A slender wooden rod tipped with sharpened iron.";
+}
+std::unique_ptr<Item> Spear::clone(int qty) const {
+    auto s = std::make_unique<Spear>();
+    s->level = level;
+    s->quantity = qty;
+    s->identified = identified;
+    s->levelKnown = levelKnown;
+    s->cursed = cursed;
+    s->cursedKnown = cursedKnown;
+    s->enchantment = enchantment;
+    s->imbue = imbue;
+    return s;
+}
+
+// Sword
+Sword::Sword() : MeleeWeapon("sword", 3, 1.0f, 1.0f) {
+    image = ItemSpriteSheet::SWORD;
+}
+std::string Sword::desc() const {
+    return "The razor-sharp length of steel blade shines reassuringly.";
+}
+std::unique_ptr<Item> Sword::clone(int qty) const {
+    auto s = std::make_unique<Sword>();
+    s->level = level;
+    s->quantity = qty;
+    s->identified = identified;
+    s->levelKnown = levelKnown;
+    s->cursed = cursed;
+    s->cursedKnown = cursedKnown;
+    s->enchantment = enchantment;
+    s->imbue = imbue;
+    return s;
+}
+
+// Mace
+Mace::Mace() : MeleeWeapon("mace", 3, 1.0f, 0.8f) {
+    image = ItemSpriteSheet::MACE;
+}
+std::string Mace::desc() const {
+    return "The iron head of this weapon inflicts substantial damage.";
+}
+std::unique_ptr<Item> Mace::clone(int qty) const {
+    auto m = std::make_unique<Mace>();
+    m->level = level;
+    m->quantity = qty;
+    m->identified = identified;
+    m->levelKnown = levelKnown;
+    m->cursed = cursed;
+    m->cursedKnown = cursedKnown;
+    m->enchantment = enchantment;
+    m->imbue = imbue;
+    return m;
+}
+
+// Longsword
+Longsword::Longsword() : MeleeWeapon("longsword", 4, 1.0f, 1.0f) {
+    image = ItemSpriteSheet::LONG_SWORD;
+}
+std::string Longsword::desc() const {
+    return "This towering blade inflicts heavy damage by investing its heft into every cut.";
+}
+std::unique_ptr<Item> Longsword::clone(int qty) const {
+    auto l = std::make_unique<Longsword>();
+    l->level = level;
+    l->quantity = qty;
+    l->identified = identified;
+    l->levelKnown = levelKnown;
+    l->cursed = cursed;
+    l->cursedKnown = cursedKnown;
+    l->enchantment = enchantment;
+    l->imbue = imbue;
+    return l;
+}
+
+// BattleAxe
+BattleAxe::BattleAxe() : MeleeWeapon("battle axe", 4, 1.2f, 1.0f) {
+    image = ItemSpriteSheet::BATTLE_AXE;
+}
+std::string BattleAxe::desc() const {
+    return "The enormous steel head of this battle axe puts considerable heft behind each stroke.";
+}
+std::unique_ptr<Item> BattleAxe::clone(int qty) const {
+    auto b = std::make_unique<BattleAxe>();
+    b->level = level;
+    b->quantity = qty;
+    b->identified = identified;
+    b->levelKnown = levelKnown;
+    b->cursed = cursed;
+    b->cursedKnown = cursedKnown;
+    b->enchantment = enchantment;
+    b->imbue = imbue;
+    return b;
+}
+
+// WarHammer
+WarHammer::WarHammer() : MeleeWeapon("war hammer", 5, 1.2f, 1.0f) {
+    image = ItemSpriteSheet::WAR_HAMMER;
+}
+std::string WarHammer::desc() const {
+    return "Few creatures can withstand the crushing blow of this towering mass of lead and steel, but only the strongest of adventurers can use it effectively.";
+}
+std::unique_ptr<Item> WarHammer::clone(int qty) const {
+    auto w = std::make_unique<WarHammer>();
+    w->level = level;
+    w->quantity = qty;
+    w->identified = identified;
+    w->levelKnown = levelKnown;
+    w->cursed = cursed;
+    w->cursedKnown = cursedKnown;
+    w->enchantment = enchantment;
+    w->imbue = imbue;
+    return w;
+}
+
+// Glaive
+Glaive::Glaive() : MeleeWeapon("glaive", 5, 1.0f, 1.5f) {
+    image = ItemSpriteSheet::GLAIVE;
+}
+std::string Glaive::desc() const {
+    return "A polearm consisting of a sword blade on the end of a pole.";
+}
+std::unique_ptr<Item> Glaive::clone(int qty) const {
+    auto g = std::make_unique<Glaive>();
+    g->level = level;
+    g->quantity = qty;
+    g->identified = identified;
+    g->levelKnown = levelKnown;
+    g->cursed = cursed;
+    g->cursedKnown = cursedKnown;
+    g->enchantment = enchantment;
+    g->imbue = imbue;
+    return g;
 }
 
 // -----------------------------------------------------------------------------
@@ -3566,22 +3936,31 @@ std::vector<std::string> MissileWeapon::actions(Hero* hero) {
 }
 
 float MissileWeapon::acuracyFactor(Hero* hero) const {
-    if (!hero) return 1.0f;
-    int enc = STR - hero->STR;
-    if (hero->heroClass == Hero::HeroClass::Warrior) {
-        enc += 3;
-    } else if (hero->heroClass == Hero::HeroClass::Huntress) {
-        enc -= 2;
-    }
-    return enc > 0 ? static_cast<float>(1.0 / std::pow(1.5, enc)) : 1.0f;
+    return Weapon::acuracyFactor(hero);
 }
 
 float MissileWeapon::speedFactor(Hero* hero) const {
-    int enc = STR - (hero ? hero->STR : 10);
-    if (hero && hero->heroClass == Hero::HeroClass::Huntress) {
-        enc -= 2;
+    return Weapon::speedFactor(hero);
+}
+
+std::string MissileWeapon::info() const {
+    std::string s = desc();
+    int mn = min();
+    int mx = max();
+    s += "\n\nAverage damage of this weapon equals to " + std::to_string(mn + (mx - mn) / 2) + " points per hit. ";
+
+    if (Dungeon::hero) {
+        if (STR > Dungeon::hero->STR) {
+            s += "Because of your inadequate strength the accuracy and speed of your attack with this " + name + " is decreased.";
+        } else if (STR < Dungeon::hero->STR) {
+            s += "Because of your excess strength the damage of your attack with this " + name + " is increased.";
+        }
     }
-    return enc > 0 ? (1.0f * std::pow(1.2f, static_cast<float>(enc))) : 1.0f;
+
+    if (Dungeon::hero && Dungeon::hero->belongings.equippedWeapon == this) {
+        s += "\n\nYou hold the " + name + " at the ready.";
+    }
+    return s;
 }
 
 int MissileWeapon::maxDistance(const Hero* hero) const {
@@ -3630,7 +4009,7 @@ Item* Dart::random() {
     return this;
 }
 
-std::string Dart::info() const {
+std::string Dart::desc() const {
     return "These simple metal spikes are weighted to fly true and sting their prey with a flick of the wrist.";
 }
 
@@ -3666,8 +4045,8 @@ void IncendiaryDart::proc(Char* attacker, Char* defender, int damage) {
     }
 }
 
-std::string IncendiaryDart::info() const {
-    return "The spike on each of these darts pins it to its target while volatile compounds burst into brilliant flames.";
+std::string IncendiaryDart::desc() const {
+    return "The spike on each of these darts is designed to pin it to its target while the unstable compounds strapped to its length burst into brilliant flames.";
 }
 
 std::unique_ptr<Item> IncendiaryDart::clone(int qty) const {
@@ -3692,8 +4071,8 @@ void CurareDart::proc(Char* attacker, Char* defender, int damage) {
     }
 }
 
-std::string CurareDart::info() const {
-    return "These little evil darts can paralyze the target leaving it helpless and motionless for some time.";
+std::string CurareDart::desc() const {
+    return "These little evil darts don't do much damage but they can paralyze the target leaving it helpless and motionless for some time.";
 }
 
 std::unique_ptr<Item> CurareDart::clone(int qty) const {
@@ -3723,7 +4102,7 @@ int Javelin::maxDistance(const Hero* hero) const {
     return isSniper ? 7 : 6;
 }
 
-std::string Javelin::info() const {
+std::string Javelin::desc() const {
     return "This length of metal is weighted to keep the spike at its tip foremost as it sails through the air.";
 }
 
@@ -3746,8 +4125,8 @@ float Shuriken::speedFactor(Hero* hero) const {
     return 0.5f * MissileWeapon::speedFactor(hero);
 }
 
-std::string Shuriken::info() const {
-    return "Star-shaped pieces of metal with razor-sharp blades. They can be thrown at very high rate.";
+std::string Shuriken::desc() const {
+    return "Star-shaped pieces of metal with razor-sharp blades do significant damage when they hit a target. They can be thrown at very high rate.";
 }
 
 std::unique_ptr<Item> Shuriken::clone(int qty) const {
@@ -3777,7 +4156,7 @@ int Tamahawk::maxDistance(const Hero* hero) const {
     return isSniper ? 7 : 6;
 }
 
-std::string Tamahawk::info() const {
+std::string Tamahawk::desc() const {
     return "This throwing axe is not that heavy, but it still requires significant strength to be used effectively.";
 }
 
@@ -3801,6 +4180,10 @@ int Boomerang::max() const {
 
 int Boomerang::damageRoll() const {
     return Random::NormalIntRange(min(), max());
+}
+
+int Boomerang::price() const {
+    return considerState(20);
 }
 
 void Boomerang::cast(Hero* hero, int targetCell) {
@@ -3876,13 +4259,24 @@ void Boomerang::circleBack(int fromCell, Hero* owner) {
     });
 }
 
-std::string Boomerang::info() const {
+std::string Boomerang::desc() const {
     return "Thrown to the enemy this flat curved wooden missile will return to the hands of its thrower.";
+}
+
+std::string Boomerang::info() const {
+    return MissileWeapon::info();
 }
 
 std::unique_ptr<Item> Boomerang::clone(int qty) const {
     auto b = std::make_unique<Boomerang>();
     b->quantity = qty;
+    b->level = level;
+    b->identified = identified;
+    b->levelKnown = levelKnown;
+    b->cursed = cursed;
+    b->cursedKnown = cursedKnown;
+    b->enchantment = enchantment;
+    b->imbue = imbue;
     return b;
 }
 

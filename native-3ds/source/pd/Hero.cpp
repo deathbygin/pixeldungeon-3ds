@@ -99,7 +99,7 @@ void Hero::initClass(HeroClass cl) {
             HT = 20;
             STR = 10;
 
-            auto knuckles = std::make_unique<Weapon>("Knuckles", 1, 6, 10);
+            auto knuckles = std::make_unique<Knuckles>();
             knuckles->identify();
             belongings.equip(std::move(knuckles));
 
@@ -117,7 +117,7 @@ void Hero::initClass(HeroClass cl) {
             HT = 20;
             STR = 10;
 
-            auto dagger = std::make_unique<Weapon>("Dagger", 2, 5, 10);
+            auto dagger = std::make_unique<Dagger>();
             dagger->identify();
             belongings.equip(std::move(dagger));
 
@@ -137,7 +137,7 @@ void Hero::initClass(HeroClass cl) {
             HT = 15;
             STR = 10;
 
-            auto dagger = std::make_unique<Weapon>("Dagger", 2, 5, 10);
+            auto dagger = std::make_unique<Dagger>();
             dagger->identify();
             belongings.equip(std::move(dagger));
 
@@ -290,6 +290,46 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
         next();
         waitingForInput = false;
         return true;
+    }
+
+    // 2-tile reach check for polearms (Spear, Glaive)
+    Weapon* equippedWep = belongings.equippedWeapon ? belongings.equippedWeapon->asWeapon() : nullptr;
+    if (equippedWep && equippedWep->reach() >= 2) {
+        int hx = pos % Level::WIDTH;
+        int hy = pos / Level::WIDTH;
+        int nx = nextCell % Level::WIDTH;
+        int ny = nextCell / Level::WIDTH;
+        int dx = nx - hx;
+        int dy = ny - hy;
+        if (dx != 0 || dy != 0) {
+            int rx = hx + dx * 2;
+            int ry = hy + dy * 2;
+            if (rx >= 0 && rx < Level::WIDTH && ry >= 0 && ry < Level::HEIGHT) {
+                int reachCell = ry * Level::WIDTH + rx;
+                Char* reachEnemy = Actor::findChar(reachCell);
+                if (reachEnemy && reachEnemy != this) {
+                    // Check obstacle between hero and reachEnemy (nextCell):
+                    // Can strike across chasm, water, low obstacles, traps, open doors, or passable terrain.
+                    // Only solid walls or closed doors block reach attacks.
+                    int midTile = currentLevel->get(nextCell);
+                    bool blocked = (midTile == Terrain::WALL || midTile == Terrain::STATUE ||
+                                    midTile == Terrain::DOOR || midTile == Terrain::LOCKED_DOOR ||
+                                    midTile == Terrain::SECRET_DOOR);
+                    if (!blocked) {
+                        if (isCharmedBy(reachEnemy)) {
+                            GLog::w("You are too charmed to attack!");
+                            waitingForInput = true;
+                            return false;
+                        }
+                        ui::BottomScreenUI::setLastTarget(reachEnemy);
+                        attack(reachEnemy);
+                        next();
+                        waitingForInput = false;
+                        return true;
+                    }
+                }
+            }
+        }
     }
 
     if (rooted) {
@@ -806,6 +846,9 @@ int Hero::defenseSkill(Char* attacker) {
     }
     int aEnc = belongings.equippedArmor ? belongings.equippedArmor->STR - STR : 0;
     int baseSkill = 5 + level;
+    if (belongings.equippedWeapon) {
+        baseSkill += belongings.equippedWeapon->defenseBonus();
+    }
     if (aEnc > 0) {
         return static_cast<int>(baseSkill * evasion / std::pow(1.5, aEnc));
     } else {

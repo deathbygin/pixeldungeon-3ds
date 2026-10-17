@@ -176,6 +176,9 @@ bool Char::attack(Char* enemy) {
         int enemyDr = (heroAttacker && heroAttacker->rangedWeapon && heroAttacker->subClass == HeroSubClass::Sniper)
             ? 0
             : Random::IntRange(0, enemy->dr());
+        if (heroAttacker && heroAttacker->belongings.equippedWeapon && heroAttacker->belongings.equippedWeapon->name == "war hammer") {
+            enemyDr /= 2; // War hammer crushing armor penetration
+        }
         int effective = std::max(0, dmg - enemyDr);
 
         effective = attackProc(enemy, effective);
@@ -195,14 +198,14 @@ bool Char::attack(Char* enemy) {
         FX::blood(enemy->pos, 8);
         FX::floatingText(enemy->pos, std::to_string(effective), 0xe43b44FF);
 
-        spend(TICK / speed());
+        spend(attackDelay());
         return true;
     } else {
         // Sound effect for miss/dodge
         Sample::playAt(Assets::SND_MISS, enemy->pos);
 
         FX::floatingText(enemy->pos, "MISS", 0x8b9bb4FF);
-        spend(TICK / speed());
+        spend(attackDelay());
         return false;
     }
 }
