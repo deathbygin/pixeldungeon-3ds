@@ -135,7 +135,6 @@ void BadgesScene::wrapText(const std::string& text, float maxW, std::vector<std:
 void BadgesScene::update(float dt, u32 kDown, u32 kHeld, const pd::ui::TouchController& touch) {
     (void)kHeld;
     m_archs.update(dt);
-    m_sparkleTimer += dt;
 
     if (m_wndBadge.isOpen()) {
         m_wndBadge.update(touch, kDown);
@@ -292,9 +291,6 @@ void BadgesScene::drawTop(C2D_TextBuf textBuf) {
     float medalX = boxX + 8.0f;
     float medalY = boxY + 8.0f;
     BadgeBanner::drawBadge(curItem.image, medalX, medalY, 3.0f, 1.0f, !curItem.unlocked, zContent + 0.03f);
-    if (curItem.unlocked) {
-        BadgeBanner::highlight(curItem.image, medalX, medalY, 3.0f, zContent + 0.04f);
-    }
 
     // Status under medal box
     std::string statusStr = curItem.unlocked ? "[UNLOCKED]" : "[LOCKED]";
@@ -391,11 +387,6 @@ void BadgesScene::drawBottom(C2D_TextBuf textBuf) {
         float iconX = std::round(cellX + (m_cellW - 24.0f) * 0.5f);
         float iconY = std::round(cellY + (m_cellH - 24.0f) * 0.5f);
         BadgeBanner::drawBadge(item.image, iconX, iconY, 1.5f, 1.0f, !item.unlocked, zContent + 0.03f);
-
-        // Occasional sparkle on unlocked badges
-        if (item.unlocked && (static_cast<int>(m_sparkleTimer * 2.0f + i) % 7 == 0)) {
-            BadgeBanner::highlight(item.image, iconX, iconY, 1.5f, zContent + 0.04f);
-        }
     }
 
     // Scrollbar indicator

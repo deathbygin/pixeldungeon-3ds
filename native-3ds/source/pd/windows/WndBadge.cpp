@@ -109,9 +109,6 @@ void WndBadge::draw(C2D_TextBuf textBuf) {
     float iconX = std::round(m_x + (m_w - 32.0f) * 0.5f);
     float iconY = m_y + 12.0f;
     BadgeBanner::drawBadge(info.image, iconX, iconY, 2.0f, 1.0f, !m_unlocked, zContent);
-    if (m_unlocked) {
-        BadgeBanner::highlight(info.image, iconX, iconY, 2.0f, zContent + 0.01f);
-    }
 
     // 4. Badge Title
     float titleW = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, info.title);

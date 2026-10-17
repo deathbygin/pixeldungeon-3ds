@@ -32,7 +32,6 @@ public:
 private:
     BadgesAction m_pendingAction = BadgesAction::NONE;
     int m_selectedIndex = 0;
-    float m_sparkleTimer = 0.0f;
 
     struct GridItem {
         Badges::Badge badge;
