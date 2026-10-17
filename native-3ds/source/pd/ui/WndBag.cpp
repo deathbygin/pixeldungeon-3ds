@@ -463,11 +463,18 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
                     BitmapFont::draw(BitmapFont::FontType::Font1x, "C", cx, sy + 18.0f, zText, COLOR_TEXT_WARNING);
                 }
 
-                // Bottom-Left Ticks: Durability
-                if (it->isUpgradable() && it->levelKnown) {
-                    C2D_DrawRectSolid(sx + 2.0f, sy + 23.0f, zText, 2.0f, 2.0f, C2D_Color32(0x00, 0xee, 0x00, 0xFF));
-                    C2D_DrawRectSolid(sx + 5.0f, sy + 23.0f, zText, 2.0f, 2.0f, C2D_Color32(0x00, 0xee, 0x00, 0xFF));
-                    C2D_DrawRectSolid(sx + 8.0f, sy + 23.0f, zText, 2.0f, 2.0f, C2D_Color32(0x00, 0xee, 0x00, 0xFF));
+                // Bottom-Left: Wand charge pips (green for active, dark socket for depleted)
+                if (Wand* wand = it->asWand()) {
+                    int maxCh = std::max(1, wand->maxCharges);
+                    int curCh = std::clamp(wand->curCharges, 0, maxCh);
+                    for (int i = 0; i < maxCh; ++i) {
+                        int col = i % 4;
+                        int row = i / 4;
+                        float px = sx + 2.0f + col * 3.0f;
+                        float py = sy + 23.0f - row * 3.0f;
+                        u32 sqCol = (i < curCh) ? C2D_Color32(0x00, 0xee, 0x00, 0xFF) : C2D_Color32(0x28, 0x2b, 0x26, 0xFF);
+                        C2D_DrawRectSolid(px, py, zText, 2.0f, 2.0f, sqCol);
+                    }
                 }
             } else if (isEquippedSlot && iTex) {
                 // Empty placeholder icon (translucent weapon/armor/ring silhouette)

@@ -594,6 +594,20 @@ void InventoryView::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
                     C2D_DrawText(&textObj, C2D_WithColor, sx + SLOT_SIZE - tw - 2.0f, sy + SLOT_SIZE - 10.0f, 0.85f, 0.34f, 0.34f, C2D_Color32(0xff, 0x44, 0x44, 0xFF));
                 }
             }
+
+            // Bottom-Left: Wand charge pips (green for active, dark socket for depleted)
+            if (Wand* wand = item->asWand()) {
+                int maxCh = std::max(1, wand->maxCharges);
+                int curCh = std::clamp(wand->curCharges, 0, maxCh);
+                for (int i = 0; i < maxCh; ++i) {
+                    int col = i % 4;
+                    int row = i / 4;
+                    float px = sx + 2.0f + col * 3.0f;
+                    float py = sy + SLOT_SIZE - 5.0f - row * 3.0f;
+                    u32 sqCol = (i < curCh) ? C2D_Color32(0x00, 0xee, 0x00, 0xFF) : C2D_Color32(0x28, 0x2b, 0x26, 0xFF);
+                    C2D_DrawRectSolid(px, py, 0.85f, 2.0f, 2.0f, sqCol);
+                }
+            }
         }
     }
 
