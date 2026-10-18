@@ -30,6 +30,14 @@ APP_DESCRIPTION := Native Nintendo 3DS Port
 APP_AUTHOR      := Oleg Dolya / 3DS Homebrew Port
 ICON            := icon.png
 
+# CIA build tools (from devkitPro tools)
+BANNERTOOL      := $(DEVKITPRO)/tools/bin/bannertool
+MAKEROM         := $(DEVKITPRO)/tools/bin/makerom
+THREEDSTOOL     ?= $(DEVKITPRO)/tools/bin/3dstool
+BANNER_IMAGE    := banner.png
+BANNER_AUDIO    := audio.wav
+RSF             := PixelDungeon.rsf
+
 #---------------------------------------------------------------------------------
 # Compiler flags
 #---------------------------------------------------------------------------------
@@ -84,7 +92,7 @@ ifneq ($(wildcard $(TOPDIR)/$(ROMFS)),)
 export _3DSXFLAGS += --romfs=$(CURDIR)/$(ROMFS)
 endif
 
-.PHONY: all clean
+.PHONY: all clean cia banner romfs
 
 all:
 	@mkdir -p $(BUILD)
@@ -92,7 +100,49 @@ all:
 
 clean:
 	@echo "Cleaning build artifacts..."
-	@rm -rf $(BUILD) $(TARGET).3dsx $(OUTPUT).smdh $(TARGET).elf $(TARGET).smdh $(TARGET).map
+	@rm -rf $(BUILD) $(TARGET).3dsx $(OUTPUT).smdh $(TARGET).elf $(TARGET).smdh $(TARGET).map \
+	         $(TARGET).cia banner.bnr romfs.bin icon.bin
+
+#---------------------------------------------------------------------------------
+# CIA build targets
+# Usage: first run 'make all', then 'make cia'
+#---------------------------------------------------------------------------------
+
+# Build the IVFC RomFS binary required by makerom.
+romfs:
+	@echo "Packing romfs..."
+	@$(THREEDSTOOL) -cvtf romfs romfs.bin --romfs-dir $(ROMFS)
+
+# Build banner.bnr from banner image + audio
+# Requires: banner.png (256x128 PNG) and audio.wav (mono/stereo, <=3s, 16-bit PCM)
+banner: $(BANNER_IMAGE) $(BANNER_AUDIO)
+	@echo "Building banner..."
+	@$(BANNERTOOL) makebanner -i $(BANNER_IMAGE) -a $(BANNER_AUDIO) -o banner.bnr
+
+# Build icon.bin (SMDH) from the icon PNG
+icon.bin: $(ICON)
+	@echo "Building icon/SMDH..."
+	@$(BANNERTOOL) makesmdh \
+	    -s "$(APP_TITLE)" \
+	    -l "$(APP_TITLE)" \
+	    -p "$(APP_AUTHOR)" \
+	    -i $(ICON) \
+	    -o icon.bin \
+	    -f visible,allow3d
+
+# Build the final installable CIA
+# Depends on: PixelDungeon.elf, banner.bnr, icon.bin, PixelDungeon.rsf, romfs dir
+cia: all banner icon.bin romfs
+	@echo "Building CIA..."
+	@$(MAKEROM) -f cia \
+	    -o $(TARGET).cia \
+	    -elf $(TARGET).elf \
+	    -rsf $(RSF) \
+	    -icon icon.bin \
+	    -banner banner.bnr \
+	    -target t \
+	    -romfs romfs.bin
+	@echo "Done: $(TARGET).cia"
 
 else
 
@@ -111,4 +161,3 @@ $(OUTPUT).elf   : $(OFILES)
 -include $(wildcard $(DEPSDIR)/*.d)
 
 endif
-
