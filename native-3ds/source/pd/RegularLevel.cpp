@@ -114,11 +114,26 @@ bool RegularLevel::build() {
 
     if (Dungeon::shopOnLevel()) {
         Room* shop = nullptr;
+        // Priority 1: A dead-end room connected to entrance with perimeter >= 16 (fits all items + clear door)
         for (const auto& pair : roomEntrance->connected) {
             Room* r = pair.first;
-            if (r && r->connected.size() == 1 && r->width() >= 5 && r->height() >= 5) {
-                shop = r;
-                break;
+            if (r && r->connected.size() == 1) {
+                int pasW = r->width() - 2;
+                int pasH = r->height() - 2;
+                if (pasW > 0 && pasH > 0 && (pasW * 2 + pasH * 2) >= 16) {
+                    shop = r;
+                    break;
+                }
+            }
+        }
+        // Priority 2: Fallback to any dead-end room with width >= 5 and height >= 5
+        if (!shop) {
+            for (const auto& pair : roomEntrance->connected) {
+                Room* r = pair.first;
+                if (r && r->connected.size() == 1 && r->width() >= 5 && r->height() >= 5) {
+                    shop = r;
+                    break;
+                }
             }
         }
         if (shop == nullptr) {

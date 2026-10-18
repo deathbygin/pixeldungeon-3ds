@@ -11,6 +11,7 @@
 #include "pd/Blob.h"
 #include <algorithm>
 #include <cstdlib>
+#include <unordered_set>
 
 namespace pd {
 
@@ -1359,53 +1360,103 @@ void Painter::paintShop(Level* level, Room* room) {
         std::swap(range[i], range[j]);
     }
 
+    // Identify all doors and their interior entryway cells to keep completely clear
+    std::unordered_set<int> forbiddenCells;
     Point entrancePoint(room->left + 1, room->top + 1);
+    bool hasEntrance = false;
+
     for (const auto& pair : room->connected) {
         if (pair.second) {
-            entrancePoint = Point(pair.second->x, pair.second->y);
-            break;
+            if (!hasEntrance) {
+                entrancePoint = Point(pair.second->x, pair.second->y);
+                hasEntrance = true;
+            }
+            int doorCell = pair.second->x + pair.second->y * Level::WIDTH;
+            forbiddenCells.insert(doorCell);
+
+            // Calculate the interior cell directly in front of this door
+            int inX = pair.second->x;
+            int inY = pair.second->y;
+            if (inX <= room->left) inX = room->left + 1;
+            else if (inX >= room->right) inX = room->right - 1;
+            if (inY <= room->top) inY = room->top + 1;
+            else if (inY >= room->bottom) inY = room->bottom - 1;
+
+            int insideCell = inX + inY * Level::WIDTH;
+            forbiddenCells.insert(insideCell);
         }
     }
 
-    int pos = xy2p(*room, entrancePoint, pasWidth, pasHeight) + (per - static_cast<int>(range.size())) / 2;
-    for (size_t i = 0; i < range.size(); ++i) {
-        Point xy = p2xy(*room, (pos % per + per) % per, pasWidth, pasHeight);
+    int doorP = xy2p(*room, entrancePoint, pasWidth, pasHeight);
+
+    // Calculate layout along outer edge (perimeter) of shop
+    int numItems = static_cast<int>(range.size());
+    int emptySlots = std::max(1, per - numItems);
+    int gapBefore = (emptySlots - 1) / 2;
+    int startP = (doorP + emptySlots - gapBefore) % per;
+
+    // Collect valid outer edge (perimeter) cells, strictly excluding doors and entryway
+    std::vector<int> perimeterSlots;
+    for (int offset = 0; offset < per; ++offset) {
+        int p = (startP + offset) % per;
+        Point xy = p2xy(*room, p, pasWidth, pasHeight);
         int cell = xy.x + xy.y * Level::WIDTH;
-
-        if (level->getHeap(cell) != nullptr) {
-            int tries = 0;
-            do {
-                cell = room->random();
-            } while (level->getHeap(cell) != nullptr && ++tries < 100);
+        if (!forbiddenCells.count(cell)) {
+            perimeterSlots.push_back(cell);
         }
+    }
 
+    // Drop items strictly on perimeter slots
+    size_t placeCount = std::min(range.size(), perimeterSlots.size());
+    for (size_t i = 0; i < placeCount; ++i) {
+        int cell = perimeterSlots[i];
         Heap* h = level->drop(std::move(range[i]), cell);
         if (h) {
             h->type = Heap::Type::FOR_SALE;
         }
-        pos++;
     }
 
-    // Place shopkeeper
+    // Place shopkeeper in the shop interior, furthest from the entrance, never blocking any door
     int shopkeeperPos = -1;
-    int tries = 0;
-    do {
-        shopkeeperPos = room->random();
-    } while ((level->getHeap(shopkeeperPos) != nullptr || Actor::findChar(shopkeeperPos) != nullptr) && ++tries < 100);
+    int maxDist = -1;
+    for (int y = room->top + 1; y < room->bottom; ++y) {
+        for (int x = room->left + 1; x < room->right; ++x) {
+            int c = x + y * Level::WIDTH;
+            if (forbiddenCells.count(c)) continue;
+            if (level->getHeap(c) != nullptr) continue;
+            if (Actor::findChar(c) != nullptr) continue;
+            if (level->get(c) != Terrain::EMPTY_SP) continue;
 
-    auto shopkeeper = std::make_unique<Shopkeeper>();
-    shopkeeper->pos = shopkeeperPos;
-    Actor::occupyCell(shopkeeper.get());
-    Actor::add(shopkeeper.get(), 1.0f);
-    Dungeon::mobs.push_back(std::move(shopkeeper));
+            int dist = std::abs(x - entrancePoint.x) + std::abs(y - entrancePoint.y);
+            if (dist > maxDist) {
+                maxDist = dist;
+                shopkeeperPos = c;
+            }
+        }
+    }
 
-    if (Dungeon::depth == 21) {
-        for (int dy = -1; dy <= 1; ++dy) {
-            for (int dx = -1; dx <= 1; ++dx) {
-                int p = shopkeeperPos + dy * Level::WIDTH + dx;
-                if (p >= 0 && p < Level::LENGTH && level->get(p) == Terrain::EMPTY_SP) {
-                    level->set(p, Terrain::WATER);
-                    level->water[p] = true;
+    if (shopkeeperPos == -1) {
+        int tries = 0;
+        do {
+            shopkeeperPos = room->random();
+        } while ((forbiddenCells.count(shopkeeperPos) || level->getHeap(shopkeeperPos) != nullptr || Actor::findChar(shopkeeperPos) != nullptr) && ++tries < 100);
+    }
+
+    if (shopkeeperPos != -1) {
+        auto shopkeeper = std::make_unique<Shopkeeper>();
+        shopkeeper->pos = shopkeeperPos;
+        Actor::occupyCell(shopkeeper.get());
+        Actor::add(shopkeeper.get(), 1.0f);
+        Dungeon::mobs.push_back(std::move(shopkeeper));
+
+        if (Dungeon::depth == 21) {
+            for (int dy = -1; dy <= 1; ++dy) {
+                for (int dx = -1; dx <= 1; ++dx) {
+                    int p = shopkeeperPos + dy * Level::WIDTH + dx;
+                    if (p >= 0 && p < Level::LENGTH && level->get(p) == Terrain::EMPTY_SP && !forbiddenCells.count(p)) {
+                        level->set(p, Terrain::WATER);
+                        level->water[p] = true;
+                    }
                 }
             }
         }
