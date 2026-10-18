@@ -69,6 +69,8 @@ bool WndBag::isItemEligible(const pd::Item* it) const {
             return (const_cast<Item*>(it)->asWeapon() != nullptr && !const_cast<Item*>(it)->asWand() && (!const_cast<Item*>(it)->asMissile() || const_cast<Item*>(it)->asBoomerang()));
         case Mode::WAND:
             return (const_cast<Item*>(it)->asWand() != nullptr && it->isUpgradable());
+        case Mode::FOR_SALE:
+            return it->price() > 0 && (!Dungeon::hero || !it->isEquipped(Dungeon::hero.get()) || !it->isCursed());
         case Mode::ALL:
         default:
             return true;
@@ -446,7 +448,7 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
                     u32 strCol;
                     if (!identified) {
                         strCol = COLOR_TEXT_ACCENT; // Warning orange for typical/unidentified strength
-                    } else if (reqStr > hero->STR) {
+                    } else if (reqStr > hero->effectiveSTR()) {
                         strCol = COLOR_TEXT_WARNING; // Red if hero strength is insufficient
                     } else {
                         strCol = COLOR_TEXT_PRIMARY; // Clean white

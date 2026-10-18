@@ -257,9 +257,9 @@ bool Ooze::act() {
         return true;
     }
 
-    target->damage(1, this);
+    target->damage(damage, this);
     if (target == Dungeon::hero.get()) {
-        GLog::n("Caustic ooze burns your skin! (-1 HP)");
+        GLog::n("Caustic ooze burns your skin! (-" + std::to_string(damage) + " HP)");
     }
     FX::burst(target->pos, 0x000000FFu, 4);
 
@@ -733,8 +733,18 @@ void Weakness::attachTo(Char* ch) {
     target = ch;
     Actor::add(this, DURATION);
     if (target) {
+        if (target == Dungeon::hero.get()) {
+            static_cast<Hero*>(target)->weakened = true;
+        }
         FX::floatingText(target->pos, "weakened", 0xbb5555FF);
     }
+}
+
+void Weakness::detach() {
+    if (target && target == Dungeon::hero.get()) {
+        static_cast<Hero*>(target)->weakened = false;
+    }
+    Buff::detach();
 }
 
 // -----------------------------------------------------------------------------

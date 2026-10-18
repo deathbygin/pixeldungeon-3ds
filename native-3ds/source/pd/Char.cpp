@@ -11,6 +11,7 @@
 #include "pd/Assets.h"
 #include "pd/Sample.h"
 #include "pd/Debug.h"
+#include "pd/GLog.h"
 #include <algorithm>
 
 namespace pd {
@@ -111,6 +112,20 @@ void Char::move(int step) {
     Bleeding* b = getBuff<Bleeding>();
     if (b && isAlive()) {
         damage(Random::Int(b->level), b);
+    }
+
+    // Stepping into water immediately extinguishes Burning and washes away Ooze
+    if (Dungeon::level && step >= 0 && step < Level::LENGTH && Dungeon::level->water[step] && !flying) {
+        if (buff(BuffType::Burning)) {
+            removeBuff(BuffType::Burning);
+            FX::waterSplash(step, 6);
+        }
+        if (buff(BuffType::Ooze)) {
+            removeBuff(BuffType::Ooze);
+            if (this == Dungeon::hero.get()) {
+                GLog::p("The water washes away the caustic ooze!");
+            }
+        }
     }
 }
 
@@ -289,6 +304,115 @@ void Char::die(Actor* src) {
 
 void Char::addBuff(Buff* b) {
     if (!b) return;
+
+    Buff* existing = buff(b->type());
+    if (existing) {
+        if (existing == b) return;
+
+        switch (b->type()) {
+        case BuffType::Burning: {
+            Burning* eb = static_cast<Burning*>(existing);
+            Burning* nb = static_cast<Burning*>(b);
+            eb->durationTicks = std::max(eb->durationTicks, nb->durationTicks);
+            break;
+        }
+        case BuffType::Poison: {
+            Poison* eb = static_cast<Poison*>(existing);
+            Poison* nb = static_cast<Poison*>(b);
+            eb->durationTicks = std::max(eb->durationTicks, nb->durationTicks);
+            eb->damagePerTick = std::max(eb->damagePerTick, nb->damagePerTick);
+            break;
+        }
+        case BuffType::Bleeding: {
+            Bleeding* eb = static_cast<Bleeding*>(existing);
+            Bleeding* nb = static_cast<Bleeding*>(b);
+            eb->level = std::max(eb->level, nb->level);
+            break;
+        }
+        case BuffType::Paralysis: {
+            Paralysis* eb = static_cast<Paralysis*>(existing);
+            Paralysis* nb = static_cast<Paralysis*>(b);
+            eb->durationTicks = std::max(eb->durationTicks, nb->durationTicks);
+            break;
+        }
+        case BuffType::Ooze: {
+            Ooze* eb = static_cast<Ooze*>(existing);
+            Ooze* nb = static_cast<Ooze*>(b);
+            eb->damage = std::min(10, eb->damage + nb->damage);
+            break;
+        }
+        case BuffType::Weakness: {
+            existing->postpone(Weakness::DURATION);
+            break;
+        }
+        case BuffType::Frost: {
+            existing->postpone(Frost::DURATION);
+            break;
+        }
+        case BuffType::Cripple: {
+            existing->postpone(Cripple::DURATION);
+            break;
+        }
+        case BuffType::Slow: {
+            existing->postpone(Slow::DURATION);
+            break;
+        }
+        case BuffType::Speed: {
+            existing->postpone(Speed::DURATION);
+            break;
+        }
+        case BuffType::Roots: {
+            existing->postpone(5.0f);
+            break;
+        }
+        case BuffType::Vertigo: {
+            existing->postpone(Vertigo::DURATION);
+            break;
+        }
+        case BuffType::Amok: {
+            existing->postpone(Amok::DURATION);
+            break;
+        }
+        case BuffType::Rage: {
+            existing->postpone(Rage::DURATION);
+            break;
+        }
+        case BuffType::Terror: {
+            existing->postpone(Terror::DURATION);
+            break;
+        }
+        case BuffType::Charm: {
+            existing->postpone(Charm::DURATION);
+            break;
+        }
+        case BuffType::Blindness: {
+            existing->postpone(Blindness::DURATION);
+            break;
+        }
+        case BuffType::Barkskin: {
+            Barkskin* eb = static_cast<Barkskin*>(existing);
+            Barkskin* nb = static_cast<Barkskin*>(b);
+            eb->setLevel(nb->level);
+            break;
+        }
+        case BuffType::EarthrootArmor: {
+            EarthrootArmor* eb = static_cast<EarthrootArmor*>(existing);
+            EarthrootArmor* nb = static_cast<EarthrootArmor*>(b);
+            eb->setLevel(nb->level);
+            break;
+        }
+        default: {
+            if (b->duration() > 0.0f) {
+                existing->postpone(b->duration());
+            }
+            break;
+        }
+        }
+
+        delete b;
+        return;
+    }
+
     if (std::find(buffs.begin(), buffs.end(), b) == buffs.end()) {
         buffs.push_back(b);
     }

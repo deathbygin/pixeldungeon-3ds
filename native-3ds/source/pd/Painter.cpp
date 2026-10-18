@@ -142,6 +142,9 @@ void Painter::paintRoom(Level* level, Room* room) {
     case Room::Type::CRYPT:
         paintCrypt(level, room);
         break;
+    case Room::Type::SHOP:
+        paintShop(level, room);
+        break;
     default:
         paintStandard(level, room);
         break;
@@ -1247,6 +1250,171 @@ void Painter::paintCrypt(Level* level, Room* room) {
     Heap* tomb = level->drop(std::move(prize), cx + cy * Level::WIDTH);
     if (tomb) {
         tomb->type = Heap::Type::TOMB;
+    }
+}
+
+void Painter::paintShop(Level* level, Room* room) {
+    if (!level || !room) return;
+
+    fill(level, *room, Terrain::WALL);
+    fill(level, *room, 1, Terrain::EMPTY_SP);
+
+    int pasWidth = room->width() - 2;
+    int pasHeight = room->height() - 2;
+    int per = pasWidth * 2 + pasHeight * 2;
+    if (per <= 0) return;
+
+    std::vector<std::unique_ptr<Item>> range;
+
+    switch (Dungeon::depth) {
+    case 6: {
+        auto w = (Random::Int(2) == 0 ? std::unique_ptr<Weapon>(std::make_unique<Quarterstaff>()) : std::unique_ptr<Weapon>(std::make_unique<Spear>()));
+        w->identify();
+        range.push_back(std::move(w));
+
+        auto a = std::make_unique<Armor>("Leather Armor", 2, 11);
+        a->identify();
+        range.push_back(std::move(a));
+
+        range.push_back(std::make_unique<SeedPouch>());
+        range.push_back(std::make_unique<Weightstone>());
+        break;
+    }
+    case 11: {
+        auto w = (Random::Int(2) == 0 ? std::unique_ptr<Weapon>(std::make_unique<Sword>()) : std::unique_ptr<Weapon>(std::make_unique<Mace>()));
+        w->identify();
+        range.push_back(std::move(w));
+
+        auto a = std::make_unique<Armor>("Mail Armor", 3, 13);
+        a->identify();
+        range.push_back(std::move(a));
+
+        range.push_back(std::make_unique<ScrollHolder>());
+        range.push_back(std::make_unique<Weightstone>());
+        break;
+    }
+    case 16: {
+        auto w = (Random::Int(2) == 0 ? std::unique_ptr<Weapon>(std::make_unique<Longsword>()) : std::unique_ptr<Weapon>(std::make_unique<BattleAxe>()));
+        w->identify();
+        range.push_back(std::move(w));
+
+        auto a = std::make_unique<Armor>("Scale Armor", 4, 15);
+        a->identify();
+        range.push_back(std::move(a));
+
+        range.push_back(std::make_unique<WandHolster>());
+        range.push_back(std::make_unique<Weightstone>());
+        break;
+    }
+    case 21: {
+        switch (Random::Int(3)) {
+        case 0: {
+            auto w = std::make_unique<Glaive>();
+            w->identify();
+            range.push_back(std::move(w));
+            break;
+        }
+        case 1: {
+            auto w = std::make_unique<WarHammer>();
+            w->identify();
+            range.push_back(std::move(w));
+            break;
+        }
+        case 2: {
+            auto a = std::make_unique<Armor>("Plate Armor", 5, 17);
+            a->identify();
+            range.push_back(std::move(a));
+            break;
+        }
+        }
+        range.push_back(std::make_unique<Torch>());
+        range.push_back(std::make_unique<Torch>());
+        break;
+    }
+    default: {
+        range.push_back(std::make_unique<Weightstone>());
+        break;
+    }
+    }
+
+    // Common guaranteed stock
+    range.push_back(std::make_unique<Potion>(Potion::PotionType::HEALING));
+    for (int i = 0; i < 3; ++i) {
+        range.push_back(std::make_unique<Potion>(static_cast<Potion::PotionType>(Random::Int(12))));
+    }
+
+    range.push_back(std::make_unique<Scroll>(Scroll::ScrollType::IDENTIFY));
+    range.push_back(std::make_unique<Scroll>(Scroll::ScrollType::REMOVE_CURSE));
+    range.push_back(std::make_unique<Scroll>(Scroll::ScrollType::MAGIC_MAPPING));
+    range.push_back(Scroll::createRandom());
+
+    range.push_back(std::make_unique<OverpricedRation>());
+    range.push_back(std::make_unique<OverpricedRation>());
+
+    range.push_back(std::make_unique<Ankh>());
+
+    // Shuffle range
+    for (int i = static_cast<int>(range.size()) - 1; i > 0; --i) {
+        int j = Random::Int(i + 1);
+        std::swap(range[i], range[j]);
+    }
+
+    Point entrancePoint(room->left + 1, room->top + 1);
+    for (const auto& pair : room->connected) {
+        if (pair.second) {
+            entrancePoint = Point(pair.second->x, pair.second->y);
+            break;
+        }
+    }
+
+    int pos = xy2p(*room, entrancePoint, pasWidth, pasHeight) + (per - static_cast<int>(range.size())) / 2;
+    for (size_t i = 0; i < range.size(); ++i) {
+        Point xy = p2xy(*room, (pos % per + per) % per, pasWidth, pasHeight);
+        int cell = xy.x + xy.y * Level::WIDTH;
+
+        if (level->getHeap(cell) != nullptr) {
+            int tries = 0;
+            do {
+                cell = room->random();
+            } while (level->getHeap(cell) != nullptr && ++tries < 100);
+        }
+
+        Heap* h = level->drop(std::move(range[i]), cell);
+        if (h) {
+            h->type = Heap::Type::FOR_SALE;
+        }
+        pos++;
+    }
+
+    // Place shopkeeper
+    int shopkeeperPos = -1;
+    int tries = 0;
+    do {
+        shopkeeperPos = room->random();
+    } while ((level->getHeap(shopkeeperPos) != nullptr || Actor::findChar(shopkeeperPos) != nullptr) && ++tries < 100);
+
+    auto shopkeeper = std::make_unique<Shopkeeper>();
+    shopkeeper->pos = shopkeeperPos;
+    Actor::occupyCell(shopkeeper.get());
+    Actor::add(shopkeeper.get(), 1.0f);
+    Dungeon::mobs.push_back(std::move(shopkeeper));
+
+    if (Dungeon::depth == 21) {
+        for (int dy = -1; dy <= 1; ++dy) {
+            for (int dx = -1; dx <= 1; ++dx) {
+                int p = shopkeeperPos + dy * Level::WIDTH + dx;
+                if (p >= 0 && p < Level::LENGTH && level->get(p) == Terrain::EMPTY_SP) {
+                    level->set(p, Terrain::WATER);
+                    level->water[p] = true;
+                }
+            }
+        }
+    }
+
+    for (auto& pair : room->connected) {
+        if (pair.second) {
+            pair.second->set(Room::Door::Type::REGULAR);
+        }
     }
 }
 

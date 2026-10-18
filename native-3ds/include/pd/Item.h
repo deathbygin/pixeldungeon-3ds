@@ -519,6 +519,7 @@ public:
     std::string info() const override;
     std::string displayName() const override;
     virtual int typicalSTR() const;
+    int price() const override;
 
     enum class Glyph {
         NONE,
@@ -663,6 +664,7 @@ public:
     bool execute(Hero* hero, const std::string& action) override;
     std::string info() const override;
     std::unique_ptr<Item> clone(int qty = 1) const override;
+    int price() const override;
 };
 
 class Dewdrop : public Item {
@@ -699,6 +701,7 @@ public:
     bool execute(Hero* hero, const std::string& action) override;
     std::string info() const override;
     std::unique_ptr<Item> clone(int qty = 1) const override;
+    int price() const override;
 };
 
 class Key : public Item {
@@ -899,6 +902,7 @@ public:
     std::string info() const override;
     std::string displayName() const override;
     std::unique_ptr<Item> clone(int qty = 1) const override;
+    int price() const override { return 10 * quantity; }
 };
 
 // =============================================================================
@@ -989,6 +993,7 @@ public:
     std::string info() const override;
     std::string displayName() const override;
     std::unique_ptr<Item> clone(int qty = 1) const override;
+    int price() const override;
 };
 
 // =============================================================================
@@ -1032,6 +1037,7 @@ public:
     void explode(int cell);
     std::string info() const override;
     std::unique_ptr<Item> clone(int qty = 1) const override;
+    int price() const override { return 20 * quantity; }
 };
 
 // =============================================================================
@@ -1049,6 +1055,7 @@ public:
     void shatter(int cell);
     std::string info() const override;
     std::unique_ptr<Item> clone(int qty = 1) const override;
+    int price() const override { return 50 * quantity; }
 };
 
 // =============================================================================
@@ -1058,6 +1065,80 @@ class MysteryMeat : public Food {
 public:
     MysteryMeat();
     bool execute(Hero* hero, const std::string& action) override;
+    std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+// =============================================================================
+// OverpricedRation
+// =============================================================================
+class OverpricedRation : public Food {
+public:
+    OverpricedRation();
+    int price() const override { return 20 * quantity; }
+    std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+// =============================================================================
+// Ankh
+// =============================================================================
+class Ankh : public Item {
+public:
+    Ankh();
+    bool isStackable() const override { return true; }
+    bool isUpgradable() const override { return false; }
+    bool isIdentified() const override { return true; }
+    int price() const override { return 50 * quantity; }
+    std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+// =============================================================================
+// Weightstone
+// =============================================================================
+class Weightstone : public Item {
+public:
+    Weightstone();
+    bool isStackable() const override { return true; }
+    bool isUpgradable() const override { return false; }
+    bool isIdentified() const override { return true; }
+    int price() const override { return 40 * quantity; }
+    std::vector<std::string> actions(Hero* hero) override;
+    bool execute(Hero* hero, const std::string& action) override;
+    std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+// =============================================================================
+// Bags & Containers
+// =============================================================================
+class SeedPouch : public Item {
+public:
+    SeedPouch();
+    bool isUpgradable() const override { return false; }
+    bool isIdentified() const override { return true; }
+    int price() const override { return 50; }
+    std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class ScrollHolder : public Item {
+public:
+    ScrollHolder();
+    bool isUpgradable() const override { return false; }
+    bool isIdentified() const override { return true; }
+    int price() const override { return 50; }
+    std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class WandHolster : public Item {
+public:
+    WandHolster();
+    bool isUpgradable() const override { return false; }
+    bool isIdentified() const override { return true; }
+    int price() const override { return 50; }
     std::string info() const override;
     std::unique_ptr<Item> clone(int qty = 1) const override;
 };

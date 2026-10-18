@@ -177,7 +177,7 @@ void WndHero::draw(const pd::Hero* hero, C2D_TextBuf textBuf) {
 
         std::vector<StatRow> stats = {
             { "Health:",        std::to_string(hero->HP) + " / " + std::to_string(hero->HT), (hero->HP == hero->HT) ? pd::ui::COLOR_TEXT_POSITIVE : pd::ui::COLOR_TEXT_PRIMARY },
-            { "Strength:",      std::to_string(hero->STR), pd::ui::COLOR_TEXT_PRIMARY },
+            { "Strength:",      (hero->effectiveSTR() != hero->STR) ? (std::to_string(hero->effectiveSTR()) + " (" + std::to_string(hero->STR) + ")") : std::to_string(hero->STR), (hero->effectiveSTR() < hero->STR) ? pd::ui::COLOR_TEXT_WARNING : pd::ui::COLOR_TEXT_PRIMARY },
             { "Experience:",    std::to_string(hero->exp) + " / " + std::to_string(hero->maxExp), pd::ui::COLOR_TEXT_PRIMARY },
             { "Gold Collected:",std::to_string(hero->gold > 0 ? hero->gold : Dungeon::gold), pd::ui::COLOR_TEXT_ACCENT },
             { "Dungeon Depth:", std::to_string(Dungeon::depth), pd::ui::COLOR_TEXT_PRIMARY },

@@ -64,6 +64,7 @@ public:
     inline static const std::string YOG           = "romfs:/yog.png";
     inline static const std::string SHEEP         = "romfs:/sheep.png";
     inline static const std::string MIMIC         = "romfs:/mimic.png";
+    inline static const std::string SHOPKEEPER    = "romfs:/shopkeeper.png";
 
     // Items & Environmental Objects
     inline static const std::string ITEMS         = "romfs:/items.png";

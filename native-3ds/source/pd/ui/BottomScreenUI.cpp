@@ -4,6 +4,7 @@
 #include "pd/Level.h"
 #include "pd/Dungeon.h"
 #include "pd/Heap.h"
+#include "pd/Item.h"
 #include "pd/Actor.h"
 #include "pd/Terrain.h"
 #include "pd/SaveManager.h"
@@ -1326,6 +1327,152 @@ void BottomScreenUI::showOptions(std::string title, std::string message,
     if (m_wndBag.isOpen) m_wndBag.close();
     if (m_wndHero.isOpen()) m_wndHero.hide();
     m_wndOptions.show(std::move(title), std::move(message), std::move(options), std::move(onSelect));
+}
+
+void BottomScreenUI::showTradeItem(pd::Heap* heap) {
+    if (!heap || heap->isEmpty()) return;
+    pd::Item* item = heap->peek();
+    if (!item) return;
+
+    bool hasHaggler = false;
+    if (Dungeon::hero) {
+        if ((Dungeon::hero->belongings.equippedRing1 && static_cast<Ring*>(Dungeon::hero->belongings.equippedRing1)->effect == "Haggler") ||
+            (Dungeon::hero->belongings.equippedRing2 && static_cast<Ring*>(Dungeon::hero->belongings.equippedRing2)->effect == "Haggler")) {
+            hasHaggler = true;
+        }
+    }
+    int price = item->price() * 5 * (Dungeon::depth / 5 + 1);
+    if (hasHaggler && price >= 2) {
+        price /= 2;
+    }
+
+    std::string title = "FOR SALE: " + item->displayName() + " - " + std::to_string(price) + "g";
+    std::string message = item->info();
+
+    std::vector<std::string> options;
+    bool canAfford = (Dungeon::gold >= price);
+    if (canAfford) {
+        options.push_back("Buy for " + std::to_string(price) + "g");
+    } else {
+        options.push_back("Buy for " + std::to_string(price) + "g (Too expensive!)");
+    }
+    options.push_back("Never mind");
+
+    int heapPos = heap->pos;
+    showOptions(title, message, options, [this, heapPos, price, canAfford](int idx) {
+        if (idx == 0) {
+            if (!canAfford) {
+                GLog::w("You cannot afford this item!");
+                return;
+            }
+            if (!Dungeon::level) return;
+            Heap* h = Dungeon::level->getHeap(heapPos);
+            if (!h || h->isEmpty()) return;
+            Dungeon::gold -= price;
+            std::unique_ptr<Item> bought = h->pickUp();
+            if (!bought) return;
+            std::string itemName = bought->displayName();
+            if (Dungeon::hero) {
+                int heroPos = Dungeon::hero->pos;
+                if (!Dungeon::hero->belongings.collect(std::move(bought))) {
+                    Dungeon::level->drop(std::move(bought), heapPos);
+                    GLog::w("Your pack is full! Dropped on ground.");
+                }
+                FX::floatingText(heroPos, "-" + std::to_string(price) + "g", 0xffd700FFu);
+            }
+            if (h->isEmpty()) {
+                Dungeon::level->removeHeap(h);
+            }
+            GLog::i("You've bought " + itemName + " for " + std::to_string(price) + "g");
+            Sample::play(Assets::SND_GOLD);
+        }
+    });
+}
+
+void BottomScreenUI::showSellDialog(pd::Item* item) {
+    if (!item) return;
+    Hero* hero = Dungeon::hero.get();
+    if (!hero) return;
+
+    std::string title = "Sell " + item->displayName() + "?";
+    std::string message = item->info();
+    std::vector<std::string> options;
+
+    int priceAll = item->price();
+    int qty = item->quantity;
+
+    if (qty <= 1) {
+        options.push_back("Sell for " + std::to_string(priceAll) + "g");
+        options.push_back("Never mind");
+    } else {
+        int priceOne = priceAll / qty;
+        options.push_back("Sell 1 for " + std::to_string(priceOne) + "g");
+        options.push_back("Sell all for " + std::to_string(priceAll) + "g");
+        options.push_back("Never mind");
+    }
+
+    showOptions(title, message, options, [this, item, priceAll, qty](int idx) {
+        Hero* h = Dungeon::hero.get();
+        if (!h || !item) return;
+
+        if (qty <= 1) {
+            if (idx == 0) {
+                if (item->isEquipped(h)) {
+                    if (item->isCursed()) {
+                        GLog::w("You cannot unequip a cursed item!");
+                        return;
+                    }
+                    if (h->belongings.equippedWeapon == item) h->belongings.equippedWeapon = nullptr;
+                    if (h->belongings.equippedArmor == item) h->belongings.equippedArmor = nullptr;
+                    if (h->belongings.equippedRing1 == item) h->belongings.equippedRing1 = nullptr;
+                    if (h->belongings.equippedRing2 == item) h->belongings.equippedRing2 = nullptr;
+                }
+                auto& pack = h->belongings.backpack;
+                for (auto it = pack.begin(); it != pack.end(); ++it) {
+                    if (it->get() == item) {
+                        pack.erase(it);
+                        break;
+                    }
+                }
+                Dungeon::gold += priceAll;
+                GLog::i("You've sold your " + item->name + " for " + std::to_string(priceAll) + "g");
+                Sample::play(Assets::SND_GOLD);
+                FX::floatingText(h->pos, "+" + std::to_string(priceAll) + "g", 0xffd700FFu);
+                openSellSelection();
+            }
+        } else {
+            int priceOne = priceAll / qty;
+            if (idx == 0) {
+                item->quantity -= 1;
+                Dungeon::gold += priceOne;
+                GLog::i("You've sold your " + item->name + " for " + std::to_string(priceOne) + "g");
+                Sample::play(Assets::SND_GOLD);
+                FX::floatingText(h->pos, "+" + std::to_string(priceOne) + "g", 0xffd700FFu);
+                openSellSelection();
+            } else if (idx == 1) {
+                auto& pack = h->belongings.backpack;
+                for (auto it = pack.begin(); it != pack.end(); ++it) {
+                    if (it->get() == item) {
+                        pack.erase(it);
+                        break;
+                    }
+                }
+                Dungeon::gold += priceAll;
+                GLog::i("You've sold your " + item->name + " for " + std::to_string(priceAll) + "g");
+                Sample::play(Assets::SND_GOLD);
+                FX::floatingText(h->pos, "+" + std::to_string(priceAll) + "g", 0xffd700FFu);
+                openSellSelection();
+            }
+        }
+    });
+}
+
+void BottomScreenUI::openSellSelection() {
+    selectItem(WndBag::Mode::FOR_SALE, "Select an item to sell", [this](Item* selected) {
+        if (selected) {
+            showSellDialog(selected);
+        }
+    });
 }
 
 void BottomScreenUI::promptStairs(bool descend) {

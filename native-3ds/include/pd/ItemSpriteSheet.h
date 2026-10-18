@@ -139,6 +139,12 @@ public:
     static constexpr int MASTERY            = 82;
     static constexpr int KIT                = 86;
     static constexpr int AMULET             = 87;
+
+    // Bags & Upgrades
+    static constexpr int POUCH              = 83;
+    static constexpr int HOLDER             = 104;
+    static constexpr int HOLSTER            = 111;
+    static constexpr int WEIGHT             = 123;
 };
 
 } // namespace pd

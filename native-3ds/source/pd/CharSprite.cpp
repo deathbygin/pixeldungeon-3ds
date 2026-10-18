@@ -495,6 +495,14 @@ std::unique_ptr<CharSprite> CharSprite::createForMob(Mob* mob) {
             sprite->m_die = noosa::Animation(1.0f / 5.0f, { 7, 8, 9 }, false);
             break;
 
+        case Mob::MobType::Shopkeeper:
+            sprite->init(Assets::SHOPKEEPER, 14, 14);
+            sprite->m_idle = noosa::Animation(1.0f / 10.0f, { 1, 1, 1, 1, 1, 0, 0, 0, 0 }, true);
+            sprite->m_run = sprite->m_idle;
+            sprite->m_attack = sprite->m_idle;
+            sprite->m_die = noosa::Animation(1.0f / 20.0f, { 0 }, false);
+            break;
+
         default:
             sprite->init(Assets::RAT, 16, 15);
             sprite->m_idle = noosa::Animation(1.0f / 2.0f, { 0, 0, 0, 1 }, true);

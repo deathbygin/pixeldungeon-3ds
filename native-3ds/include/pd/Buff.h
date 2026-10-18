@@ -132,6 +132,7 @@ public:
 
     void attachTo(Char* ch) override;
     bool act() override;
+    void reignite(Char* ch = nullptr) { (void)ch; durationTicks = 5; }
 };
 
 class Poison : public Buff {
@@ -172,6 +173,9 @@ public:
 class Ooze : public Buff {
 public:
     static constexpr BuffType STATIC_TYPE = BuffType::Ooze;
+    int damage = 1;
+
+    explicit Ooze(int dmg = 1) : damage(dmg) {}
 
     BuffType type() const override { return STATIC_TYPE; }
     std::string name() const override { return "Caustic Ooze"; }
@@ -504,6 +508,7 @@ public:
     std::string desc() const override;
 
     void attachTo(Char* ch) override;
+    void detach() override;
 };
 
 // =============================================================================

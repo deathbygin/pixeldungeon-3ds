@@ -46,7 +46,8 @@ public:
         Yog,
         MirrorImage,
         Sheep,
-        Mimic
+        Mimic,
+        Shopkeeper
     };
 
     State state = State::SLEEPING;
@@ -441,6 +442,19 @@ public:
 
     static std::unique_ptr<Item> createChestDrop();
     static Mimic* spawnAt(int pos, std::vector<std::unique_ptr<Item>> chestItems = {});
+};
+
+class Shopkeeper : public Mob {
+public:
+    Shopkeeper();
+    MobType mobType() const override { return MobType::Shopkeeper; }
+    std::string description() const override;
+    bool act() override;
+    void damage(int dmg, Actor* src) override;
+    void die(Actor* src) override;
+    void aiStep(Hero* hero, Level* currentLevel) override { (void)hero; (void)currentLevel; }
+    void interact();
+    void flee();
 };
 
 } // namespace pd

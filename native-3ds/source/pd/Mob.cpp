@@ -15,6 +15,8 @@
 #include "pd/Sample.h"
 #include "pd/Debug.h"
 #include "pd/Statistics.h"
+#include "pd/Heap.h"
+#include "pd/ui/BottomScreenUI.h"
 #include "noosa/Audio.h"
 #include "noosa/Music.h"
 #include <cmath>
@@ -1896,6 +1898,63 @@ Mimic* Mimic::spawnAt(int pos, std::vector<std::unique_ptr<Item>> chestItems) {
 
     Dungeon::mobs.push_back(std::move(m));
     return ptr;
+}
+
+// -----------------------------------------------------------------------------
+// Shopkeeper
+// -----------------------------------------------------------------------------
+Shopkeeper::Shopkeeper() {
+    name = "shopkeeper";
+    HP = HT = 100;
+    state = State::PASSIVE;
+    baseSpeed = 1.0f;
+}
+
+std::string Shopkeeper::description() const {
+    return "This stout guy looks more appropriate for a trade district in some large city than for a dungeon. His prices explain why he prefers to do business here.";
+}
+
+bool Shopkeeper::act() {
+    if (Dungeon::hero && getSprite()) {
+        getSprite()->turnTo(pos, Dungeon::hero->pos);
+    }
+    spend(TICK);
+    return true;
+}
+
+void Shopkeeper::damage(int dmg, Actor* src) {
+    (void)dmg;
+    (void)src;
+    flee();
+}
+
+void Shopkeeper::die(Actor* src) {
+    (void)src;
+    flee();
+}
+
+void Shopkeeper::flee() {
+    if (Dungeon::level) {
+        std::vector<Heap*> toRemove;
+        for (const auto& heap : Dungeon::level->heaps) {
+            if (heap && heap->type == Heap::Type::FOR_SALE) {
+                FX::burst(heap->pos, 0xffd700FFu, 6);
+                toRemove.push_back(heap.get());
+            }
+        }
+        for (Heap* h : toRemove) {
+            Dungeon::level->removeHeap(h);
+        }
+    }
+    FX::burst(pos, 0xffd700FFu, 8);
+    GLog::w("The shopkeeper vanishes in a flash of smoke!");
+    destroy();
+}
+
+void Shopkeeper::interact() {
+    if (ui::BottomScreenUI::instance()) {
+        ui::BottomScreenUI::instance()->openSellSelection();
+    }
 }
 
 } // namespace pd

@@ -23,6 +23,8 @@ public:
     HeroClass heroClass = HeroClass::Warrior;
     HeroSubClass subClass = HeroSubClass::None;
     int STR = 10;
+    bool weakened = false;
+    int effectiveSTR() const { return weakened ? std::max(1, STR - 2) : STR; }
     int exp = 0;
     int level = 1;
     int maxExp = 5;

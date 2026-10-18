@@ -20,6 +20,7 @@ namespace pd {
 class Hero;
 class Level;
 class Item;
+class Heap;
 }
 
 #include "pd/LevelTransition.h"
@@ -90,6 +91,9 @@ public:
     void showOptions(std::string title, std::string message,
                      std::vector<std::string> options,
                      std::function<void(int)> onSelect);
+    void showTradeItem(pd::Heap* heap);
+    void showSellDialog(pd::Item* item);
+    void openSellSelection();
     void inspectCell(int cell, pd::Level* level);
 
     // Top-Screen Examine mode

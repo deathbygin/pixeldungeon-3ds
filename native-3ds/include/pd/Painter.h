@@ -43,6 +43,7 @@ public:
     static void paintWeakFloor(Level* level, Room* room);
     static void paintAltar(Level* level, Room* room);
     static void paintCrypt(Level* level, Room* room);
+    static void paintShop(Level* level, Room* room);
 
 private:
     static void paintBurned(Level* level, Room* room);

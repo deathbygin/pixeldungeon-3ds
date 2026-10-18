@@ -92,6 +92,11 @@ bool Dungeon::bossLevel(int d) {
     return d == 5 || d == 10 || d == 15 || d == 20 || d == 25;
 }
 
+bool Dungeon::shopOnLevel(int d) {
+    if (d == -1) d = depth;
+    return d == 6 || d == 11 || d == 16 || d == 21;
+}
+
 void Dungeon::dropToChasm(std::unique_ptr<Item> item) {
     if (!item) return;
     int nextDepth = depth + 1;

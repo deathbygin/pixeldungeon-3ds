@@ -112,6 +112,22 @@ bool RegularLevel::build() {
         }
     }
 
+    if (Dungeon::shopOnLevel()) {
+        Room* shop = nullptr;
+        for (const auto& pair : roomEntrance->connected) {
+            Room* r = pair.first;
+            if (r && r->connected.size() == 1 && r->width() >= 5 && r->height() >= 5) {
+                shop = r;
+                break;
+            }
+        }
+        if (shop == nullptr) {
+            return false;
+        } else {
+            shop->type = Room::Type::SHOP;
+        }
+    }
+
     assignRoomType();
     paint();
     paintWater();

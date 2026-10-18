@@ -25,7 +25,8 @@ public:
         ENCHANTABLE,
         WEAPON,
         WAND,
-        QUICKSLOT
+        QUICKSLOT,
+        FOR_SALE
     };
 
     static constexpr int COLS = 4;

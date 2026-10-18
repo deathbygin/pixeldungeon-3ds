@@ -81,24 +81,17 @@ public:
 
     template<typename T, typename... Args>
     T* affect(Args&&... args) {
-        T* existing = getBuff<T>();
-        if (existing) {
-            return existing;
-        }
         T* b = new T(std::forward<Args>(args)...);
         addBuff(b);
-        return b;
+        return getBuff<T>();
     }
 
     template<typename T, typename... Args>
     T* prolong(float duration, Args&&... args) {
-        T* existing = getBuff<T>();
-        if (existing) {
-            existing->postpone(duration);
-            return existing;
+        T* b = affect<T>(std::forward<Args>(args)...);
+        if (b) {
+            b->postpone(duration);
         }
-        T* b = new T(std::forward<Args>(args)...);
-        addBuff(b);
         return b;
     }
 };

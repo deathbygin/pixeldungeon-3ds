@@ -281,6 +281,11 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
 
     Char* enemy = Actor::findChar(nextCell);
     if (enemy && enemy != this) {
+        if (enemy->asMob() && enemy->asMob()->mobType() == Mob::MobType::Shopkeeper) {
+            static_cast<Shopkeeper*>(enemy)->interact();
+            waitingForInput = true;
+            return false;
+        }
         if (isCharmedBy(enemy)) {
             GLog::w("You are too charmed to attack!");
             waitingForInput = true;
@@ -309,6 +314,11 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
                 int reachCell = ry * Level::WIDTH + rx;
                 Char* reachEnemy = Actor::findChar(reachCell);
                 if (reachEnemy && reachEnemy != this) {
+                    if (reachEnemy->asMob() && reachEnemy->asMob()->mobType() == Mob::MobType::Shopkeeper) {
+                        static_cast<Shopkeeper*>(reachEnemy)->interact();
+                        waitingForInput = true;
+                        return false;
+                    }
                     // Check obstacle between hero and reachEnemy (nextCell):
                     // Can strike across chasm, water, low obstacles, traps, open doors, or passable terrain.
                     // Only solid walls or closed doors block reach attacks.
@@ -392,6 +402,13 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
 
     // Check for container on adjacent tile BEFORE moving onto it!
     Heap* targetHeap = currentLevel->getHeap(nextCell);
+    if (targetHeap && targetHeap->type == Heap::Type::FOR_SALE && targetHeap->peek() && targetHeap->peek()->price() > 0) {
+        if (ui::BottomScreenUI::instance()) {
+            ui::BottomScreenUI::instance()->showTradeItem(targetHeap);
+        }
+        waitingForInput = true;
+        return false;
+    }
     if (targetHeap && targetHeap->type != Heap::Type::HEAP && targetHeap->type != Heap::Type::FOR_SALE && targetHeap->type != Heap::Type::HIDDEN) {
         // Player opens container from an adjacent tile without stepping onto its tile!
         openContainer(targetHeap, nextCell);
@@ -486,6 +503,13 @@ bool Hero::pickUp(Level* currentLevel, bool spendTurn) {
     Heap* heap = currentLevel->getHeap(pos);
     if (!heap || heap->isEmpty()) {
         GLog::w("There is nothing here to pick up.");
+        return false;
+    }
+
+    if (heap->type == Heap::Type::FOR_SALE && heap->peek() && heap->peek()->price() > 0) {
+        if (ui::BottomScreenUI::instance()) {
+            ui::BottomScreenUI::instance()->showTradeItem(heap);
+        }
         return false;
     }
 
@@ -804,7 +828,7 @@ void Hero::damage(int dmg, Actor* src) {
 }
 
 float Hero::speed() const {
-    int aEnc = belongings.equippedArmor ? belongings.equippedArmor->STR - STR : 0;
+    int aEnc = belongings.equippedArmor ? belongings.equippedArmor->STR - effectiveSTR() : 0;
     if (aEnc > 0) {
         return static_cast<float>(Char::speed() * std::pow(1.3, -aEnc));
     } else {
@@ -845,7 +869,7 @@ int Hero::defenseSkill(Char* attacker) {
     if (paralysed) {
         evasion /= 2.0f;
     }
-    int aEnc = belongings.equippedArmor ? belongings.equippedArmor->STR - STR : 0;
+    int aEnc = belongings.equippedArmor ? belongings.equippedArmor->STR - effectiveSTR() : 0;
     int baseSkill = 5 + level;
     if (belongings.equippedWeapon) {
         baseSkill += belongings.equippedWeapon->defenseBonus();
@@ -883,7 +907,7 @@ int Hero::damageRoll() {
     } else if (belongings.equippedWeapon) {
         dmg = belongings.equippedWeapon->damageRoll(this);
     } else {
-        dmg = STR > 10 ? Random::IntRange(1, STR - 9) : 1;
+        dmg = effectiveSTR() > 10 ? Random::IntRange(1, effectiveSTR() - 9) : 1;
     }
     if (getBuff<Fury>() != nullptr) {
         dmg = static_cast<int>(dmg * 1.5f);

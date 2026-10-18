@@ -416,7 +416,7 @@ std::string Weapon::info() const {
 
 float Weapon::acuracyFactor(Hero* hero) const {
     if (!hero) return ACU;
-    int encumbrance = STR - hero->STR;
+    int encumbrance = STR - hero->effectiveSTR();
     if (asMissile()) {
         if (hero->heroClass == Hero::HeroClass::Warrior) {
             encumbrance += 3;
@@ -431,7 +431,7 @@ float Weapon::acuracyFactor(Hero* hero) const {
 
 float Weapon::speedFactor(Hero* hero) const {
     if (!hero) return DLY;
-    int encumbrance = STR - hero->STR;
+    int encumbrance = STR - hero->effectiveSTR();
     if (asMissile() && hero->heroClass == Hero::HeroClass::Huntress) {
         encumbrance -= 2;
     }
@@ -450,7 +450,7 @@ int Weapon::damageRoll(Hero* hero) const {
         bool isRanged = (hero->rangedWeapon != nullptr);
         bool isHuntress = (hero->heroClass == Hero::HeroClass::Huntress);
         if (isRanged == isHuntress) {
-            int exStr = hero->STR - STR;
+            int exStr = hero->effectiveSTR() - STR;
             if (exStr > 0) {
                 dmg += Random::IntRange(0, exStr);
             }
@@ -620,7 +620,7 @@ std::string MeleeWeapon::info() const {
         int mn = min0();
         int mx = max0();
         s += "Its typical average damage is " + std::to_string(mn + (mx - mn) / 2) + " points per hit and usually it requires " + std::to_string(typicalSTR()) + " points of strength. ";
-        if (Dungeon::hero && typicalSTR() > Dungeon::hero->STR) {
+        if (Dungeon::hero && typicalSTR() > Dungeon::hero->effectiveSTR()) {
             s += "Probably this weapon is too heavy for you. ";
         }
     }
@@ -651,9 +651,9 @@ std::string MeleeWeapon::info() const {
     }
 
     if (levelKnown && Dungeon::hero) {
-        if (STR > Dungeon::hero->STR) {
+        if (STR > Dungeon::hero->effectiveSTR()) {
             s += "\n\nBecause of your inadequate strength the accuracy and speed of your attack with this " + name + " is decreased.";
-        } else if (STR < Dungeon::hero->STR) {
+        } else if (STR < Dungeon::hero->effectiveSTR()) {
             s += "\n\nBecause of your excess strength the damage of your attack with this " + name + " is increased.";
         }
     }
@@ -1261,7 +1261,7 @@ int Wand::damageRoll(Hero* hero) const {
     int mx = maxDamage();
     int dmg = Random::IntRange(mn, mx);
     if (hero && hero->heroClass != Hero::HeroClass::Huntress) {
-        int ex = hero->STR - 10;
+        int ex = hero->effectiveSTR() - 10;
         if (ex > 0) {
             dmg += Random::IntRange(0, ex);
         }
@@ -2243,6 +2243,14 @@ Armor::Armor(std::string n, int t, int strReq)
 int Armor::typicalSTR() const {
     if (tier >= 1 && tier <= 5) return 7 + tier * 2;
     return STR + (levelKnown ? level : 0);
+}
+
+int Armor::price() const {
+    int basePrice = 10 * (1 << (tier - 1));
+    if (isInscribed()) {
+        basePrice = static_cast<int>(basePrice * 1.5f);
+    }
+    return considerState(basePrice);
 }
 
 Item* Armor::identify() {
@@ -3749,6 +3757,10 @@ std::unique_ptr<Item> Food::clone(int qty) const {
     return f;
 }
 
+int Food::price() const {
+    return 10 * quantity;
+}
+
 // -----------------------------------------------------------------------------
 // Dewdrop
 // -----------------------------------------------------------------------------
@@ -3862,6 +3874,10 @@ std::unique_ptr<Item> Torch::clone(int qty) const {
     return t;
 }
 
+int Torch::price() const {
+    return 10 * quantity;
+}
+
 // -----------------------------------------------------------------------------
 // Keys
 // -----------------------------------------------------------------------------
@@ -3968,9 +3984,9 @@ std::string MissileWeapon::info() const {
     s += "\n\nAverage damage of this weapon equals to " + std::to_string(mn + (mx - mn) / 2) + " points per hit. ";
 
     if (Dungeon::hero) {
-        if (STR > Dungeon::hero->STR) {
+        if (STR > Dungeon::hero->effectiveSTR()) {
             s += "Because of your inadequate strength the accuracy and speed of your attack with this " + name + " is decreased.";
-        } else if (STR < Dungeon::hero->STR) {
+        } else if (STR < Dungeon::hero->effectiveSTR()) {
             s += "Because of your excess strength the damage of your attack with this " + name + " is increased.";
         }
     }
@@ -4771,6 +4787,10 @@ std::unique_ptr<Item> Ring::clone(int qty) const {
     return r;
 }
 
+int Ring::price() const {
+    return considerState(50);
+}
+
 // =============================================================================
 // DewVial Implementation
 // =============================================================================
@@ -5067,6 +5087,166 @@ std::unique_ptr<Item> MysteryMeat::clone(int qty) const {
     auto m = std::make_unique<MysteryMeat>();
     m->quantity = qty;
     return m;
+}
+
+// -----------------------------------------------------------------------------
+// OverpricedRation
+// -----------------------------------------------------------------------------
+OverpricedRation::OverpricedRation() {
+    name = "overpriced food ration";
+    image = ItemSpriteSheet::OVERPRICED;
+    identified = true;
+    levelKnown = true;
+    cursedKnown = true;
+}
+
+std::string OverpricedRation::info() const {
+    return "It looks exactly like a standard ration of food but smaller.";
+}
+
+std::unique_ptr<Item> OverpricedRation::clone(int qty) const {
+    auto r = std::make_unique<OverpricedRation>();
+    r->quantity = qty;
+    return r;
+}
+
+// -----------------------------------------------------------------------------
+// Ankh
+// -----------------------------------------------------------------------------
+Ankh::Ankh() {
+    name = "Ankh";
+    image = ItemSpriteSheet::ANKH;
+    quantity = 1;
+    identified = true;
+    levelKnown = true;
+    cursedKnown = true;
+}
+
+std::string Ankh::info() const {
+    return "The ancient symbol of immortality grants an ability to return to life after death. Upon resurrection all non-equipped items are lost.";
+}
+
+std::unique_ptr<Item> Ankh::clone(int qty) const {
+    auto a = std::make_unique<Ankh>();
+    a->quantity = qty;
+    return a;
+}
+
+// -----------------------------------------------------------------------------
+// Weightstone
+// -----------------------------------------------------------------------------
+Weightstone::Weightstone() {
+    name = "weightstone";
+    image = ItemSpriteSheet::WEIGHT;
+    quantity = 1;
+    identified = true;
+    levelKnown = true;
+    cursedKnown = true;
+}
+
+std::vector<std::string> Weightstone::actions(Hero* hero) {
+    (void)hero;
+    return { "APPLY", "DROP", "THROW" };
+}
+
+bool Weightstone::execute(Hero* hero, const std::string& action) {
+    if (!hero) return false;
+    if (action == "APPLY") {
+        if (hero->belongings.equippedWeapon) {
+            Weapon* w = hero->belongings.equippedWeapon->asWeapon();
+            if (w) {
+                w->imbue = (w->imbue == Weapon::Imbue::SPEED) ? Weapon::Imbue::ACCURACY : Weapon::Imbue::SPEED;
+                GLog::p("You balanced your " + w->displayName() + (w->imbue == Weapon::Imbue::SPEED ? " for speed." : " for accuracy."));
+                Sample::play(Assets::SND_MISS);
+                quantity--;
+                if (quantity <= 0) {
+                    hero->belongings.backpack.erase(
+                        std::remove_if(hero->belongings.backpack.begin(), hero->belongings.backpack.end(),
+                                       [this](const std::unique_ptr<Item>& it) { return it.get() == this; }),
+                        hero->belongings.backpack.end());
+                }
+                hero->spendAndNext(2.0f * Actor::TICK);
+                return true;
+            }
+        }
+        GLog::w("You must equip a melee weapon first!");
+        return false;
+    } else if (action == "DROP") {
+        return doDropItem(hero, this);
+    } else if (action == "THROW") {
+        return doThrowItem(hero, this);
+    }
+    return false;
+}
+
+std::string Weightstone::info() const {
+    return "Using a weightstone, you can balance your melee weapon to increase its speed or accuracy.";
+}
+
+std::unique_ptr<Item> Weightstone::clone(int qty) const {
+    auto w = std::make_unique<Weightstone>();
+    w->quantity = qty;
+    return w;
+}
+
+// -----------------------------------------------------------------------------
+// Bags
+// -----------------------------------------------------------------------------
+SeedPouch::SeedPouch() {
+    name = "seed pouch";
+    image = ItemSpriteSheet::POUCH;
+    quantity = 1;
+    identified = true;
+    levelKnown = true;
+    cursedKnown = true;
+}
+
+std::string SeedPouch::info() const {
+    return "This small velvet pouch allows you to store any number of seeds in it. Very convenient.";
+}
+
+std::unique_ptr<Item> SeedPouch::clone(int qty) const {
+    auto b = std::make_unique<SeedPouch>();
+    b->quantity = qty;
+    return b;
+}
+
+ScrollHolder::ScrollHolder() {
+    name = "scroll holder";
+    image = ItemSpriteSheet::HOLDER;
+    quantity = 1;
+    identified = true;
+    levelKnown = true;
+    cursedKnown = true;
+}
+
+std::string ScrollHolder::info() const {
+    return "You can place any number of scrolls into this tubular container. It saves room in your backpack and protects scrolls from fire.";
+}
+
+std::unique_ptr<Item> ScrollHolder::clone(int qty) const {
+    auto b = std::make_unique<ScrollHolder>();
+    b->quantity = qty;
+    return b;
+}
+
+WandHolster::WandHolster() {
+    name = "wand holster";
+    image = ItemSpriteSheet::HOLSTER;
+    quantity = 1;
+    identified = true;
+    levelKnown = true;
+    cursedKnown = true;
+}
+
+std::string WandHolster::info() const {
+    return "A leather holster for carrying magical wands. Keeps them safe and within easy reach.";
+}
+
+std::unique_ptr<Item> WandHolster::clone(int qty) const {
+    auto b = std::make_unique<WandHolster>();
+    b->quantity = qty;
+    return b;
 }
 
 } // namespace pd

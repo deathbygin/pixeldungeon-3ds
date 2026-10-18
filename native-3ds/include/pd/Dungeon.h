@@ -37,6 +37,7 @@ public:
     static bool posNeeded();
 
     static bool bossLevel(int d = -1);
+    static bool shopOnLevel(int d = -1);
 
     static std::string resultDescription;
     static void fail(const std::string& desc = "");
