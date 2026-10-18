@@ -305,6 +305,11 @@ void Char::die(Actor* src) {
 void Char::addBuff(Buff* b) {
     if (!b) return;
 
+    if (isImmune(b->type())) {
+        delete b;
+        return;
+    }
+
     Buff* existing = buff(b->type());
     if (existing) {
         if (existing == b) return;

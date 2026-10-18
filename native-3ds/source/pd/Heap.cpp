@@ -189,6 +189,11 @@ void Heap::burn() {
         } else if ((*it)->name == "Dewdrop") {
             it = items.erase(it);
             burnt = true;
+        } else if ((*it)->name == "honeypot" || (*it)->name == "Honeypot") {
+            auto hp = std::move(*it);
+            it = items.erase(it);
+            burnt = true;
+            static_cast<Honeypot*>(hp.get())->shatter(pos);
         } else {
             ++it;
         }

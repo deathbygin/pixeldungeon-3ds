@@ -285,6 +285,21 @@ void Traps::trigger(int tile, int cell, Char* ch) {
         }
         if (Dungeon::level) {
             Dungeon::level->set(cell, Terrain::INACTIVE_TRAP);
+            Heap* h = Dungeon::level->getHeap(cell);
+            if (h && h->type == Heap::Type::HEAP) {
+                for (auto it = h->items.begin(); it != h->items.end();) {
+                    if ((*it)->name == "honeypot" || (*it)->name == "Honeypot") {
+                        auto hp = std::move(*it);
+                        it = h->items.erase(it);
+                        static_cast<Honeypot*>(hp.get())->shatter(cell);
+                    } else {
+                        ++it;
+                    }
+                }
+                if (h->isEmpty()) {
+                    Dungeon::level->removeHeap(h);
+                }
+            }
         }
         Dungeon::observe();
     }

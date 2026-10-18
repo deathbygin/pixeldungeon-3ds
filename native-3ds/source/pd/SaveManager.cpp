@@ -788,6 +788,10 @@ bool SaveManager::loadGame(const std::string& customPath) {
                 item = std::make_unique<TomeOfMastery>();
             } else if (iName == "Amulet of Yendor") {
                 item = std::make_unique<Amulet>();
+            } else if (iName == "Honeypot" || iName == "honeypot") {
+                item = std::make_unique<Honeypot>();
+            } else if (iName == "Bomb" || iName == "bomb") {
+                item = std::make_unique<Bomb>();
             } else {
                 item = std::make_unique<Item>();
             }
@@ -1001,6 +1005,10 @@ bool SaveManager::loadGame(const std::string& customPath) {
                         item = std::make_unique<TomeOfMastery>();
                     } else if (iName == "Amulet of Yendor") {
                         item = std::make_unique<Amulet>();
+                    } else if (iName == "Honeypot" || iName == "honeypot") {
+                        item = std::make_unique<Honeypot>();
+                    } else if (iName == "Bomb" || iName == "bomb") {
+                        item = std::make_unique<Bomb>();
                     } else {
                         item = std::make_unique<Item>();
                     }
@@ -1087,7 +1095,8 @@ bool SaveManager::loadGame(const std::string& customPath) {
             case Mob::MobType::BurningFist: mob = std::make_unique<BurningFist>(); break;
             case Mob::MobType::RottingFist: mob = std::make_unique<RottingFist>(); break;
             case Mob::MobType::Mimic:       mob = std::make_unique<Mimic>(); break;
-            default:                     mob = std::make_unique<Rat>(); break;
+            case Mob::MobType::Bee:         mob = std::make_unique<Bee>(); break;
+            default:                        mob = std::make_unique<Rat>(); break;
         }
 
         if (mob) {

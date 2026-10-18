@@ -300,6 +300,16 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
             waitingForInput = true;
             return false;
         }
+        if (enemy->asMob() && enemy->asMob()->mobType() == Mob::MobType::Bee) {
+            static_cast<Bee*>(enemy)->interact();
+            waitingForInput = false;
+            return true;
+        }
+        if (enemy->asMob() && enemy->asMob()->mobType() == Mob::MobType::Sheep) {
+            static_cast<Sheep*>(enemy)->interact();
+            waitingForInput = true;
+            return false;
+        }
         if (isCharmedBy(enemy)) {
             GLog::w("You are too charmed to attack!");
             waitingForInput = true;
@@ -328,8 +338,10 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
                 int reachCell = ry * Level::WIDTH + rx;
                 Char* reachEnemy = Actor::findChar(reachCell);
                 if (reachEnemy && reachEnemy != this) {
-                    if (reachEnemy->asMob() && reachEnemy->asMob()->mobType() == Mob::MobType::Shopkeeper) {
-                        static_cast<Shopkeeper*>(reachEnemy)->interact();
+                    if (reachEnemy->asMob() && !reachEnemy->asMob()->hostile) {
+                        if (reachEnemy->asMob()->mobType() == Mob::MobType::Shopkeeper) {
+                            static_cast<Shopkeeper*>(reachEnemy)->interact();
+                        }
                         waitingForInput = true;
                         return false;
                     }

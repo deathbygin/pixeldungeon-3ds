@@ -191,14 +191,18 @@ void Mob::aiStep(Hero* hero, Level* currentLevel) {
         }
     } else {
         Char* chosenTarget = hero;
-        if (mobType() != MobType::MirrorImage) {
-            int bestDist = hero ? PathFinder::distanceChebyshev(pos, hero->pos) : 999;
-            for (const auto& otherMob : Dungeon::mobs) {
-                if (otherMob && otherMob->isAlive() && otherMob->mobType() == MobType::MirrorImage && s_mobFov[otherMob->pos]) {
-                    int d = PathFinder::distanceChebyshev(pos, otherMob->pos);
-                    if (d < bestDist) {
-                        bestDist = d;
-                        chosenTarget = otherMob.get();
+        if (mobType() != MobType::MirrorImage && mobType() != MobType::Bee) {
+            if (enemy && enemy->isAlive() && (!enemy->asMob() || !enemy->asMob()->hostile) && s_mobFov[enemy->pos]) {
+                chosenTarget = enemy;
+            } else {
+                int bestDist = hero ? PathFinder::distanceChebyshev(pos, hero->pos) : 999;
+                for (const auto& otherMob : Dungeon::mobs) {
+                    if (otherMob && otherMob->isAlive() && otherMob.get() != this && !otherMob->hostile && s_mobFov[otherMob->pos]) {
+                        int d = PathFinder::distanceChebyshev(pos, otherMob->pos);
+                        if (d < bestDist) {
+                            bestDist = d;
+                            chosenTarget = otherMob.get();
+                        }
                     }
                 }
             }
@@ -1788,6 +1792,7 @@ MirrorImage::MirrorImage() {
     HP = 1;
     HT = 1;
     expAward = 0;
+    hostile = false;
     state = State::HUNTING;
 }
 
@@ -1860,6 +1865,7 @@ Sheep::Sheep(float life) : Mob(), lifespan(life) {
     name = "sheep";
     HP = HT = 1;
     expAward = 0;
+    hostile = false;
     state = State::PASSIVE;
 }
 
@@ -2051,6 +2057,7 @@ Mimic* Mimic::spawnAt(int pos, std::vector<std::unique_ptr<Item>> chestItems) {
 Shopkeeper::Shopkeeper() {
     name = "shopkeeper";
     HP = HT = 100;
+    hostile = false;
     state = State::PASSIVE;
     baseSpeed = 1.0f;
 }
@@ -2100,6 +2107,156 @@ void Shopkeeper::interact() {
     if (ui::BottomScreenUI::instance()) {
         ui::BottomScreenUI::instance()->openSellSelection();
     }
+}
+
+// -----------------------------------------------------------------------------
+// Golden Bee (Spawned by Honeypot)
+// -----------------------------------------------------------------------------
+Bee::Bee() {
+    name = "golden bee";
+    HP = 20;
+    HT = 20;
+    expAward = 0;
+    hostile = false;
+    flying = true;
+    baseSpeed = 1.0f;
+    viewDistance = 4;
+    state = State::WANDERING;
+}
+
+std::string Bee::description() const {
+    return "Despite their small size, golden bees tend to protect their master fiercely. They don't live long though.";
+}
+
+void Bee::spawn(int depth) {
+    level = depth;
+    HT = (3 + level) * 5;
+    HP = HT;
+}
+
+int Bee::damageRoll() {
+    return Random::NormalIntRange(HT / 10, HT / 4);
+}
+
+int Bee::attackSkill(Char* target) {
+    (void)target;
+    return 9 + level;
+}
+
+int Bee::defenseSkill(Char* attacker) {
+    (void)attacker;
+    return 9 + level;
+}
+
+int Bee::attackProc(Char* enemyChar, int damage) {
+    if (enemyChar) {
+        if (auto* m = enemyChar->asMob()) {
+            m->aggro(this);
+        }
+    }
+    return damage;
+}
+
+bool Bee::act() {
+    HP--;
+    if (HP <= 0) {
+        die(nullptr);
+        return true;
+    }
+    return Mob::act();
+}
+
+void Bee::aiStep(Hero* hero, Level* currentLevel) {
+    if (!hero || !hero->isAlive() || !currentLevel) {
+        spend(TICK);
+        return;
+    }
+
+    if (paralysed || buff(BuffType::Sleep) != nullptr) {
+        enemySeen = false;
+        spend(TICK);
+        return;
+    }
+
+    // 1. Calculate mob's independent FOV from its own position
+    int mx = pos % Level::WIDTH;
+    int my = pos / Level::WIDTH;
+    ShadowCaster::castShadow(mx, my, s_mobFov, viewDistance, currentLevel->losBlocking);
+
+    // 2. Target selection
+    if (!enemy || !enemy->isAlive() || !s_mobFov[enemy->pos]) {
+        std::vector<Mob*> candidateEnemies;
+        for (const auto& otherMob : Dungeon::mobs) {
+            if (otherMob && otherMob->isAlive() && otherMob.get() != this && otherMob->hostile) {
+                if (s_mobFov[otherMob->pos]) {
+                    candidateEnemies.push_back(otherMob.get());
+                }
+            }
+        }
+        if (!candidateEnemies.empty()) {
+            enemy = candidateEnemies[Random::Int(static_cast<int>(candidateEnemies.size()))];
+        } else {
+            enemy = nullptr;
+        }
+    }
+
+    // 3. Act based on enemy presence
+    if (enemy && enemy->isAlive() && s_mobFov[enemy->pos]) {
+        state = State::HUNTING;
+        target = enemy->pos;
+        enemySeen = true;
+
+        if (canAttack(enemy)) {
+            doAttack(enemy);
+            return;
+        } else {
+            if (getCloser(target)) {
+                spend(TICK / speed());
+                return;
+            } else {
+                spend(TICK);
+                return;
+            }
+        }
+    } else {
+        // Wandering: follow the master (Hero)
+        state = State::WANDERING;
+        enemySeen = false;
+        enemy = nullptr;
+
+        int distToHero = PathFinder::distanceChebyshev(pos, hero->pos);
+        if (distToHero > 1) {
+            if (getCloser(hero->pos)) {
+                spend(TICK / speed());
+                return;
+            }
+        }
+        spend(TICK);
+    }
+}
+
+void Bee::die(Actor* src) {
+    GLog::i("The golden bee perished.");
+    Sample::playAt(Assets::SND_DEATH, pos);
+    FX::burst(pos, 0xffd500FF, 8);
+    Char::die(src);
+}
+
+void Bee::interact() {
+    if (!Dungeon::hero) return;
+    int heroPos = Dungeon::hero->pos;
+    int beePos = pos;
+
+    Actor::freeCell(beePos);
+    Actor::freeCell(heroPos);
+
+    place(heroPos);
+    Actor::occupyCell(this);
+
+    Dungeon::hero->place(beePos);
+    Actor::occupyCell(Dungeon::hero.get());
+
+    Dungeon::hero->spendAndNext(1.0f / Dungeon::hero->speed());
 }
 
 } // namespace pd

@@ -63,6 +63,7 @@ public:
     bool isCharmedBy(Char* ch) const;
     void unfreeze();
 
+    virtual bool isImmune(BuffType type) const { (void)type; return false; }
     void addBuff(Buff* b);
     void removeBuff(Buff* b);
     void removeBuff(BuffType type);

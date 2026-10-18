@@ -49,10 +49,12 @@ public:
         MirrorImage,
         Sheep,
         Mimic,
-        Shopkeeper
+        Shopkeeper,
+        Bee
     };
 
     State state = State::SLEEPING;
+    bool hostile = true;
     int expAward = 1;
     int target = -1;
     Char* enemy = nullptr;
@@ -63,6 +65,8 @@ public:
 
     Mob();
     ~Mob() override = default;
+
+    virtual void aggro(Char* ch) { enemy = ch; }
 
     CharSprite* getSprite() override;
     Mob* asMob() override { return this; }
@@ -486,6 +490,25 @@ public:
     void aiStep(Hero* hero, Level* currentLevel) override { (void)hero; (void)currentLevel; }
     void interact();
     void flee();
+};
+
+class Bee : public Mob {
+public:
+    int level = 1;
+
+    Bee();
+    MobType mobType() const override { return MobType::Bee; }
+    std::string description() const override;
+    void spawn(int depth);
+    int damageRoll() override;
+    int attackSkill(Char* target) override;
+    int defenseSkill(Char* attacker) override;
+    int attackProc(Char* enemy, int damage) override;
+    bool isImmune(BuffType type) const override { return type == BuffType::Poison; }
+    bool act() override;
+    void aiStep(Hero* hero, Level* currentLevel) override;
+    void die(Actor* src) override;
+    void interact();
 };
 
 } // namespace pd

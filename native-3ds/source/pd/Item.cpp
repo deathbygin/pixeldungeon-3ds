@@ -4926,6 +4926,23 @@ void Bomb::explode(int cell) {
                 ch->affect<Paralysis>();
             }
         }
+
+        // Check for honeypot on the ground damaged by explosion
+        Heap* h = Dungeon::level->getHeap(c);
+        if (h && h->type == Heap::Type::HEAP) {
+            for (auto it = h->items.begin(); it != h->items.end();) {
+                if ((*it)->name == "honeypot" || (*it)->name == "Honeypot") {
+                    auto hp = std::move(*it);
+                    it = h->items.erase(it);
+                    static_cast<Honeypot*>(hp.get())->shatter(c);
+                } else {
+                    ++it;
+                }
+            }
+            if (h->isEmpty()) {
+                Dungeon::level->removeHeap(h);
+            }
+        }
     }
     Dungeon::observe();
 }
@@ -4944,7 +4961,7 @@ std::unique_ptr<Item> Bomb::clone(int qty) const {
 // Honeypot Implementation
 // =============================================================================
 Honeypot::Honeypot() {
-    name = "Honeypot";
+    name = "honeypot";
     image = ItemSpriteSheet::HONEYPOT;
     quantity = 1;
     identified = true;
@@ -4962,7 +4979,15 @@ bool Honeypot::execute(Hero* hero, const std::string& action) {
     if (!hero) return false;
     if (action == "SHATTER") {
         shatter(hero->pos);
-        quantity--;
+        for (auto it = hero->belongings.backpack.begin(); it != hero->belongings.backpack.end(); ++it) {
+            if (it->get() == this) {
+                quantity--;
+                if (quantity <= 0) {
+                    hero->belongings.backpack.erase(it);
+                }
+                break;
+            }
+        }
         hero->spendAndNext(Actor::TICK);
         return true;
     } else if (action == "THROW") {
@@ -4983,26 +5008,40 @@ void Honeypot::onThrow(int cell) {
 
 void Honeypot::shatter(int cell) {
     Sample::playAt(Assets::SND_SHATTER, cell);
-    FX::burst(cell, 0xffd500FFu, 16);
-    GLog::p("The honeypot shatters, releasing sweet golden honey!");
-    if (Dungeon::level) {
-        for (int n : Level::NEIGHBOURS4) {
-            int c = cell + n;
-            if (c >= 0 && c < Level::LENGTH && Dungeon::level->isPassable(c) && !Actor::findChar(c)) {
-                auto bat = std::make_unique<Bat>();
-                bat->name = "Golden Bee";
-                bat->place(c);
-                Actor::occupyCell(bat.get());
-                Actor::add(bat.get());
-                Dungeon::mobs.push_back(std::move(bat));
-                break;
+    Sample::playAt(Assets::SND_BEE, cell);
+    FX::splash(cell, 0xffd500FF, 5);
+    FX::burst(cell, 0xffd500FFu, 8);
+
+    int newPos = cell;
+    if (Actor::findChar(cell) != nullptr) {
+        std::vector<int> candidates;
+        if (Dungeon::level) {
+            for (int n : Level::NEIGHBOURS4) {
+                int c = cell + n;
+                if (c >= 0 && c < Level::LENGTH && Dungeon::level->isPassable(c) && Actor::findChar(c) == nullptr) {
+                    candidates.push_back(c);
+                }
             }
         }
+        newPos = !candidates.empty() ? candidates[Random::Int(static_cast<int>(candidates.size()))] : -1;
+    }
+
+    if (newPos != -1) {
+        auto bee = std::make_unique<Bee>();
+        bee->spawn(Dungeon::depth);
+        bee->place(newPos);
+        bee->state = Mob::State::WANDERING;
+        Actor::occupyCell(bee.get());
+        Actor::add(bee.get(), 1.0f);
+        Dungeon::mobs.push_back(std::move(bee));
+        GLog::p("The honeypot shatters and a golden bee emerges!");
+    } else {
+        GLog::w("The honeypot shatters, but there was no room for the bee to emerge!");
     }
 }
 
 std::string Honeypot::info() const {
-    return "A sealed pot filled with thick aromatic honey. When thrown or shattered, it breaks and summons a loyal golden bee.";
+    return "There is not much honey in this small honeypot, but there is a golden bee there and it doesn't want to leave it.";
 }
 
 std::unique_ptr<Item> Honeypot::clone(int qty) const {
