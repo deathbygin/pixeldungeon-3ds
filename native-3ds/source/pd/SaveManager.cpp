@@ -333,6 +333,11 @@ bool SaveManager::saveGame(const std::string& customPath) {
     for (const auto& it : hero->belongings.backpack) {
         if (it) allItems.push_back(it.get());
     }
+    if (hero->belongings.keyring) {
+        for (const auto& k : hero->belongings.keyring->keys) {
+            if (k) allItems.push_back(k.get());
+        }
+    }
 
     uint32_t itemCount = static_cast<uint32_t>(allItems.size());
     std::fwrite(&itemCount, sizeof(uint32_t), 1, fp);
@@ -705,6 +710,11 @@ bool SaveManager::loadGame(const std::string& customPath) {
 
     // 4. Inventory & Belongings
     hero->belongings.backpack.clear();
+    if (hero->belongings.keyring) {
+        hero->belongings.keyring->keys.clear();
+    } else {
+        hero->belongings.keyring = std::make_unique<Keyring>();
+    }
     hero->belongings.weaponSlot.reset();
     hero->belongings.armorSlot.reset();
     hero->belongings.ring1Slot.reset();
@@ -873,6 +883,13 @@ bool SaveManager::loadGame(const std::string& customPath) {
             } else if (isEquippedWeapon == 3) {
                 hero->belongings.ring2Slot = std::move(item);
                 hero->belongings.equippedRing2 = hero->belongings.ring2Slot.get();
+            } else if (item->asKey()) {
+                if (hero->belongings.keyring) {
+                    std::unique_ptr<Key> keyPtr(static_cast<Key*>(item.release()));
+                    hero->belongings.keyring->addKey(std::move(keyPtr));
+                } else {
+                    hero->belongings.backpack.push_back(std::move(item));
+                }
             } else {
                 hero->belongings.backpack.push_back(std::move(item));
             }

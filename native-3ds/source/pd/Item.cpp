@@ -5294,4 +5294,106 @@ std::unique_ptr<Item> WandHolster::clone(int qty) const {
     return b;
 }
 
+// =============================================================================
+// Keyring
+// =============================================================================
+Keyring::Keyring() {
+    name = "Key Ring";
+    image = ItemSpriteSheet::KEYRING;
+    quantity = 1;
+    unique = true;
+    identified = true;
+    levelKnown = true;
+    cursedKnown = true;
+}
+
+bool Keyring::grab(const Item* item) const {
+    return item != nullptr && const_cast<Item*>(item)->asKey() != nullptr;
+}
+
+bool Keyring::addKey(std::unique_ptr<Key> key) {
+    if (!key) return false;
+    for (auto& k : keys) {
+        if (k && k->name == key->name && k->depth == key->depth && k->isStackable()) {
+            k->quantity += key->quantity;
+            return true;
+        }
+    }
+    if (keys.size() >= KEYRING_SIZE) return false;
+    keys.push_back(std::move(key));
+    std::sort(keys.begin(), keys.end(), [](const std::unique_ptr<Key>& a, const std::unique_ptr<Key>& b) {
+        if (!a || !b) return a != nullptr;
+        if (a->depth != b->depth) return a->depth < b->depth;
+        return a->name < b->name;
+    });
+    return true;
+}
+
+Key* Keyring::getKey(const std::string& keyName, int depth) const {
+    for (const auto& k : keys) {
+        if (k && k->name == keyName) {
+            if (depth <= 0 || k->depth == depth) {
+                return k.get();
+            }
+        }
+    }
+    return nullptr;
+}
+
+bool Keyring::consumeKey(const std::string& keyName, int depth) {
+    for (auto it = keys.begin(); it != keys.end(); ++it) {
+        if (*it && (*it)->name == keyName) {
+            if (depth <= 0 || (*it)->depth == depth) {
+                (*it)->quantity--;
+                if ((*it)->quantity <= 0) {
+                    keys.erase(it);
+                }
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+std::unique_ptr<Key> Keyring::removeKey(Key* key) {
+    for (auto it = keys.begin(); it != keys.end(); ++it) {
+        if (it->get() == key) {
+            std::unique_ptr<Key> removed = std::move(*it);
+            keys.erase(it);
+            return removed;
+        }
+    }
+    return nullptr;
+}
+
+std::vector<std::string> Keyring::actions(Hero* hero) {
+    (void)hero;
+    return {};
+}
+
+bool Keyring::execute(Hero* hero, const std::string& action) {
+    (void)hero;
+    (void)action;
+    return false;
+}
+
+std::string Keyring::info() const {
+    return "This is a copper key ring, that lets you keep all your keys "
+           "separately from the rest of your belongings.";
+}
+
+std::unique_ptr<Item> Keyring::clone(int qty) const {
+    (void)qty;
+    auto kr = std::make_unique<Keyring>();
+    for (const auto& k : keys) {
+        if (k) {
+            auto cloned = k->clone(k->quantity);
+            if (cloned && cloned->asKey()) {
+                kr->keys.push_back(std::unique_ptr<Key>(static_cast<Key*>(cloned.release())));
+            }
+        }
+    }
+    return kr;
+}
+
 } // namespace pd

@@ -31,6 +31,7 @@ WndBag::WndBag() {
 void WndBag::open() {
     isOpen = true;
     m_wndItem.hide();
+    m_activeTab = Tab::BACKPACK;
     m_selectedSlot = 0;
     m_selectionMode = Mode::ALL;
     m_selectionTitle.clear();
@@ -40,6 +41,7 @@ void WndBag::open() {
 void WndBag::openForSelection(Mode mode, const std::string& title, std::function<void(pd::Item*)> listener) {
     isOpen = true;
     m_wndItem.hide();
+    m_activeTab = Tab::BACKPACK;
     m_selectedSlot = 0;
     m_selectionMode = mode;
     m_selectionTitle = title;
@@ -49,6 +51,7 @@ void WndBag::openForSelection(Mode mode, const std::string& title, std::function
 void WndBag::close() {
     isOpen = false;
     m_wndItem.hide();
+    m_activeTab = Tab::BACKPACK;
     m_selectionMode = Mode::ALL;
     m_selectionTitle.clear();
     m_selectionListener = nullptr;
@@ -83,6 +86,14 @@ pd::Item* WndBag::getSelectedItem(pd::Hero* hero) const {
     if (m_selectedSlot == 1) return hero->belongings.equippedArmor;
     if (m_selectedSlot == 2) return hero->belongings.equippedRing1;
     if (m_selectedSlot == 3) return hero->belongings.equippedRing2;
+
+    if (m_activeTab == Tab::KEYRING) {
+        int keyIdx = m_selectedSlot - 4;
+        if (hero->belongings.keyring && keyIdx >= 0 && keyIdx < static_cast<int>(hero->belongings.keyring->keys.size())) {
+            return hero->belongings.keyring->keys[keyIdx].get();
+        }
+        return nullptr;
+    }
 
     int packIdx = m_selectedSlot - 4;
     auto& pack = hero->belongings.backpack;
@@ -140,14 +151,44 @@ bool WndBag::update(pd::Hero* hero, const TouchController& touch, u32 kDown, u32
     }
 
     // -------------------------------------------------------------------------
-    // Tap-Outside-to-Dismiss (Backdrop Touch on 320x240 screen)
+    // L/R Shoulder Button Tab Switching
     // -------------------------------------------------------------------------
-    float tabY = WIN_Y - 9.0f;
+    if (kDown & (KEY_L | KEY_R)) {
+        m_activeTab = (m_activeTab == Tab::BACKPACK) ? Tab::KEYRING : Tab::BACKPACK;
+        m_selectedSlot = (m_activeTab == Tab::BACKPACK) ? 0 : 4;
+        Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
+        return false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Tab Header Touch Hit Detection & Tap-Outside-to-Dismiss
+    // -------------------------------------------------------------------------
+    float tabY = WIN_Y - 12.0f;
     noosa::RectF rWin(WIN_X, tabY, WIN_W, WIN_H + (WIN_Y - tabY));
+    noosa::RectF rTab0(WIN_X + 12.0f, tabY, 76.0f, 26.0f);
+    noosa::RectF rTab1(WIN_X + 92.0f, tabY, 76.0f, 26.0f);
+
     if (touch.justPressed()) {
         m_longPressTriggered = false;
         float tx = static_cast<float>(touch.x());
         float ty = static_cast<float>(touch.y());
+
+        if (rTab0.contains(tx, ty)) {
+            if (m_activeTab != Tab::BACKPACK) {
+                m_activeTab = Tab::BACKPACK;
+                m_selectedSlot = 0;
+                Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
+            }
+            return false;
+        } else if (rTab1.contains(tx, ty)) {
+            if (m_activeTab != Tab::KEYRING) {
+                m_activeTab = Tab::KEYRING;
+                m_selectedSlot = 4;
+                Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
+            }
+            return false;
+        }
+
         if (!rWin.contains(tx, ty)) {
             Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
             if (isSelectionMode()) {
@@ -306,50 +347,87 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
     // 2. Stone Window Frame using authentic Chrome::WINDOW
     Chrome::get(Chrome::Type::WINDOW).draw(WIN_X, WIN_Y, WIN_W, WIN_H, zWin);
 
-    // 3. Dedicated raised 9-slice container tab for "Backpack" Title & Icon
-    std::string titleStr = (isSelectionMode() && !m_selectionTitle.empty()) ? m_selectionTitle : "Backpack";
-    float titleW = BitmapFont::width(BitmapFont::FontType::Font1x, titleStr);
-
-    bool showIcon = !isSelectionMode() || (m_selectionTitle.length() <= 14);
-    float iconW = showIcon ? 10.0f : 0.0f;
-    float iconSpacing = showIcon ? 6.0f : 0.0f;
-    float contentW = iconW + iconSpacing + titleW;
-
+    // 3. Dual raised container tabs: Backpack and Key Ring
     float tabH = 22.0f;
-    float tabW = std::clamp(contentW + 24.0f, 90.0f, WIN_W - 16.0f);
-    float tabX = WIN_X + std::floor((WIN_W - tabW) * 0.5f);
-    float tabY = WIN_Y - 9.0f;
-    float zTab = zWin + 0.02f;
-    float zContent = zTab + 0.03f;
+    float tab0X = WIN_X + 12.0f;
+    float tab0W = 76.0f;
+    float tab1X = WIN_X + 92.0f;
+    float tab1W = 76.0f;
 
-    // Draw the raised stone container tab
-    Chrome::get(Chrome::Type::TOAST).draw(tabX, tabY, tabW, tabH, zTab);
+    bool backpackActive = (m_activeTab == Tab::BACKPACK);
+    bool keyringActive = (m_activeTab == Tab::KEYRING);
 
-    // Center icon & title inside the tab
-    float contentX = tabX + std::floor((tabW - contentW) * 0.5f);
+    // --- Tab 0: Backpack ---
+    float tab0Y = backpackActive ? (WIN_Y - 9.0f) : (WIN_Y - 5.0f);
+    float zTab0 = backpackActive ? (zWin + 0.02f) : (zWin + 0.01f);
+    float zContent0 = zTab0 + 0.03f;
+    Chrome::get(Chrome::Type::TOAST).draw(tab0X, tab0Y, tab0W, tabH, zTab0);
 
-    if (showIcon && m_texIcons && m_texIcons->isLoaded()) {
-        float iconX = contentX;
-        float iconY = tabY + std::floor((tabH - 10.0f) * 0.5f);
+    float bContentW = 10.0f + 5.0f + BitmapFont::width(BitmapFont::FontType::Font1x, "Backpack");
+    float bContentX = tab0X + std::floor((tab0W - bContentW) * 0.5f);
+
+    if (m_texIcons && m_texIcons->isLoaded()) {
+        float iconX = bContentX;
+        float iconY = tab0Y + std::floor((tabH - 10.0f) * 0.5f);
 
         Tex3DS_SubTexture subTab;
         setupSubTex(subTab, m_texIcons->potWidth(), m_texIcons->potHeight(), 58, 0, 10, 10);
         C2D_Image imgTab = { m_texIcons->getTex(), &subTab };
         C2D_DrawParams pT;
-        pT.pos.x = iconX;
-        pT.pos.y = iconY;
-        pT.pos.w = 10.0f;
-        pT.pos.h = 10.0f;
-        pT.center.x = 0.0f;
-        pT.center.y = 0.0f;
-        pT.depth = zContent;
-        pT.angle = 0.0f;
-        C2D_DrawImage(imgTab, &pT, nullptr);
+        pT.pos.x = iconX; pT.pos.y = iconY; pT.pos.w = 10.0f; pT.pos.h = 10.0f;
+        pT.center.x = 0.0f; pT.center.y = 0.0f; pT.depth = zContent0; pT.angle = 0.0f;
+        if (!backpackActive) {
+            C2D_ImageTint tint;
+            C2D_PlainImageTint(&tint, C2D_Color32(0x99, 0x99, 0x99, 0xFF), 1.0f);
+            C2D_DrawImage(imgTab, &pT, &tint);
+        } else {
+            C2D_DrawImage(imgTab, &pT, nullptr);
+        }
     }
+    float bTextX = bContentX + 10.0f + 5.0f;
+    float bTextY = tab0Y + std::floor((tabH - 8.0f) * 0.5f);
+    u32 bTextCol = backpackActive ? COLOR_TEXT_ACCENT : COLOR_TEXT_MUTED;
+    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "Backpack", bTextX, bTextY, zContent0, bTextCol, COLOR_TEXT_SHADOW);
 
-    float textX = contentX + iconW + iconSpacing;
-    float textY = tabY + std::floor((tabH - 8.0f) * 0.5f);
-    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, titleStr, textX, textY, zContent, COLOR_TEXT_ACCENT, COLOR_TEXT_SHADOW);
+    // --- Tab 1: Key Ring ---
+    float tab1Y = keyringActive ? (WIN_Y - 9.0f) : (WIN_Y - 5.0f);
+    float zTab1 = keyringActive ? (zWin + 0.02f) : (zWin + 0.01f);
+    float zContent1 = zTab1 + 0.03f;
+    Chrome::get(Chrome::Type::TOAST).draw(tab1X, tab1Y, tab1W, tabH, zTab1);
+
+    float kContentW = 10.0f + 5.0f + BitmapFont::width(BitmapFont::FontType::Font1x, "Keys");
+    float kContentX = tab1X + std::floor((tab1W - kContentW) * 0.5f);
+
+    if (m_texIcons && m_texIcons->isLoaded()) {
+        float iconX = kContentX;
+        float iconY = tab1Y + std::floor((tabH - 10.0f) * 0.5f);
+
+        Tex3DS_SubTexture subTab;
+        setupSubTex(subTab, m_texIcons->potWidth(), m_texIcons->potHeight(), 64, 29, 10, 10);
+        C2D_Image imgTab = { m_texIcons->getTex(), &subTab };
+        C2D_DrawParams pT;
+        pT.pos.x = iconX; pT.pos.y = iconY; pT.pos.w = 10.0f; pT.pos.h = 10.0f;
+        pT.center.x = 0.0f; pT.center.y = 0.0f; pT.depth = zContent1; pT.angle = 0.0f;
+        if (!keyringActive) {
+            C2D_ImageTint tint;
+            C2D_PlainImageTint(&tint, C2D_Color32(0x99, 0x99, 0x99, 0xFF), 1.0f);
+            C2D_DrawImage(imgTab, &pT, &tint);
+        } else {
+            C2D_DrawImage(imgTab, &pT, nullptr);
+        }
+    }
+    float kTextX = kContentX + 10.0f + 5.0f;
+    float kTextY = tab1Y + std::floor((tabH - 8.0f) * 0.5f);
+    u32 kTextCol = keyringActive ? COLOR_TEXT_ACCENT : COLOR_TEXT_MUTED;
+    BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, "Keys", kTextX, kTextY, zContent1, kTextCol, COLOR_TEXT_SHADOW);
+
+    // 4. Selection Title Banner (if in selection mode)
+    if (isSelectionMode() && !m_selectionTitle.empty()) {
+        float titleW = BitmapFont::width(BitmapFont::FontType::Font1x, m_selectionTitle);
+        float titleX = WIN_X + WIN_W - titleW - 12.0f;
+        float titleY = WIN_Y + 4.0f;
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, m_selectionTitle, titleX, titleY, zWin + 0.05f, COLOR_TEXT_ACCENT, COLOR_TEXT_SHADOW);
+    }
 
     // 5. 4x5 Recessed Item Grid (Slot size 28x28, margin 2px)
     int potW = m_texItems ? m_texItems->potWidth() : 128;
@@ -365,17 +443,23 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
             // Determine item and equipped state
             pd::Item* it = nullptr;
             bool isEquippedSlot = (slotIdx < 4);
+            bool isGoldSlot = (m_activeTab == Tab::BACKPACK && slotIdx == 19);
 
             if (slotIdx == 0) it = hero->belongings.equippedWeapon;
             else if (slotIdx == 1) it = hero->belongings.equippedArmor;
             else if (slotIdx == 2) it = hero->belongings.equippedRing1;
             else if (slotIdx == 3) it = hero->belongings.equippedRing2;
-            else if (slotIdx == 19) {
-                // Gold slot
-            } else {
-                int pIdx = slotIdx - 4;
-                if (pIdx < static_cast<int>(hero->belongings.backpack.size())) {
-                    it = hero->belongings.backpack[pIdx].get();
+            else if (m_activeTab == Tab::BACKPACK) {
+                if (slotIdx != 19) {
+                    int pIdx = slotIdx - 4;
+                    if (pIdx < static_cast<int>(hero->belongings.backpack.size())) {
+                        it = hero->belongings.backpack[pIdx].get();
+                    }
+                }
+            } else if (m_activeTab == Tab::KEYRING) {
+                int kIdx = slotIdx - 4;
+                if (hero->belongings.keyring && kIdx >= 0 && kIdx < static_cast<int>(hero->belongings.keyring->keys.size())) {
+                    it = hero->belongings.keyring->keys[kIdx].get();
                 }
             }
 
@@ -406,7 +490,7 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
             }
 
             // Draw Item / Placeholder / Gold
-            if (slotIdx == 19 && iTex) {
+            if (isGoldSlot && iTex) {
                 // Gold Slot
                 setupSubTex(m_subItemIcon, potW, potH, (ItemSpriteSheet::GOLD % 8) * 16, (ItemSpriteSheet::GOLD / 8) * 16, 16, 16);
                 C2D_Image imgG = { iTex, &m_subItemIcon };
@@ -428,8 +512,17 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
                 pI.center.x = pI.center.y = 0.0f; pI.depth = zItem; pI.angle = 0.0f;
                 C2D_DrawImage(imgIt, &pI, nullptr);
 
-                // Top-Left Badge: Stack count (e.g., 8)
-                if (it->quantity > 1) {
+                // Top-Left Badge: Key depth indicator OR Stack count
+                if (Key* k = it->asKey()) {
+                    std::string depthBadge = std::to_string(k->depth);
+                    BitmapFont::draw(BitmapFont::FontType::Font1x, depthBadge, sx + 2.0f, sy + 1.0f, zText, COLOR_TEXT_PRIMARY);
+                    if (k->quantity > 1) {
+                        std::string qStr = std::to_string(k->quantity);
+                        float qw = BitmapFont::width(BitmapFont::FontType::Font1x, qStr);
+                        float qx = sx + SLOT_SIZE - qw - 2.0f;
+                        BitmapFont::draw(BitmapFont::FontType::Font1x, qStr, qx, sy + 18.0f, zText, COLOR_TEXT_PRIMARY);
+                    }
+                } else if (it->quantity > 1) {
                     std::string qStr = std::to_string(it->quantity);
                     BitmapFont::draw(BitmapFont::FontType::Font1x, qStr, sx + 2.0f, sy + 1.0f, zText, COLOR_TEXT_PRIMARY);
                 }
@@ -500,7 +593,7 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
 
             // In selection mode, dim ineligible or empty slots
             if (isSelectionMode()) {
-                if (slotIdx == 19 || !it || !isItemEligible(it)) {
+                if (isGoldSlot || !it || !isItemEligible(it)) {
                     C2D_DrawRectSolid(sx, sy, zText + 0.01f, SLOT_SIZE, SLOT_SIZE, C2D_Color32(0x00, 0x00, 0x00, 0xB8));
                 }
             }

@@ -144,6 +144,7 @@ public:
     static constexpr int POUCH              = 83;
     static constexpr int HOLDER             = 104;
     static constexpr int HOLSTER            = 111;
+    static constexpr int KEYRING            = 126;
     static constexpr int WEIGHT             = 123;
 };
 

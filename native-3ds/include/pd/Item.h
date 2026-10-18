@@ -113,6 +113,7 @@ public:
     virtual Potion* asPotion() { return nullptr; }
     virtual Scroll* asScroll() { return nullptr; }
     virtual class Key* asKey() { return nullptr; }
+    virtual class Keyring* asKeyring() { return nullptr; }
 };
 
 class Weapon : public Item {
@@ -1146,6 +1147,31 @@ public:
     int price() const override { return 50; }
     std::string info() const override;
     std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class Keyring : public Item {
+public:
+    static constexpr size_t KEYRING_SIZE = 12;
+
+    std::vector<std::unique_ptr<Key>> keys;
+
+    Keyring();
+    Keyring* asKeyring() override { return this; }
+    bool isStackable() const override { return false; }
+    bool isUpgradable() const override { return false; }
+    bool isIdentified() const override { return true; }
+
+    bool grab(const Item* item) const;
+    bool addKey(std::unique_ptr<Key> key);
+    Key* getKey(const std::string& keyName, int depth) const;
+    bool consumeKey(const std::string& keyName, int depth);
+    std::unique_ptr<Key> removeKey(Key* key);
+
+    std::vector<std::string> actions(Hero* hero) override;
+    bool execute(Hero* hero, const std::string& action) override;
+    std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+    int price() const override { return 50; }
 };
 
 } // namespace pd

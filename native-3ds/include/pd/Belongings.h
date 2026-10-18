@@ -13,6 +13,7 @@ public:
     static constexpr size_t BACKPACK_SIZE = 15;
 
     std::vector<std::unique_ptr<Item>> backpack;
+    std::unique_ptr<Keyring> keyring;
     std::unique_ptr<Weapon> weaponSlot;
     std::unique_ptr<Armor> armorSlot;
     std::unique_ptr<Item> ring1Slot;
@@ -23,7 +24,7 @@ public:
     Item* equippedRing1 = nullptr;
     Item* equippedRing2 = nullptr;
 
-    Belongings() = default;
+    Belongings();
     ~Belongings() = default;
 
     bool canCollect(const Item* item) const;

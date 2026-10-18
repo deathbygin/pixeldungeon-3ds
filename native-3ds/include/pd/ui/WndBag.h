@@ -65,10 +65,19 @@ public:
 
     void draw(const pd::Hero* hero, C2D_TextBuf textBuf) const;
 
+    enum class Tab {
+        BACKPACK,
+        KEYRING
+    };
+
+    Tab getActiveTab() const { return m_activeTab; }
+    void setActiveTab(Tab tab) { m_activeTab = tab; m_selectedSlot = (tab == Tab::BACKPACK ? 0 : 4); }
+
     int getSelectedIndex() const { return m_selectedSlot; }
     pd::Item* getSelectedItem(pd::Hero* hero) const;
 
 private:
+    Tab m_activeTab = Tab::BACKPACK;
     int m_selectedSlot = 0;
     bool m_longPressTriggered = false;
     WndItem m_wndItem;

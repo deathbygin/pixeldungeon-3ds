@@ -5,8 +5,15 @@
 
 namespace pd {
 
+Belongings::Belongings() : keyring(std::make_unique<Keyring>()) {}
+
 bool Belongings::canCollect(const Item* item) const {
     if (!item) return false;
+
+    // Keys bypass backpack and route into keyring
+    if (const_cast<Item*>(item)->asKey()) {
+        return keyring && keyring->keys.size() < Keyring::KEYRING_SIZE;
+    }
 
     // Check stackable items
     if (item->isStackable()) {
@@ -34,6 +41,16 @@ bool Belongings::collect(std::unique_ptr<Item>& item) {
     if (!item) return false;
 
     Hero* hero = Dungeon::hero ? Dungeon::hero.get() : nullptr;
+
+    // Keys bypass backpack and route directly into keyring
+    if (item->asKey()) {
+        if (keyring) {
+            item->onCollect(hero);
+            std::unique_ptr<Key> keyPtr(static_cast<Key*>(item.release()));
+            return keyring->addKey(std::move(keyPtr));
+        }
+        return false;
+    }
 
     // Check stackable items
     if (item->isStackable()) {
@@ -207,6 +224,17 @@ std::unique_ptr<Item> Belongings::drop(Item* item) {
         return dropped;
     }
 
+    // Check keyring for keys
+    if (keyring) {
+        for (auto it = keyring->keys.begin(); it != keyring->keys.end(); ++it) {
+            if (it->get() == item) {
+                std::unique_ptr<Item> dropped = std::move(*it);
+                keyring->keys.erase(it);
+                return dropped;
+            }
+        }
+    }
+
     for (auto it = backpack.begin(); it != backpack.end(); ++it) {
         if (it->get() == item) {
             std::unique_ptr<Item> dropped = std::move(*it);
@@ -218,6 +246,10 @@ std::unique_ptr<Item> Belongings::drop(Item* item) {
 }
 
 Item* Belongings::getKey(const std::string& keyName, int depth) {
+    if (keyring) {
+        Key* k = keyring->getKey(keyName, depth);
+        if (k) return k;
+    }
     for (auto& it : backpack) {
         if (it && it->name == keyName) {
             Key* k = it->asKey();
@@ -230,6 +262,9 @@ Item* Belongings::getKey(const std::string& keyName, int depth) {
 }
 
 bool Belongings::consumeKey(const std::string& keyName, int depth) {
+    if (keyring && keyring->consumeKey(keyName, depth)) {
+        return true;
+    }
     for (auto it = backpack.begin(); it != backpack.end(); ++it) {
         if (*it && (*it)->name == keyName) {
             Key* k = (*it)->asKey();
@@ -250,6 +285,12 @@ Item* Belongings::getItem(const std::string& itemName) {
     if (equippedArmor && equippedArmor->name == itemName) return equippedArmor;
     if (equippedRing1 && equippedRing1->name == itemName) return equippedRing1;
     if (equippedRing2 && equippedRing2->name == itemName) return equippedRing2;
+    if (keyring && keyring->name == itemName) return keyring.get();
+    if (keyring) {
+        for (auto& k : keyring->keys) {
+            if (k && k->name == itemName) return k.get();
+        }
+    }
     for (auto& item : backpack) {
         if (item && item->name == itemName) {
             return item.get();

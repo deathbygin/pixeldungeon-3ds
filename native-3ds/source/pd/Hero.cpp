@@ -67,6 +67,11 @@ void Hero::initClass(HeroClass cl) {
     belongings.equippedArmor = nullptr;
     belongings.equippedRing1 = nullptr;
     belongings.equippedRing2 = nullptr;
+    if (!belongings.keyring) {
+        belongings.keyring = std::make_unique<Keyring>();
+    } else {
+        belongings.keyring->keys.clear();
+    }
 
     // Common starter gear
     auto clothArmor = std::make_unique<Armor>("Cloth Armor", 1, 10);
@@ -721,13 +726,24 @@ bool Hero::pickUp(Level* currentLevel, bool spendTurn) {
         FX::floatingText(pos, "+" + std::to_string(g), 0xffd700FF);
         GLog::p("You collected " + std::to_string(g) + " gold.");
         Sample::play(Assets::SND_GOLD, 1.0f, 1.0f, Random::Float(0.9f, 1.1f));
-    } else if (belongings.collect(item)) {
-        GLog::p("You picked up " + itemName);
-        Sample::play(Assets::SND_ITEM);
     } else {
-        GLog::w("Your pack is too full for " + itemName);
-        currentLevel->drop(std::move(item), pos);
-        return false;
+        bool wasKey = (item->asKey() != nullptr);
+        if (belongings.collect(item)) {
+            if (wasKey) {
+                GLog::p("You found a " + itemName + " (it was added to your key ring)");
+            } else {
+                GLog::p("You picked up " + itemName);
+            }
+            Sample::play(Assets::SND_ITEM);
+        } else {
+            if (wasKey) {
+                GLog::w("Your key ring is full!");
+            } else {
+                GLog::w("Your pack is too full for " + itemName);
+            }
+            currentLevel->drop(std::move(item), pos);
+            return false;
+        }
     }
 
     if (heap->isEmpty()) {
