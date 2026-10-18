@@ -8,6 +8,7 @@ namespace pd {
 
 class Level;
 class Heap;
+class Mob;
 
 class MissileWeapon;
 
@@ -59,13 +60,18 @@ public:
 
     // Turn actions
     bool stepTo(int nextCell, Level* currentLevel);
+    void swapWith(Mob* ally, Level* currentLevel);
     bool pickUp(Level* currentLevel = nullptr, bool spendTurn = true);
     bool lastStepPickedUp() const { return m_lastStepPickedUp; }
+    bool lastStepAttacked() const { return m_lastStepAttacked; }
+    bool lastStepSwapped() const { return m_lastStepSwapped; }
     void openContainer(Heap* heap, int targetCell);
     void rest(bool tillHealthy = true);
     bool search(Level* currentLevel, bool intentional = true);
 
     bool m_lastStepPickedUp = false;
+    bool m_lastStepAttacked = false;
+    bool m_lastStepSwapped = false;
     int m_autoPickDisabledCell = -1;
 
     void disableAutoPick(int cell) { m_autoPickDisabledCell = cell; }

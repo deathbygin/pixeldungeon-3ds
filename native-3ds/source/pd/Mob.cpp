@@ -91,6 +91,12 @@ void Mob::die(Actor* src) {
     Char::die(src);
 }
 
+void Mob::interact() {
+    if (Dungeon::hero && Dungeon::level) {
+        Dungeon::hero->swapWith(this, Dungeon::level.get());
+    }
+}
+
 bool Mob::canAttack(Char* enemyChar) {
     if (!enemyChar || !enemyChar->isAlive()) return false;
     return PathFinder::distanceChebyshev(pos, enemyChar->pos) <= 1;
@@ -1858,6 +1864,10 @@ void MirrorImage::aiStep(Hero* hero, Level* currentLevel) {
     }
 }
 
+void MirrorImage::interact() {
+    Mob::interact();
+}
+
 // -----------------------------------------------------------------------------
 // Sheep (Summoned by Wand of Flock)
 // -----------------------------------------------------------------------------
@@ -2243,20 +2253,7 @@ void Bee::die(Actor* src) {
 }
 
 void Bee::interact() {
-    if (!Dungeon::hero) return;
-    int heroPos = Dungeon::hero->pos;
-    int beePos = pos;
-
-    Actor::freeCell(beePos);
-    Actor::freeCell(heroPos);
-
-    place(heroPos);
-    Actor::occupyCell(this);
-
-    Dungeon::hero->place(beePos);
-    Actor::occupyCell(Dungeon::hero.get());
-
-    Dungeon::hero->spendAndNext(1.0f / Dungeon::hero->speed());
+    Mob::interact();
 }
 
 } // namespace pd

@@ -1010,8 +1010,8 @@ int main(int argc, char* argv[]) {
                     bool isInitialTap = (kDown & (KEY_DUP | KEY_DDOWN | KEY_DLEFT | KEY_DRIGHT)) != 0;
                     moveDelay = isInitialTap ? 0.20f : 0.12f;
 
-                    Char* targetEnemy = Actor::findChar(targetCell);
-                    int prevTargetHp = targetEnemy ? targetEnemy->HP : 0;
+                    Char* targetOccupant = Actor::findChar(targetCell);
+                    int prevTargetHp = targetOccupant ? targetOccupant->HP : 0;
 
                     if (hero->stepTo(targetCell, level)) {
                         if (hero->halted) {
@@ -1019,18 +1019,19 @@ int main(int argc, char* argv[]) {
                             moveDelay = 0.40f;
                         }
 
-                        if (targetEnemy) {
-                            Sample::playAt(Assets::SND_HIT, targetEnemy->pos, 1.0f, Random::Float(0.8f, 1.25f));
-                            int dealt = prevTargetHp - targetEnemy->HP;
-                            if (targetEnemy->isAlive()) {
-                                GLog::i("Hero hit " + targetEnemy->name + " for " + std::to_string(dealt) + " dmg!");
-                            } else {
-                                GLog::p("Hero defeated " + targetEnemy->name + "!");
+                        if (hero->lastStepAttacked()) {
+                            if (targetOccupant) {
+                                int dealt = prevTargetHp - targetOccupant->HP;
+                                if (targetOccupant->isAlive()) {
+                                    GLog::i("Hero hit " + targetOccupant->name + " for " + std::to_string(dealt) + " dmg!");
+                                } else {
+                                    GLog::p("Hero defeated " + targetOccupant->name + "!");
+                                }
                             }
                         } else if (hero->lastStepPickedUp()) {
                             // Item was automatically picked up; pickUp() already triggered the authentic sound effect
                             // (SND_ITEM, SND_GOLD, or SND_DEWDROP). Suppress footstep so the pickup sound is crystal clear.
-                        } else {
+                        } else if (hero->pos == targetCell) {
                             Sample::play((level && level->water[targetCell]) ? Assets::SND_WATER : Assets::SND_STEP, 0.8f, Random::Float(0.95f, 1.05f));
                         }
 

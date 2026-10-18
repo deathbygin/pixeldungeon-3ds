@@ -78,6 +78,10 @@ public:
                t == MobType::King || t == MobType::Yog ||
                t == MobType::BurningFist || t == MobType::RottingFist;
     }
+    virtual bool isHostile() const { return (buff(BuffType::Amok) != nullptr) || hostile; }
+    virtual bool isAlly() const { return !isHostile(); }
+    virtual bool isPet() const { return mobType() == MobType::Bee; }
+    virtual void interact();
     virtual std::string description() const;
     std::string status() const;
     std::string statePreview() const;
@@ -442,6 +446,7 @@ public:
     void damage(int dmg, Actor* src) override;
     int attackSkill(Char* target) override;
     int defenseSkill(Char* attacker) override;
+    void interact() override;
 };
 
 class Sheep : public Mob {
@@ -456,7 +461,7 @@ public:
     void damage(int dmg, Actor* src) override { (void)dmg; (void)src; }
     int defenseSkill(Char* attacker) override;
     void aiStep(Hero* hero, Level* currentLevel) override { (void)hero; (void)currentLevel; }
-    void interact();
+    void interact() override;
 };
 
 class Mimic : public Mob {
@@ -488,7 +493,7 @@ public:
     void damage(int dmg, Actor* src) override;
     void die(Actor* src) override;
     void aiStep(Hero* hero, Level* currentLevel) override { (void)hero; (void)currentLevel; }
-    void interact();
+    void interact() override;
     void flee();
 };
 
@@ -508,7 +513,7 @@ public:
     bool act() override;
     void aiStep(Hero* hero, Level* currentLevel) override;
     void die(Actor* src) override;
-    void interact();
+    void interact() override;
 };
 
 } // namespace pd

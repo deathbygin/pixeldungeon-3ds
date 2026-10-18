@@ -1,4 +1,5 @@
 #include "pd/Hero.h"
+#include "pd/Mob.h"
 #include "pd/Item.h"
 #include "pd/CharSprite.h"
 #include "pd/Dungeon.h"
@@ -255,10 +256,105 @@ std::string Hero::hungerStatus() const {
     return h->name();
 }
 
+void Hero::swapWith(Mob* ally, Level* currentLevel) {
+    if (!ally || !currentLevel) return;
+
+    int heroPos = pos;
+    int allyPos = ally->pos;
+
+    Actor::freeCell(heroPos);
+    Actor::freeCell(allyPos);
+
+    ally->pos = heroPos;
+    Actor::chars[heroPos] = ally;
+    if (ally->getSprite()) {
+        ally->getSprite()->move(allyPos, heroPos);
+    }
+    ally->spriteVisible = (heroPos >= 0 && heroPos < Level::LENGTH) ? Dungeon::visible[heroPos] : false;
+    if (currentLevel->get(heroPos) == Terrain::HIGH_GRASS) {
+        currentLevel->trample(heroPos, ally);
+    }
+    if (!ally->flying) {
+        currentLevel->press(heroPos, ally);
+    }
+
+    if (allyPos != heroPos) {
+        enableAutoPick(heroPos);
+    }
+
+    pos = allyPos;
+    Actor::chars[allyPos] = this;
+    if (getSprite()) {
+        getSprite()->move(heroPos, allyPos);
+    }
+    if (currentLevel->get(allyPos) == Terrain::HIGH_GRASS) {
+        currentLevel->trample(allyPos, this);
+    }
+    if (!flying) {
+        currentLevel->press(allyPos, this);
+    }
+
+    EarthrootArmor* earthArmor = getBuff<EarthrootArmor>();
+    if (earthArmor) earthArmor->detach();
+    HerbalHealing* herbalHealing = getBuff<HerbalHealing>();
+    if (herbalHealing) herbalHealing->detach();
+
+    Bleeding* b = getBuff<Bleeding>();
+    if (b && isAlive()) {
+        damage(Random::Int(b->level), b);
+    }
+
+    if (currentLevel->water[allyPos] && !flying) {
+        if (buff(BuffType::Burning)) {
+            removeBuff(BuffType::Burning);
+            FX::waterSplash(allyPos, 6);
+        }
+        if (buff(BuffType::Ooze)) {
+            removeBuff(BuffType::Ooze);
+            GLog::p("The water washes away the caustic ooze!");
+        }
+    }
+
+    search(currentLevel, false);
+    Dungeon::observe();
+
+    if (currentLevel->map[allyPos] == Terrain::SIGN) {
+        pd::Sign::read(allyPos);
+    }
+
+    if (currentLevel->water[allyPos]) {
+        FX::ripple(allyPos);
+        FX::waterSplash(allyPos, 4);
+    }
+
+    Heap* heap = currentLevel->getHeap(allyPos);
+    if (heap && !heap->isEmpty() && heap->type == Heap::Type::HEAP) {
+        Item* item = heap->peek();
+        if (isAutoPickDisabled(allyPos)) {
+            if (item) {
+                GLog::i("You see " + item->displayName() + " lying here.");
+            }
+        } else if (pickUp(currentLevel, false)) {
+            m_lastStepPickedUp = true;
+        } else if (item) {
+            GLog::i("You see " + item->displayName() + " lying here.");
+        }
+    }
+
+    m_lastStepAttacked = false;
+    m_lastStepSwapped = true;
+
+    spend(TICK / speed());
+    next();
+    waitingForInput = false;
+}
+
 bool Hero::stepTo(int nextCell, Level* currentLevel) {
     interrupt();
     halted = false;
     m_lastStepPickedUp = false;
+    m_lastStepAttacked = false;
+    m_lastStepSwapped = false;
 
     if (!currentLevel || nextCell < 0 || nextCell >= Level::LENGTH) {
         return false;
@@ -293,33 +389,60 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
         }
     }
 
-    Char* enemy = Actor::findChar(nextCell);
-    if (enemy && enemy != this) {
-        if (enemy->asMob() && enemy->asMob()->mobType() == Mob::MobType::Shopkeeper) {
-            static_cast<Shopkeeper*>(enemy)->interact();
-            waitingForInput = true;
-            return false;
-        }
-        if (enemy->asMob() && enemy->asMob()->mobType() == Mob::MobType::Bee) {
-            static_cast<Bee*>(enemy)->interact();
+    Char* occupant = Actor::findChar(nextCell);
+    if (occupant && occupant != this) {
+        Mob* mob = occupant->asMob();
+        bool heroAmok = (buff(BuffType::Amok) != nullptr);
+        bool isHostileTarget = heroAmok || !mob || mob->isHostile();
+
+        if (isHostileTarget) {
+            if (isCharmedBy(occupant)) {
+                GLog::w("You are too charmed to attack!");
+                waitingForInput = true;
+                return false;
+            }
+            ui::BottomScreenUI::setLastTarget(occupant);
+            attack(occupant);
+            m_lastStepAttacked = true;
+            next();
             waitingForInput = false;
             return true;
+        } else {
+            // Non-hostile / friendly entity
+            if (mob->mobType() == Mob::MobType::Shopkeeper) {
+                static_cast<Shopkeeper*>(mob)->interact();
+                waitingForInput = true;
+                return false;
+            }
+            if (mob->mobType() == Mob::MobType::Sheep) {
+                static_cast<Sheep*>(mob)->interact();
+                waitingForInput = true;
+                return false;
+            }
+
+            // Swapping with an ally/pet/friendly mob
+            if (rooted) {
+                GLog::w("You are rooted to the ground and cannot move!");
+                waitingForInput = true;
+                return false;
+            }
+            if (mob->paralysed || mob->rooted) {
+                GLog::w(mob->name + " is unable to move!");
+                waitingForInput = true;
+                return false;
+            }
+
+            bool heroCanEnter = flying || (currentLevel->isPassable(nextCell) && !currentLevel->pit[nextCell]);
+            bool allyCanEnter = mob->flying || (currentLevel->isPassable(pos) && !currentLevel->pit[pos]);
+
+            if (!heroCanEnter || !allyCanEnter) {
+                waitingForInput = true;
+                return false;
+            }
+
+            swapWith(mob, currentLevel);
+            return true;
         }
-        if (enemy->asMob() && enemy->asMob()->mobType() == Mob::MobType::Sheep) {
-            static_cast<Sheep*>(enemy)->interact();
-            waitingForInput = true;
-            return false;
-        }
-        if (isCharmedBy(enemy)) {
-            GLog::w("You are too charmed to attack!");
-            waitingForInput = true;
-            return false;
-        }
-        ui::BottomScreenUI::setLastTarget(enemy);
-        attack(enemy);
-        next();
-        waitingForInput = false;
-        return true;
     }
 
     // 2-tile reach check for polearms (Spear, Glaive)
@@ -338,31 +461,27 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
                 int reachCell = ry * Level::WIDTH + rx;
                 Char* reachEnemy = Actor::findChar(reachCell);
                 if (reachEnemy && reachEnemy != this) {
-                    if (reachEnemy->asMob() && !reachEnemy->asMob()->hostile) {
-                        if (reachEnemy->asMob()->mobType() == Mob::MobType::Shopkeeper) {
-                            static_cast<Shopkeeper*>(reachEnemy)->interact();
+                    Mob* reachMob = reachEnemy->asMob();
+                    bool heroAmok = (buff(BuffType::Amok) != nullptr);
+                    bool isReachHostile = heroAmok || !reachMob || reachMob->isHostile();
+                    if (isReachHostile) {
+                        int midTile = currentLevel->get(nextCell);
+                        bool blocked = (midTile == Terrain::WALL || midTile == Terrain::STATUE ||
+                                        midTile == Terrain::DOOR || midTile == Terrain::LOCKED_DOOR ||
+                                        midTile == Terrain::SECRET_DOOR);
+                        if (!blocked) {
+                            if (isCharmedBy(reachEnemy)) {
+                                GLog::w("You are too charmed to attack!");
+                                waitingForInput = true;
+                                return false;
+                            }
+                            ui::BottomScreenUI::setLastTarget(reachEnemy);
+                            attack(reachEnemy);
+                            m_lastStepAttacked = true;
+                            next();
+                            waitingForInput = false;
+                            return true;
                         }
-                        waitingForInput = true;
-                        return false;
-                    }
-                    // Check obstacle between hero and reachEnemy (nextCell):
-                    // Can strike across chasm, water, low obstacles, traps, open doors, or passable terrain.
-                    // Only solid walls or closed doors block reach attacks.
-                    int midTile = currentLevel->get(nextCell);
-                    bool blocked = (midTile == Terrain::WALL || midTile == Terrain::STATUE ||
-                                    midTile == Terrain::DOOR || midTile == Terrain::LOCKED_DOOR ||
-                                    midTile == Terrain::SECRET_DOOR);
-                    if (!blocked) {
-                        if (isCharmedBy(reachEnemy)) {
-                            GLog::w("You are too charmed to attack!");
-                            waitingForInput = true;
-                            return false;
-                        }
-                        ui::BottomScreenUI::setLastTarget(reachEnemy);
-                        attack(reachEnemy);
-                        next();
-                        waitingForInput = false;
-                        return true;
                     }
                 }
             }
