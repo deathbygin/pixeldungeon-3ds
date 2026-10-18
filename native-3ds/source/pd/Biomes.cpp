@@ -580,7 +580,11 @@ void CavesBossLevel::decorate() {
 // =============================================================================
 
 CityLevel::CityLevel() {
-    viewDistance = 8;
+    if (Dungeon::depth == 21) {
+        viewDistance = std::max(25 - Dungeon::depth, 1);
+    } else {
+        viewDistance = 8;
+    }
 }
 
 std::vector<bool> CityLevel::createWater() {

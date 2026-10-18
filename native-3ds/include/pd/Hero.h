@@ -58,6 +58,9 @@ public:
     void damage(int dmg, Actor* src) override;
     float speed() const override;
 
+    bool ready = false;
+    void busy() { ready = false; }
+
     // Turn actions
     bool stepTo(int nextCell, Level* currentLevel);
     void swapWith(Mob* ally, Level* currentLevel);
@@ -98,6 +101,8 @@ public:
     int stealth() const override;
     int attackProc(Char* enemy, int damage) override;
     int defenseProc(Char* enemy, int damage) override;
+    void spend(float time) override;
+    float elementsDurationFactor() const;
 };
 
 } // namespace pd

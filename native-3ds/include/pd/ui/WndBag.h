@@ -24,6 +24,7 @@ public:
         UPGRADEABLE,
         ENCHANTABLE,
         WEAPON,
+        ARMOR,
         WAND,
         QUICKSLOT,
         FOR_SALE

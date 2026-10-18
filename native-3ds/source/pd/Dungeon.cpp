@@ -152,6 +152,7 @@ void Dungeon::init() {
     Potion::initColors();
     Scroll::initLabels();
     Wand::initWoods();
+    Ring::initGems();
     dewVial = true;
 }
 
@@ -208,6 +209,7 @@ void Dungeon::newGame() {
     Potion::initColors();
     Scroll::initLabels();
     Wand::initWoods();
+    Ring::initGems();
     hero = std::make_unique<Hero>();
     if (hero) {
         if (hero->heroClass == Hero::HeroClass::Warrior) {
@@ -237,7 +239,8 @@ void Dungeon::resetLevel() {
     fog = std::make_unique<FogOfWar>(Level::WIDTH, Level::HEIGHT);
 
     if (hero) {
-        hero->viewDistance = level->viewDistance;
+        Buff* light = hero->buff(BuffType::Light);
+        hero->viewDistance = (light == nullptr) ? level->viewDistance : std::max(Light::DISTANCE, level->viewDistance);
         hero->move(level->entrance);
         Actor::occupyCell(hero.get());
         Actor::add(hero.get());
@@ -254,6 +257,9 @@ void Dungeon::resetLevel() {
     Actor::add(FX::getBlob(Blob::BlobType::CORROSIVE_GAS), Actor::TICK);
     Actor::add(FX::getBlob(Blob::BlobType::REGROWTH), Actor::TICK);
     Actor::add(FX::getBlob(Blob::BlobType::FOLIAGE), Actor::TICK);
+    Actor::add(FX::getBlob(Blob::BlobType::WATER_OF_HEALTH), Actor::TICK);
+    Actor::add(FX::getBlob(Blob::BlobType::WATER_OF_AWARENESS), Actor::TICK);
+    Actor::add(FX::getBlob(Blob::BlobType::WATER_OF_TRANSMUTATION), Actor::TICK);
     observe();
     announceLevelEntrance();
     Actor::process();
@@ -333,7 +339,8 @@ void Dungeon::switchLevel(int newDepth, bool isFall) {
     }
 
     if (hero && level) {
-        hero->viewDistance = level->viewDistance;
+        Buff* light = hero->buff(BuffType::Light);
+        hero->viewDistance = (light == nullptr) ? level->viewDistance : std::max(Light::DISTANCE, level->viewDistance);
     }
 
     fog = std::make_unique<FogOfWar>(Level::WIDTH, Level::HEIGHT);

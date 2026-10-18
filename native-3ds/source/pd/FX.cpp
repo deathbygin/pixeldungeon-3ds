@@ -363,6 +363,23 @@ void FX::update(float dt) {
                                   Random::Float(6.0f, 14.0f), 0.0f, 5.0f, false);
                 }
             }
+
+            if (ch->buff(BuffType::Light)) {
+                // Torch flame & ember particles matching Java Speck.LIGHT / FlameParticle / TorchHalo
+                if (Random::Float() < 0.65f) {
+                    static const uint32_t torchCols[] = {
+                        0xFFFFFFFF, // Brilliant incandescent white/gold spark
+                        0xFFFFDD66, // Warm torch amber
+                        0xFFFF9922, // Rich flame orange
+                        0xFFEE4411  // Fiery red-orange ember
+                    };
+                    float wx = cx + Random::Float(-3.0f, 3.0f);
+                    float wy = cy + Random::Float(-10.0f, -2.0f); // Emanating from torch held high
+                    spawnParticle(wx, wy, torchCols[Random::Int(4)], Random::Float(2.0f, 3.5f),
+                                  Random::Float(0.35f, 0.55f), Random::Float(-4.0f, 4.0f),
+                                  Random::Float(-22.0f, -42.0f), 0.0f, -35.0f, true);
+                }
+            }
         };
 
         emitCharBuffFX(Dungeon::hero.get());
@@ -376,6 +393,18 @@ void FX::drawGround(const noosa::Camera* camera) {
     // Ground FX: Water ripples & search checked cell highlights (drawn between tiles/heaps and characters)
     for (auto& r : s_ripples) if (r.active) r.draw(camera);
     for (auto& c : s_checked) if (c.active) c.draw(camera);
+
+    // Warm radial torch halo matching Java TorchHalo (0xFFDDCC, 0.15f alpha, radius 24)
+    if (camera && Dungeon::hero && Dungeon::hero->buff(BuffType::Light)) {
+        float cx = (Dungeon::hero->pos % Level::WIDTH) * 16.0f + 8.0f;
+        float cy = (Dungeon::hero->pos / Level::WIDTH) * 16.0f + 8.0f;
+        float sx = 0.0f, sy = 0.0f;
+        camera->worldToScreen(cx, cy, sx, sy);
+        float zoom = camera->getZoom();
+        float pulse = 1.0f + 0.05f * std::sin(Actor::now * 6.0f);
+        float radius = 24.0f * zoom * pulse;
+        C2D_DrawCircleSolid(sx, sy, 0.21f, radius, C2D_Color32(0xFF, 0xDD, 0xAA, 0x24));
+    }
 }
 
 void FX::draw(const noosa::Camera* camera, C2D_TextBuf textBuf) {

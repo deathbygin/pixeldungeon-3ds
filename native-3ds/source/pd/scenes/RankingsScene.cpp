@@ -247,8 +247,27 @@ void RankingsScene::drawTop(C2D_TextBuf textBuf) {
     std::string scoreStr = "Score: " + formatScore(rec.score);
     pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, scoreStr, col1X + 40.0f, col1Y + 22.0f, zText, pd::ui::COLOR_TEXT_ACCENT, pd::ui::COLOR_TEXT_SHADOW);
 
-    // Status icon (Tombstone / Amulet) & Outcome string
+    // Divider line between columns
+    float divX = cardX + 190.0f;
+    C2D_DrawRectSolid(divX, cardY + 12.0f, zContent + 0.01f, 1.0f, cardH - 24.0f, C2D_Color32(0x4A, 0x4D, 0x44, 0xFF));
+
+    // Status icon (Tombstone / Amulet) & Outcome string (Method of Death / Win)
     float outY = col1Y + 44.0f;
+    float textStartX = col1X + 22.0f;
+    float maxInfoW = std::max(20.0f, divX - textStartX - 6.0f);
+    auto infoLines = pd::ui::BitmapFont::splitMultiline(pd::ui::BitmapFont::FontType::Font1x, rec.info, maxInfoW);
+    for (auto& line : infoLines) {
+        if (pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, line) > maxInfoW) {
+            while (!line.empty() && pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, line + "...") > maxInfoW) {
+                line.pop_back();
+            }
+            line += "...";
+        }
+    }
+
+    float totalOutcomeH = std::max(16.0f, static_cast<float>(infoLines.size()) * 10.0f);
+    float iconY = outY + (totalOutcomeH - 16.0f) * 0.5f;
+
     int statusImgIdx = rec.win ? ItemSpriteSheet::AMULET : ItemSpriteSheet::TOMB;
     if (m_texItems && m_texItems->isLoaded()) {
         Tex3DS_SubTexture sub;
@@ -257,21 +276,23 @@ void RankingsScene::drawTop(C2D_TextBuf textBuf) {
         setupSubTex(sub, potW, potH, (statusImgIdx % 8) * 16, (statusImgIdx / 8) * 16, 16, 16);
         C2D_Image img = { m_texItems->getTex(), &sub };
         C2D_DrawParams p;
-        p.pos.x = col1X; p.pos.y = outY;
+        p.pos.x = col1X; p.pos.y = iconY;
         p.pos.w = 16.0f; p.pos.h = 16.0f;
         p.center.x = p.center.y = 0.0f; p.depth = zContent + 0.05f; p.angle = 0.0f;
         C2D_DrawImage(img, &p, nullptr);
     }
 
     u32 outColor = rec.win ? pd::ui::COLOR_TEXT_POSITIVE : pd::ui::COLOR_TEXT_MUTED;
-    pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, rec.info, col1X + 22.0f, outY + 3.0f, zText, outColor, pd::ui::COLOR_TEXT_SHADOW);
-
-    // Divider line between columns
-    float divX = cardX + 190.0f;
-    C2D_DrawRectSolid(divX, cardY + 12.0f, zContent + 0.01f, 1.0f, cardH - 24.0f, C2D_Color32(0x4A, 0x4D, 0x44, 0xFF));
+    float curLineY = (infoLines.size() == 1) ? (outY + 4.0f) : outY;
+    for (const auto& line : infoLines) {
+        if (!line.empty()) {
+            pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, line, textStartX, curLineY, zText, outColor, pd::ui::COLOR_TEXT_SHADOW);
+        }
+        curLineY += 10.0f;
+    }
 
     // Left Column stats summary
-    float stY = outY + 26.0f;
+    float stY = std::max(outY + 26.0f, outY + totalOutcomeH + 6.0f);
     pd::ui::BitmapFont::draw(pd::ui::BitmapFont::FontType::Font1x, "Dungeon Depth:", col1X, stY, zText, pd::ui::COLOR_TEXT_MUTED);
     pd::ui::BitmapFont::draw(pd::ui::BitmapFont::FontType::Font1x, std::to_string(rec.depth), col1X + 105.0f, stY, zText, pd::ui::COLOR_TEXT_PRIMARY);
 
@@ -420,25 +441,39 @@ void RankingsScene::drawBottom(C2D_TextBuf textBuf) {
             C2D_DrawImage(img, &p, nullptr);
         }
 
+        // Score (right aligned)
+        std::string scStr = formatScore(r.score);
+        float scW = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, scStr);
+        float scoreX = rowX + rowW - scW - 6.0f;
+        u32 scCol = pd::ui::COLOR_TEXT_ACCENT;
+        pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, scStr, scoreX, rowY + 9.0f, zText, scCol, pd::ui::COLOR_TEXT_SHADOW);
+
         // Hero Info: Level & Class Name
         const char* clNames[] = { "Warrior", "Mage", "Rogue", "Huntress" };
         int clIdx = static_cast<int>(r.heroClass);
         std::string nameStr = "Lvl " + std::to_string(r.level) + " " + ((clIdx >= 0 && clIdx < 4) ? clNames[clIdx] : "Hero");
-        u32 nameCol = isSel ? pd::ui::COLOR_TEXT_PRIMARY : pd::ui::COLOR_TEXT_PRIMARY;
-        pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, nameStr, rowX + 66.0f, rowY + 3.0f, zText, nameCol, pd::ui::COLOR_TEXT_SHADOW);
+        u32 nameCol = pd::ui::COLOR_TEXT_PRIMARY;
 
-        // Truncated info string
-        std::string subStr = r.info;
-        if (subStr.length() > 22) {
-            subStr = subStr.substr(0, 19) + "...";
+        float textStartX = rowX + 66.0f;
+        float maxTextW = std::max(20.0f, scoreX - textStartX - 8.0f);
+
+        if (pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, nameStr) > maxTextW) {
+            while (!nameStr.empty() && pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, nameStr + "...") > maxTextW) {
+                nameStr.pop_back();
+            }
+            nameStr += "...";
         }
-        pd::ui::BitmapFont::draw(pd::ui::BitmapFont::FontType::Font1x, subStr, rowX + 66.0f, rowY + 14.0f, zText, pd::ui::COLOR_TEXT_MUTED);
+        pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, nameStr, textStartX, rowY + 3.0f, zText, nameCol, pd::ui::COLOR_TEXT_SHADOW);
 
-        // Score (right aligned)
-        std::string scStr = formatScore(r.score);
-        float scW = pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, scStr);
-        u32 scCol = isSel ? pd::ui::COLOR_TEXT_ACCENT : pd::ui::COLOR_TEXT_ACCENT;
-        pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, scStr, rowX + rowW - scW - 6.0f, rowY + 9.0f, zText, scCol, pd::ui::COLOR_TEXT_SHADOW);
+        // Truncated info string (method of death / win)
+        std::string subStr = r.info;
+        if (pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, subStr) > maxTextW) {
+            while (!subStr.empty() && pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, subStr + "...") > maxTextW) {
+                subStr.pop_back();
+            }
+            subStr += "...";
+        }
+        pd::ui::BitmapFont::draw(pd::ui::BitmapFont::FontType::Font1x, subStr, textStartX, rowY + 14.0f, zText, pd::ui::COLOR_TEXT_MUTED);
     }
 
     if (recs.empty()) {

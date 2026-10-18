@@ -60,16 +60,20 @@ void WndItemSpawner::initCategories() {
         m_categories.push_back(std::move(cat));
     }
 
-    // 2. Armor
+    // 2. Armor & Class Armor
     {
         SpawnCategory cat;
-        cat.name = "Armor (Tiers 1-5)";
+        cat.name = "Armor & Class Armor";
         cat.items = {
             { "Cloth Armor", ItemSpriteSheet::ARMOR_CLOTH, []() { return std::make_unique<Armor>("Cloth Armor", 1, 9); } },
             { "Leather Armor", ItemSpriteSheet::ARMOR_LEATHER, []() { return std::make_unique<Armor>("Leather Armor", 2, 11); } },
             { "Mail Armor", ItemSpriteSheet::ARMOR_MAIL, []() { return std::make_unique<Armor>("Mail Armor", 3, 13); } },
             { "Scale Armor", ItemSpriteSheet::ARMOR_SCALE, []() { return std::make_unique<Armor>("Scale Armor", 4, 15); } },
-            { "Plate Armor", ItemSpriteSheet::ARMOR_PLATE, []() { return std::make_unique<Armor>("Plate Armor", 5, 17); } }
+            { "Plate Armor", ItemSpriteSheet::ARMOR_PLATE, []() { return std::make_unique<Armor>("Plate Armor", 5, 17); } },
+            { "Warrior Armor", ItemSpriteSheet::ARMOR_WARRIOR, []() { auto a = std::make_unique<WarriorArmor>(); a->DR_val = 15; a->STR = 15; return a; } },
+            { "Mage Armor", ItemSpriteSheet::ARMOR_MAGE, []() { auto a = std::make_unique<MageArmor>(); a->DR_val = 15; a->STR = 15; return a; } },
+            { "Rogue Armor", ItemSpriteSheet::ARMOR_ROGUE, []() { auto a = std::make_unique<RogueArmor>(); a->DR_val = 15; a->STR = 15; return a; } },
+            { "Huntress Armor", ItemSpriteSheet::ARMOR_HUNTRESS, []() { auto a = std::make_unique<HuntressArmor>(); a->DR_val = 15; a->STR = 15; return a; } }
         };
         m_categories.push_back(std::move(cat));
     }
@@ -144,18 +148,18 @@ void WndItemSpawner::initCategories() {
         SpawnCategory cat;
         cat.name = "Rings";
         cat.items = {
-            { "Shadows", ItemSpriteSheet::RING_OPAL, []() { return std::make_unique<Ring>(Ring::Gem::OPAL, "Shadows"); } },
-            { "Haste", ItemSpriteSheet::RING_TOURMALINE, []() { return std::make_unique<Ring>(Ring::Gem::TOURMALINE, "Haste"); } },
-            { "Detection", ItemSpriteSheet::RING_GARNET, []() { return std::make_unique<Ring>(Ring::Gem::GARNET, "Detection"); } },
-            { "Accuracy", ItemSpriteSheet::RING_RUBY, []() { return std::make_unique<Ring>(Ring::Gem::RUBY, "Accuracy"); } },
-            { "Evasion", ItemSpriteSheet::RING_AMETHYST, []() { return std::make_unique<Ring>(Ring::Gem::AMETHYST, "Evasion"); } },
-            { "Elements", ItemSpriteSheet::RING_TOPAZ, []() { return std::make_unique<Ring>(Ring::Gem::TOPAZ, "Elements"); } },
-            { "Mending", ItemSpriteSheet::RING_DIAMOND, []() { return std::make_unique<Ring>(Ring::Gem::DIAMOND, "Mending"); } },
-            { "Haggler", ItemSpriteSheet::RING_ONYX, []() { return std::make_unique<Ring>(Ring::Gem::ONYX, "Haggler"); } },
-            { "Herbalism", ItemSpriteSheet::RING_EMERALD, []() { return std::make_unique<Ring>(Ring::Gem::EMERALD, "Herbalism"); } },
-            { "Power", ItemSpriteSheet::RING_SAPPHIRE, []() { return std::make_unique<Ring>(Ring::Gem::SAPPHIRE, "Power"); } },
-            { "Satiety", ItemSpriteSheet::RING_QUARTZ, []() { return std::make_unique<Ring>(Ring::Gem::QUARTZ, "Satiety"); } },
-            { "Thorns", ItemSpriteSheet::RING_AGATE, []() { return std::make_unique<Ring>(Ring::Gem::AGATE, "Thorns"); } }
+            { "Shadows", ItemSpriteSheet::RING_OPAL, []() { return Ring::createForEffect("Shadows"); } },
+            { "Haste", ItemSpriteSheet::RING_TOURMALINE, []() { return Ring::createForEffect("Haste"); } },
+            { "Detection", ItemSpriteSheet::RING_GARNET, []() { return Ring::createForEffect("Detection"); } },
+            { "Accuracy", ItemSpriteSheet::RING_RUBY, []() { return Ring::createForEffect("Accuracy"); } },
+            { "Evasion", ItemSpriteSheet::RING_AMETHYST, []() { return Ring::createForEffect("Evasion"); } },
+            { "Elements", ItemSpriteSheet::RING_TOPAZ, []() { return Ring::createForEffect("Elements"); } },
+            { "Mending", ItemSpriteSheet::RING_DIAMOND, []() { return Ring::createForEffect("Mending"); } },
+            { "Haggler", ItemSpriteSheet::RING_ONYX, []() { return Ring::createForEffect("Haggler"); } },
+            { "Herbalism", ItemSpriteSheet::RING_EMERALD, []() { return Ring::createForEffect("Herbalism"); } },
+            { "Power", ItemSpriteSheet::RING_SAPPHIRE, []() { return Ring::createForEffect("Power"); } },
+            { "Satiety", ItemSpriteSheet::RING_QUARTZ, []() { return Ring::createForEffect("Satiety"); } },
+            { "Thorns", ItemSpriteSheet::RING_AGATE, []() { return Ring::createForEffect("Thorns"); } }
         };
         m_categories.push_back(std::move(cat));
     }

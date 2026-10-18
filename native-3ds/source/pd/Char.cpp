@@ -421,6 +421,11 @@ void Char::addBuff(Buff* b) {
             eb->setLevel(nb->level);
             break;
         }
+        case BuffType::Light: {
+            Light* el = static_cast<Light*>(existing);
+            el->prolong(b->duration() > 0.0f ? b->duration() : Light::DURATION);
+            break;
+        }
         default: {
             if (b->duration() > 0.0f) {
                 existing->postpone(b->duration());

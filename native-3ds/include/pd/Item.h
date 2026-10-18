@@ -12,6 +12,11 @@ class Char;
 class Hero;
 class Weapon;
 class Armor;
+class ClassArmor;
+class WarriorArmor;
+class MageArmor;
+class RogueArmor;
+class HuntressArmor;
 class Wand;
 class MissileWeapon;
 class Boomerang;
@@ -123,6 +128,7 @@ public:
     virtual const class ChargrilledMeat* asChargrilledMeat() const { return nullptr; }
     virtual class FrozenCarpaccio* asFrozenCarpaccio() { return nullptr; }
     virtual const class FrozenCarpaccio* asFrozenCarpaccio() const { return nullptr; }
+    virtual ClassArmor* asClassArmor() { return nullptr; }
 };
 
 class Weapon : public Item {
@@ -553,8 +559,80 @@ public:
     bool isInscribed() const { return glyph != Glyph::NONE; }
     void inscribe(Glyph g = Glyph::NONE);
 
-    int drRoll() const;
+    virtual int DR() const;
+    virtual int drRoll() const;
     int proc(Char* attacker, Char* defender, int damage);
+};
+
+// =============================================================================
+// Class Armor (Epic Armor)
+// =============================================================================
+class ClassArmor : public Armor {
+public:
+    int DR_val = 0;
+
+    explicit ClassArmor(std::string n);
+    ClassArmor* asClassArmor() override { return this; }
+    bool isUpgradable() const override { return false; }
+    bool isIdentified() const override { return true; }
+    int price() const override { return 0; }
+    std::string desc() const override { return "The thing looks awesome!"; }
+    std::string info() const override;
+
+    int DR() const override { return DR_val; }
+    int drRoll() const override;
+
+    std::vector<std::string> actions(Hero* hero) override;
+    bool execute(Hero* hero, const std::string& action) override;
+
+    virtual std::string special() const = 0;
+    virtual bool doSpecial(Hero* hero) = 0;
+
+    static std::unique_ptr<ClassArmor> upgradeArmor(Hero* owner, Armor* armor);
+};
+
+class WarriorArmor : public ClassArmor {
+public:
+    WarriorArmor();
+    std::string special() const override { return "HEROIC LEAP"; }
+    bool doSpecial(Hero* hero) override;
+    void cast(Hero* hero, int targetCell) override;
+    int maxDistance(const Hero* hero = nullptr) const override { (void)hero; return 8; }
+    std::string desc() const override;
+    bool execute(Hero* hero, const std::string& action) override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class MageArmor : public ClassArmor {
+public:
+    MageArmor();
+    std::string special() const override { return "MOLTEN EARTH"; }
+    bool doSpecial(Hero* hero) override;
+    std::string desc() const override;
+    bool execute(Hero* hero, const std::string& action) override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class RogueArmor : public ClassArmor {
+public:
+    RogueArmor();
+    std::string special() const override { return "SMOKE BOMB"; }
+    bool doSpecial(Hero* hero) override;
+    void cast(Hero* hero, int targetCell) override;
+    int maxDistance(const Hero* hero = nullptr) const override { (void)hero; return 8; }
+    std::string desc() const override;
+    bool execute(Hero* hero, const std::string& action) override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class HuntressArmor : public ClassArmor {
+public:
+    HuntressArmor();
+    std::string special() const override { return "SPECTRAL BLADES"; }
+    bool doSpecial(Hero* hero) override;
+    std::string desc() const override;
+    bool execute(Hero* hero, const std::string& action) override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
 };
 
 class Potion : public Item {
@@ -976,7 +1054,7 @@ public:
 class Ring : public Item {
 public:
     enum class Gem {
-        DIAMOND,
+        DIAMOND = 0,
         OPAL,
         GARNET,
         RUBY,
@@ -989,6 +1067,8 @@ public:
         QUARTZ,
         AGATE
     };
+    static constexpr int RING_COUNT = 12;
+    static constexpr int STANDARD_RING_COUNT = 10;
     static constexpr int TICKS_TO_KNOW = 200;
     Gem gem = Gem::DIAMOND;
     std::string effect = "Mending";
@@ -998,7 +1078,7 @@ public:
     Ring* asRing() override { return this; }
     ItemCategory category() const override { return ItemCategory::Ring; }
     bool isEquippable() const override { return true; }
-    bool isUpgradable() const override { return true; }
+    bool isUpgradable() const override;
     bool isIdentified() const override { return identified && levelKnown && isKnown(); }
     bool isKnown() const;
     void setKnown();
@@ -1008,14 +1088,103 @@ public:
     static bool allKnown();
     static const std::vector<bool>& getKnownTable();
     static void restoreStatus(const std::vector<bool>& known);
+    static void initGems();
+    static Gem gemForEffect(const std::string& eff);
+    static int imageForGem(Gem g);
+    static std::string gemName(Gem g);
+    static std::unique_ptr<Ring> createForEffect(const std::string& eff);
+
     Item* identify() override;
     Item* random() override;
+    void onCollect(Hero* hero) override;
     std::vector<std::string> actions(Hero* hero) override;
     bool execute(Hero* hero, const std::string& action) override;
+    std::string desc() const override;
     std::string info() const override;
     std::string displayName() const override;
     std::unique_ptr<Item> clone(int qty = 1) const override;
     int price() const override;
+};
+
+// -----------------------------------------------------------------------------
+// The 12 Canonical Rings
+// -----------------------------------------------------------------------------
+class RingOfAccuracy : public Ring {
+public:
+    RingOfAccuracy();
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class RingOfDetection : public Ring {
+public:
+    RingOfDetection();
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class RingOfElements : public Ring {
+public:
+    RingOfElements();
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class RingOfEvasion : public Ring {
+public:
+    RingOfEvasion();
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class RingOfHaggler : public Ring {
+public:
+    RingOfHaggler();
+    bool isUpgradable() const override { return false; }
+    Item* random() override;
+    void onCollect(Hero* hero) override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class RingOfHaste : public Ring {
+public:
+    RingOfHaste();
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class RingOfHerbalism : public Ring {
+public:
+    RingOfHerbalism();
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class RingOfMending : public Ring {
+public:
+    RingOfMending();
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class RingOfPower : public Ring {
+public:
+    RingOfPower();
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class RingOfSatiety : public Ring {
+public:
+    RingOfSatiety();
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class RingOfShadows : public Ring {
+public:
+    RingOfShadows();
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+};
+
+class RingOfThorns : public Ring {
+public:
+    RingOfThorns();
+    bool isUpgradable() const override { return false; }
+    Item* random() override;
+    void onCollect(Hero* hero) override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
 };
 
 // =============================================================================

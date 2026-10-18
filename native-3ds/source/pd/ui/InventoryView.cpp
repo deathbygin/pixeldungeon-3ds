@@ -280,7 +280,7 @@ bool InventoryView::update(pd::Hero* hero, const TouchController& touch, u32 kDo
                     }
                 }
 
-                if (chosenAction == "THROW" || chosenAction == "ZAP") {
+                if (chosenAction == "THROW" || chosenAction == "ZAP" || chosenAction == "HEROIC LEAP" || chosenAction == "SMOKE BOMB") {
                     outMessage = "START_TARGETING";
                     close();
                     return false;

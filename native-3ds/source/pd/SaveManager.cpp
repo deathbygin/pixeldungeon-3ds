@@ -14,6 +14,9 @@
 #include "pd/FogOfWar.h"
 #include "pd/Rankings.h"
 #include "pd/Statistics.h"
+#include "pd/Blob.h"
+#include "pd/Buff.h"
+#include "pd/FX.h"
 
 #include <3ds.h>
 #include <sys/stat.h>
@@ -185,7 +188,7 @@ bool SaveManager::getSaveSummary(int& outDepth, int& outLevel, int& outHeroClass
         return false;
     }
 
-    if (magic != SAVE_MAGIC || (version != 6 && version != 7 && version != SAVE_VERSION)) {
+    if (magic != SAVE_MAGIC || (version != 6 && version != 7 && version != 8 && version != 9 && version != 10 && version != SAVE_VERSION)) {
         std::fclose(fp);
         return false;
     }
@@ -330,6 +333,13 @@ bool SaveManager::saveGame(const std::string& customPath) {
     std::fwrite(&paralysed, sizeof(uint8_t), 1, fp);
     std::fwrite(&rooted, sizeof(uint8_t), 1, fp);
 
+    float lightRemaining = 0.0f;
+    Light* lightBuff = hero->getBuff<Light>();
+    if (lightBuff) {
+        lightRemaining = lightBuff->timeRemaining;
+    }
+    std::fwrite(&lightRemaining, sizeof(float), 1, fp);
+
     // 4. Inventory & Belongings
     std::vector<const Item*> allItems;
     if (hero->belongings.weaponSlot) allItems.push_back(hero->belongings.weaponSlot.get());
@@ -400,9 +410,13 @@ bool SaveManager::saveGame(const std::string& customPath) {
             int32_t tier = a->tier;
             int32_t sReq = a->STR;
             int32_t htk = a->hitsToKnow;
+            int32_t glyph = static_cast<int32_t>(a->glyph);
+            int32_t dr = a->DR();
             std::fwrite(&tier, sizeof(int32_t), 1, fp);
             std::fwrite(&sReq, sizeof(int32_t), 1, fp);
             std::fwrite(&htk, sizeof(int32_t), 1, fp);
+            std::fwrite(&glyph, sizeof(int32_t), 1, fp);
+            std::fwrite(&dr, sizeof(int32_t), 1, fp);
         } else if (it->category() == ItemCategory::Potion) {
             const Potion* p = static_cast<const Potion*>(it);
             int32_t pType = static_cast<int32_t>(p->type);
@@ -514,9 +528,13 @@ bool SaveManager::saveGame(const std::string& customPath) {
                 int32_t tier = a->tier;
                 int32_t strReq = a->STR;
                 int32_t htk = a->hitsToKnow;
+                int32_t glyph = static_cast<int32_t>(a->glyph);
+                int32_t dr = a->DR();
                 std::fwrite(&tier, sizeof(int32_t), 1, fp);
                 std::fwrite(&strReq, sizeof(int32_t), 1, fp);
                 std::fwrite(&htk, sizeof(int32_t), 1, fp);
+                std::fwrite(&glyph, sizeof(int32_t), 1, fp);
+                std::fwrite(&dr, sizeof(int32_t), 1, fp);
             } else if (it->category() == ItemCategory::Potion) {
                 Potion* p = static_cast<Potion*>(it.get());
                 int32_t pType = static_cast<int32_t>(p->type);
@@ -533,6 +551,16 @@ bool SaveManager::saveGame(const std::string& customPath) {
                 std::fwrite(&ttk, sizeof(int32_t), 1, fp);
             }
         }
+    }
+
+    // 5.5. Wells
+    uint32_t wellCount = static_cast<uint32_t>(level->wells.size());
+    std::fwrite(&wellCount, sizeof(uint32_t), 1, fp);
+    for (const auto& pair : level->wells) {
+        int32_t wCell = pair.first;
+        int32_t wType = static_cast<int32_t>(pair.second);
+        std::fwrite(&wCell, sizeof(int32_t), 1, fp);
+        std::fwrite(&wType, sizeof(int32_t), 1, fp);
     }
 
     // 6. Active Living Mobs State
@@ -590,7 +618,7 @@ bool SaveManager::loadGame(const std::string& customPath) {
         return false;
     }
 
-    if (magic != SAVE_MAGIC || (version != 6 && version != 7 && version != SAVE_VERSION)) {
+    if (magic != SAVE_MAGIC || (version != 6 && version != 7 && version != 8 && version != 9 && version != 10 && version != SAVE_VERSION)) {
         std::fclose(fp);
         return false;
     }
@@ -734,6 +762,14 @@ bool SaveManager::loadGame(const std::string& customPath) {
     Actor::occupyCell(hero);
     Actor::add(hero);
 
+    if (version >= 11) {
+        float lightRemaining = 0.0f;
+        std::fread(&lightRemaining, sizeof(float), 1, fp);
+        if (lightRemaining > 0.0f) {
+            hero->affect<Light>(lightRemaining);
+        }
+    }
+
     // 4. Inventory & Belongings
     hero->belongings.backpack.clear();
     if (hero->belongings.keyring) {
@@ -815,8 +851,41 @@ bool SaveManager::loadGame(const std::string& customPath) {
             if (version >= 3) {
                 std::fread(&htk, sizeof(int32_t), 1, fp);
             }
-            auto armor = std::make_unique<Armor>(iName, tier, sReq);
+            int32_t glyph = 0;
+            int32_t dr = 0;
+            if (version >= 10) {
+                std::fread(&glyph, sizeof(int32_t), 1, fp);
+                std::fread(&dr, sizeof(int32_t), 1, fp);
+            }
+
+            std::unique_ptr<Armor> armor;
+            if (iName == "warrior suit of armor") {
+                auto ca = std::make_unique<WarriorArmor>();
+                ca->STR = sReq;
+                ca->DR_val = (version >= 10) ? dr : (tier * (2 + iLvl));
+                armor = std::move(ca);
+            } else if (iName == "mage robe") {
+                auto ca = std::make_unique<MageArmor>();
+                ca->STR = sReq;
+                ca->DR_val = (version >= 10) ? dr : (tier * (2 + iLvl));
+                armor = std::move(ca);
+            } else if (iName == "rogue garb") {
+                auto ca = std::make_unique<RogueArmor>();
+                ca->STR = sReq;
+                ca->DR_val = (version >= 10) ? dr : (tier * (2 + iLvl));
+                armor = std::move(ca);
+            } else if (iName == "huntress cloak") {
+                auto ca = std::make_unique<HuntressArmor>();
+                ca->STR = sReq;
+                ca->DR_val = (version >= 10) ? dr : (tier * (2 + iLvl));
+                armor = std::move(ca);
+            } else {
+                armor = std::make_unique<Armor>(iName, tier, sReq);
+            }
             armor->hitsToKnow = htk;
+            if (version >= 10 && glyph >= 0 && glyph <= 13) {
+                armor->glyph = static_cast<Armor::Glyph>(glyph);
+            }
             item = std::move(armor);
         } else if (cat == ItemCategory::Potion) {
             int32_t pType = 0;
@@ -836,7 +905,9 @@ bool SaveManager::loadGame(const std::string& customPath) {
             if (iName.rfind("Ring of ", 0) == 0) {
                 eff = iName.substr(8);
             }
-            auto ring = std::make_unique<Ring>(static_cast<Ring::Gem>(gem), eff);
+            auto ring = Ring::createForEffect(eff);
+            ring->gem = static_cast<Ring::Gem>(gem);
+            ring->image = Ring::imageForGem(ring->gem);
             ring->ticksToKnow = ttk;
             item = std::move(ring);
         } else {
@@ -1056,8 +1127,41 @@ bool SaveManager::loadGame(const std::string& customPath) {
                     if (version >= 3) {
                         std::fread(&htk, sizeof(int32_t), 1, fp);
                     }
-                    auto armor = std::make_unique<Armor>(iName, tier, sReq);
+                    int32_t glyph = 0;
+                    int32_t dr = 0;
+                    if (version >= 10) {
+                        std::fread(&glyph, sizeof(int32_t), 1, fp);
+                        std::fread(&dr, sizeof(int32_t), 1, fp);
+                    }
+
+                    std::unique_ptr<Armor> armor;
+                    if (iName == "warrior suit of armor") {
+                        auto ca = std::make_unique<WarriorArmor>();
+                        ca->STR = sReq;
+                        ca->DR_val = (version >= 10) ? dr : (tier * (2 + iLvl));
+                        armor = std::move(ca);
+                    } else if (iName == "mage robe") {
+                        auto ca = std::make_unique<MageArmor>();
+                        ca->STR = sReq;
+                        ca->DR_val = (version >= 10) ? dr : (tier * (2 + iLvl));
+                        armor = std::move(ca);
+                    } else if (iName == "rogue garb") {
+                        auto ca = std::make_unique<RogueArmor>();
+                        ca->STR = sReq;
+                        ca->DR_val = (version >= 10) ? dr : (tier * (2 + iLvl));
+                        armor = std::move(ca);
+                    } else if (iName == "huntress cloak") {
+                        auto ca = std::make_unique<HuntressArmor>();
+                        ca->STR = sReq;
+                        ca->DR_val = (version >= 10) ? dr : (tier * (2 + iLvl));
+                        armor = std::move(ca);
+                    } else {
+                        armor = std::make_unique<Armor>(iName, tier, sReq);
+                    }
                     armor->hitsToKnow = htk;
+                    if (version >= 10 && glyph >= 0 && glyph <= 13) {
+                        armor->glyph = static_cast<Armor::Glyph>(glyph);
+                    }
                     item = std::move(armor);
                 } else if (cat == ItemCategory::Potion) {
                     int32_t pType = 0;
@@ -1077,7 +1181,9 @@ bool SaveManager::loadGame(const std::string& customPath) {
                     if (iName.rfind("Ring of ", 0) == 0) {
                         eff = iName.substr(8);
                     }
-                    auto ring = std::make_unique<Ring>(static_cast<Ring::Gem>(gem), eff);
+                    auto ring = Ring::createForEffect(eff);
+                    ring->gem = static_cast<Ring::Gem>(gem);
+                    ring->image = Ring::imageForGem(ring->gem);
                     ring->ticksToKnow = ttk;
                     item = std::move(ring);
                 } else {
@@ -1150,10 +1256,51 @@ bool SaveManager::loadGame(const std::string& customPath) {
         }
     }
 
+    level->wells.clear();
+    if (version >= 9) {
+        uint32_t wellCount = 0;
+        std::fread(&wellCount, sizeof(uint32_t), 1, fp);
+        for (uint32_t w = 0; w < wellCount; ++w) {
+            int32_t wCell = 0, wType = 0;
+            std::fread(&wCell, sizeof(int32_t), 1, fp);
+            std::fread(&wType, sizeof(int32_t), 1, fp);
+            level->wells[wCell] = static_cast<Level::WellType>(wType);
+            if (level->map[wCell] == Terrain::WELL) {
+                Blob::BlobType btype = (static_cast<Level::WellType>(wType) == Level::WellType::Health) ? Blob::BlobType::WATER_OF_HEALTH :
+                                       ((static_cast<Level::WellType>(wType) == Level::WellType::Awareness) ? Blob::BlobType::WATER_OF_AWARENESS :
+                                                                                                             Blob::BlobType::WATER_OF_TRANSMUTATION);
+                FX::seedBlob(wCell, btype, 1);
+            }
+        }
+    } else {
+        for (int i = 0; i < Level::LENGTH; ++i) {
+            if (level->map[i] == Terrain::WELL) {
+                Level::WellType type = static_cast<Level::WellType>(Random::Int(3));
+                level->wells[i] = type;
+                Blob::BlobType btype = (type == Level::WellType::Health) ? Blob::BlobType::WATER_OF_HEALTH :
+                                       ((type == Level::WellType::Awareness) ? Blob::BlobType::WATER_OF_AWARENESS :
+                                                                              Blob::BlobType::WATER_OF_TRANSMUTATION);
+                FX::seedBlob(i, btype, 1);
+            }
+        }
+    }
+
     level->buildFlags();
 
-    // Add hero to Actor timeline
+    // Add hero and blobs to Actor timeline
     Actor::add(hero);
+    Actor::add(FX::getBlob(Blob::BlobType::FIRE), Actor::TICK);
+    Actor::add(FX::getBlob(Blob::BlobType::TOXIC_GAS), Actor::TICK);
+    Actor::add(FX::getBlob(Blob::BlobType::PARALYTIC_GAS), Actor::TICK);
+    Actor::add(FX::getBlob(Blob::BlobType::CONFUSION_GAS), Actor::TICK);
+    Actor::add(FX::getBlob(Blob::BlobType::CORROSIVE_GAS), Actor::TICK);
+    Actor::add(FX::getBlob(Blob::BlobType::REGROWTH), Actor::TICK);
+    Actor::add(FX::getBlob(Blob::BlobType::FOLIAGE), Actor::TICK);
+    Actor::add(FX::getBlob(Blob::BlobType::WATER_OF_HEALTH), Actor::TICK);
+    Actor::add(FX::getBlob(Blob::BlobType::WATER_OF_AWARENESS), Actor::TICK);
+    Actor::add(FX::getBlob(Blob::BlobType::WATER_OF_TRANSMUTATION), Actor::TICK);
+    Buff* light = hero->buff(BuffType::Light);
+    hero->viewDistance = (light == nullptr) ? level->viewDistance : std::max(Light::DISTANCE, level->viewDistance);
     level->updateFieldOfView(hero->pos, hero->viewDistance);
 
     // 6. Active Living Mobs State

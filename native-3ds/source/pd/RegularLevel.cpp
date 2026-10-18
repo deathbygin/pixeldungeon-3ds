@@ -537,7 +537,9 @@ void RegularLevel::createItems() {
 
         float roll = Random::Float();
         std::unique_ptr<Item> item;
-        if (roll < 0.25f) {
+        if (Dungeon::depth >= 21 && Dungeon::depth <= 24 && roll < 0.12f && Random::Float() < 0.35f) {
+            item = std::make_unique<Torch>();
+        } else if (roll < 0.25f) {
             item = std::make_unique<Potion>(static_cast<Potion::PotionType>(Random::Int(12)));
         } else if (roll < 0.50f) {
             item = Scroll::createRandom();

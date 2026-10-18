@@ -206,6 +206,15 @@ void Level::trample(int cell, Char* ch) {
         FX::burst(cell, 0x44aa33FF, leaves);
 
         int herbalismLevel = 0;
+        Hero* hero = (ch == Dungeon::hero.get()) ? Dungeon::hero.get() : (ch ? ch->asHero() : nullptr);
+        if (hero) {
+            if (hero->belongings.equippedRing1 && hero->belongings.equippedRing1->asRing() && hero->belongings.equippedRing1->asRing()->effect == "Herbalism") {
+                herbalismLevel += hero->belongings.equippedRing1->asRing()->level;
+            }
+            if (hero->belongings.equippedRing2 && hero->belongings.equippedRing2->asRing() && hero->belongings.equippedRing2->asRing()->effect == "Herbalism") {
+                herbalismLevel += hero->belongings.equippedRing2->asRing()->level;
+            }
+        }
         // Seed drop: Random.Int(18) <= Random.Int(herbalismLevel + 1)
         if (herbalismLevel >= 0 && Random::Int(18) <= Random::Int(herbalismLevel + 1)) {
             drop(std::make_unique<PlantSeed>(static_cast<PlantSeed::PlantType>(Random::Int(8))), cell);
@@ -316,7 +325,7 @@ void Level::affectWell(int cell, Char* ch) {
             hero->removeBuff(BuffType::Slow);
             hero->removeBuff(BuffType::Blindness);
             hero->interrupt();
-            GLog::p("As you take a sip, you feel your wounds heal completely.");
+            GLog::p("Power of health radiates from the water of this well. Your wounds heal and hunger vanishes!");
             FX::burst(cell, 0x20CC66FFu, 12);
             set(cell, Terrain::EMPTY_WELL);
             wells.erase(cell);
@@ -335,9 +344,7 @@ void Level::affectWell(int cell, Char* ch) {
             hero->affect<Awareness>();
             Dungeon::observe();
             hero->interrupt();
-            GLog::p("As you take a sip, you feel the knowledge pours into your mind. "
-                   "Now you know everything about your equipped items. Also you sense "
-                   "all items on the level and know all its secrets.");
+            GLog::p("Power of knowledge radiates from the water of this well. The dungeon's secrets and your gear are revealed!");
             FX::burst(cell, 0x3388EEFFu, 12);
             set(cell, Terrain::EMPTY_WELL);
             wells.erase(cell);
@@ -345,8 +352,8 @@ void Level::affectWell(int cell, Char* ch) {
             if (b) b->clear(cell);
             return;
         } else if (type == WellType::Transmutation) {
-            // Stepping into transmutation well does nothing to hero
-            GLog::i("The water in this well feels strange, but nothing happens when you step into it.");
+            // Stepping into transmutation well does nothing to hero, gives hint
+            GLog::w("Power of change radiates from the water of this well. Throw an item into the well to turn it into something else.");
             return;
         }
     } else if (ch == nullptr) {
@@ -360,7 +367,7 @@ void Level::affectWell(int cell, Char* ch) {
             DewVial* vial = item->asDewVial();
             if (vial && !vial->isFull()) {
                 vial->fill();
-                Sample::play(Assets::SND_DRINK);
+                Sample::play(Assets::SND_DEWDROP);
                 GLog::p("The dew vial is filled to the brim!");
                 FX::burst(cell, 0x20CC66FFu, 12);
                 set(cell, Terrain::EMPTY_WELL);
@@ -392,12 +399,12 @@ void Level::affectWell(int cell, Char* ch) {
         } else if (type == WellType::Transmutation) {
             std::unique_ptr<Item> newItem = nullptr;
             if (Weapon* w = item->asWeapon()) {
-                if (w->category() == Item::ItemCategory::Weapon) {
+                if (!item->asMissile() && !item->asWand() && w->category() == Item::ItemCategory::Weapon) {
                     std::string newName;
                     if (w->name == "Knuckles" || w->name == "Knuckleduster" || w->name == "knuckleduster") { newName = "Dagger"; }
                     else if (w->name == "Dagger" || w->name == "dagger") { newName = "Knuckles"; }
                     else if (w->name == "Spear" || w->name == "spear") { newName = "Quarterstaff"; }
-                    else if (w->name == "Quarterstaff" || w->name == "quarterstaff" || w->name == "Shortsword" || w->name == "short sword") { newName = "Spear"; }
+                    else if (w->name == "Quarterstaff" || w->name == "quarterstaff" || w->name == "Shortsword" || w->name == "short sword" || w->name == "Short Sword") { newName = "Spear"; }
                     else if (w->name == "Sword" || w->name == "sword") { newName = "Mace"; }
                     else if (w->name == "Mace" || w->name == "mace") { newName = "Sword"; }
                     else if (w->name == "Longsword" || w->name == "longsword") { newName = "Battle Axe"; }
@@ -415,6 +422,18 @@ void Level::affectWell(int cell, Char* ch) {
                     nw->cursedKnown = w->cursedKnown;
                     newItem = std::move(nw);
                 }
+            } else if (Armor* a = item->asArmor()) {
+                static const char* armorNames[] = { "Cloth Armor", "Leather Armor", "Mail Armor", "Scale Armor", "Plate Armor" };
+                int t = std::clamp(a->tier, 1, 5);
+                int strReq = 9 + t * 2;
+                auto na = std::make_unique<Armor>(armorNames[t - 1], t, strReq);
+                na->level = a->level;
+                na->cursed = a->cursed;
+                na->glyph = a->glyph;
+                na->identified = a->identified;
+                na->levelKnown = a->levelKnown;
+                na->cursedKnown = a->cursedKnown;
+                newItem = std::move(na);
             } else if (Scroll* s = item->asScroll()) {
                 if (s->type == Scroll::ScrollType::UPGRADE) {
                     newItem = std::make_unique<Scroll>(Scroll::ScrollType::ENCHANTMENT);
@@ -424,7 +443,7 @@ void Level::affectWell(int cell, Char* ch) {
                     Scroll::ScrollType newType;
                     do {
                         newType = static_cast<Scroll::ScrollType>(Random::Int(static_cast<int>(Scroll::SCROLL_COUNT)));
-                    } while (newType == s->type);
+                    } while (newType == s->type || newType == Scroll::ScrollType::UPGRADE || newType == Scroll::ScrollType::ENCHANTMENT);
                     newItem = std::make_unique<Scroll>(newType);
                 }
             } else if (Potion* p = item->asPotion()) {
@@ -436,30 +455,47 @@ void Level::affectWell(int cell, Char* ch) {
                     Potion::PotionType newType;
                     do {
                         newType = static_cast<Potion::PotionType>(Random::Int(static_cast<int>(Potion::POTION_COUNT)));
-                    } while (newType == p->type);
+                    } while (newType == p->type || newType == Potion::PotionType::STRENGTH || newType == Potion::PotionType::MIGHT);
                     newItem = std::make_unique<Potion>(newType);
                 }
             } else if (PlantSeed* ps = item->asPlantSeed()) {
                 PlantSeed::PlantType newPt;
                 do {
-                    newPt = static_cast<PlantSeed::PlantType>(Random::Int(8));
+                    newPt = static_cast<PlantSeed::PlantType>(Random::Int(7));
                 } while (newPt == ps->plantType);
                 newItem = std::make_unique<PlantSeed>(newPt);
             } else if (Ring* r = item->asRing()) {
-                Ring::Gem newGem;
+                static const char* s_standardEffects[10] = {
+                    "Mending", "Detection", "Shadows", "Power",
+                    "Herbalism", "Accuracy", "Evasion", "Satiety",
+                    "Haste", "Elements"
+                };
+                std::string newEff;
                 do {
-                    newGem = static_cast<Ring::Gem>(Random::Int(12));
-                } while (newGem == r->gem);
-                auto nr = std::make_unique<Ring>(newGem);
+                    int rIdx = Random::Int(10);
+                    newEff = s_standardEffects[rIdx];
+                } while (newEff == r->effect);
+                auto nr = Ring::createForEffect(newEff);
                 nr->level = r->level;
                 nr->cursed = r->cursed;
                 nr->identified = r->identified;
+                nr->levelKnown = r->levelKnown;
+                nr->cursedKnown = r->cursedKnown;
                 newItem = std::move(nr);
-            } else if (item->asWand()) {
-                auto nw = Wand::randomWand();
-                nw->level = item->level;
-                nw->cursed = item->cursed;
-                nw->identified = item->identified;
+            } else if (Wand* w = item->asWand()) {
+                std::unique_ptr<Wand> nw;
+                do {
+                    int r = Random::Int(static_cast<int>(Wand::WandType::COUNT));
+                    nw = Wand::createByType(static_cast<Wand::WandType>(r));
+                } while (nw->wandType == w->wandType);
+                nw->maxCharges = Wand::INITIAL_CHARGES + w->level;
+                nw->curCharges = std::min(w->curCharges, nw->maxCharges);
+                nw->level = w->level;
+                nw->cursed = w->cursed;
+                nw->identified = w->identified;
+                nw->levelKnown = w->levelKnown;
+                nw->cursedKnown = w->cursedKnown;
+                nw->curChargeKnown = w->curChargeKnown;
                 newItem = std::move(nw);
             }
 
@@ -470,7 +506,7 @@ void Level::affectWell(int cell, Char* ch) {
                 } else {
                     heap->replace(item, std::move(newItem));
                 }
-                Sample::play(Assets::SND_DRINK);
+                Sample::play(Assets::SND_DEWDROP);
                 GLog::p("The water flashes and changes the item!");
                 FX::burst(cell, 0xEEBB22FFu, 12);
                 set(cell, Terrain::EMPTY_WELL);

@@ -569,6 +569,31 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
             }
         }
 
+        // Stylus minimap tap jumping to target cell
+        if (level && hero) {
+            float vpX = 10.0f;
+            float vpY = 42.0f;
+            float vpW = 142.0f;
+            float vpH = 106.0f;
+            noosa::RectF minimapRect(vpX, vpY, vpW, vpH);
+            if (m_touch.justReleased() && minimapRect.contains(static_cast<float>(m_touch.x()), static_cast<float>(m_touch.y()))) {
+                float cellSize = 3.0f;
+                int cols = static_cast<int>(vpW / cellSize);
+                int rows = static_cast<int>(vpH / cellSize);
+                int startX = (hero->pos % Level::WIDTH) - (cols / 2);
+                int startY = (hero->pos / Level::WIDTH) - (rows / 2);
+
+                int clickedX = startX + static_cast<int>((m_touch.x() - vpX) / cellSize);
+                int clickedY = startY + static_cast<int>((m_touch.y() - vpY) / cellSize);
+                if (clickedX >= 0 && clickedX < Level::WIDTH && clickedY >= 0 && clickedY < Level::HEIGHT) {
+                    int cell = clickedY * Level::WIDTH + clickedX;
+                    if (canTargetCell(hero, level, m_targetItem, cell)) {
+                        m_targetCell = cell;
+                    }
+                }
+            }
+        }
+
         // Confirm Throw: A button
         if (kDown & KEY_A) {
             Item* it = m_targetItem;
@@ -891,7 +916,17 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
                               (qIt->category() == ItemCategory::Potion ? "DRINK" :
                               (qIt->category() == ItemCategory::Scroll ? "READ" : "USE"))));
 
-            if (act == "THROW" || act == "ZAP") {
+            if (act == "THROW" || act == "ZAP" || act == "HEROIC LEAP" || act == "SMOKE BOMB") {
+                if (qIt->asClassArmor()) {
+                    if (hero->HP < 3) {
+                        GLog::w("Your health is too low!");
+                        return false;
+                    }
+                    if (hero->belongings.equippedArmor != qIt) {
+                        GLog::w("You need to be wearing this armor to use its special power!");
+                        return false;
+                    }
+                }
                 startTargeting(qIt);
                 log("Aiming " + qIt->displayName() + "...", COLOR_TEXT_ACCENT);
                 return false;
@@ -1368,8 +1403,8 @@ void BottomScreenUI::showTradeItem(pd::Heap* heap) {
 
     bool hasHaggler = false;
     if (Dungeon::hero) {
-        if ((Dungeon::hero->belongings.equippedRing1 && static_cast<Ring*>(Dungeon::hero->belongings.equippedRing1)->effect == "Haggler") ||
-            (Dungeon::hero->belongings.equippedRing2 && static_cast<Ring*>(Dungeon::hero->belongings.equippedRing2)->effect == "Haggler")) {
+        if ((Dungeon::hero->belongings.equippedRing1 && Dungeon::hero->belongings.equippedRing1->asRing() && Dungeon::hero->belongings.equippedRing1->asRing()->effect == "Haggler") ||
+            (Dungeon::hero->belongings.equippedRing2 && Dungeon::hero->belongings.equippedRing2->asRing() && Dungeon::hero->belongings.equippedRing2->asRing()->effect == "Haggler")) {
             hasHaggler = true;
         }
     }
@@ -1692,7 +1727,10 @@ void BottomScreenUI::inspectCell(int cell, pd::Level* level) {
         Blob::BlobType::CONFUSION_GAS,
         Blob::BlobType::CORROSIVE_GAS,
         Blob::BlobType::REGROWTH,
-        Blob::BlobType::FOLIAGE
+        Blob::BlobType::FOLIAGE,
+        Blob::BlobType::WATER_OF_HEALTH,
+        Blob::BlobType::WATER_OF_AWARENESS,
+        Blob::BlobType::WATER_OF_TRANSMUTATION
     };
     for (auto bt : blobTypes) {
         Blob* b = FX::getBlob(bt);

@@ -406,19 +406,28 @@ public:
     void detach() override;
 };
 
-class Light : public FlavourBuff {
+class Light : public Buff {
 public:
     static constexpr BuffType STATIC_TYPE = BuffType::Light;
     static constexpr float DURATION = 250.0f;
-    static constexpr int DISTANCE = 6;
+    static constexpr int DISTANCE = 4;
+
+    float timeRemaining = DURATION;
+    bool warned = false;
+
+    Light() = default;
+    explicit Light(float duration) : timeRemaining(duration) {}
 
     BuffType type() const override { return STATIC_TYPE; }
     std::string name() const override { return "Illuminated"; }
     int icon() const override { return 22; }
+    float duration() const override { return timeRemaining; }
     std::string desc() const override;
 
     void attachTo(Char* ch) override;
     void detach() override;
+    bool act() override;
+    void prolong(float dur);
 };
 
 class Shadows : public Buff {

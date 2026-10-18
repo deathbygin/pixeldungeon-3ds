@@ -129,7 +129,7 @@ void Hero::initClass(HeroClass cl) {
             dagger->identify();
             belongings.equip(std::move(dagger));
 
-            auto ring = std::make_unique<Ring>(Ring::Gem::ONYX, "Shadows");
+            auto ring = std::make_unique<RingOfShadows>();
             ring->upgrade();
             ring->identify();
             belongings.ring1Slot = std::move(ring);
@@ -466,8 +466,8 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
                 return false;
             }
 
-            bool heroCanEnter = flying || (currentLevel->isPassable(nextCell) && !currentLevel->pit[nextCell]);
-            bool allyCanEnter = mob->flying || (currentLevel->isPassable(pos) && !currentLevel->pit[pos]);
+            bool heroCanEnter = flying || (currentLevel->isPassable(nextCell) && !currentLevel->pit[nextCell]) || currentLevel->map[nextCell] == Terrain::WELL;
+            bool allyCanEnter = mob->flying || (currentLevel->isPassable(pos) && !currentLevel->pit[pos]) || currentLevel->map[pos] == Terrain::WELL;
 
             if (!heroCanEnter || !allyCanEnter) {
                 if (hasVertigo) {
@@ -652,7 +652,7 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
         return true;
     }
 
-    if (currentLevel->isPassable(nextCell)) {
+    if (currentLevel->isPassable(nextCell) || currentLevel->map[nextCell] == Terrain::WELL) {
         int fromCell = pos;
         if (nextCell != fromCell) {
             enableAutoPick(fromCell);
@@ -821,7 +821,11 @@ bool Hero::pickUp(Level* currentLevel, bool spendTurn) {
         Sample::play(Assets::SND_GOLD, 1.0f, 1.0f, Random::Float(0.9f, 1.1f));
     } else {
         bool wasKey = (item->asKey() != nullptr);
+        Item* itPtr = item.get();
         if (belongings.collect(item)) {
+            if (itPtr) {
+                itPtr->onCollect(this);
+            }
             if (wasKey) {
                 GLog::p("You found a " + itemName + " (it was added to your key ring)");
             } else {
@@ -872,8 +876,8 @@ bool Hero::search(Level* currentLevel, bool intentional) {
     int positive = 0;
     int negative = 0;
     auto checkRing = [&](Item* r) {
-        if (r && r->name == "Ring of Detection") {
-            int bonus = r->level;
+        if (r && r->asRing() && r->asRing()->effect == "Detection") {
+            int bonus = r->asRing()->level;
             if (bonus > positive) {
                 positive = bonus;
             } else if (bonus < 0) {
@@ -1083,11 +1087,81 @@ void Hero::die(Actor* src) {
     Char::die(src);
 }
 
+void Hero::spend(float time) {
+    int hasteLevel = 0;
+    if (belongings.equippedRing1 && belongings.equippedRing1->asRing() && belongings.equippedRing1->asRing()->effect == "Haste") {
+        hasteLevel += belongings.equippedRing1->asRing()->level;
+    }
+    if (belongings.equippedRing2 && belongings.equippedRing2->asRing() && belongings.equippedRing2->asRing()->effect == "Haste") {
+        hasteLevel += belongings.equippedRing2->asRing()->level;
+    }
+    float effectiveTime = (hasteLevel == 0) ? time : static_cast<float>(time * std::pow(1.1, -hasteLevel));
+    Char::spend(effectiveTime);
+}
+
+float Hero::elementsDurationFactor() const {
+    int level = 0;
+    bool hasRing = false;
+    if (belongings.equippedRing1 && belongings.equippedRing1->asRing() && belongings.equippedRing1->asRing()->effect == "Elements") {
+        level += belongings.equippedRing1->asRing()->level;
+        hasRing = true;
+    }
+    if (belongings.equippedRing2 && belongings.equippedRing2->asRing() && belongings.equippedRing2->asRing()->effect == "Elements") {
+        level += belongings.equippedRing2->asRing()->level;
+        hasRing = true;
+    }
+    if (!hasRing) return 1.0f;
+    if (level < 0) {
+        return (2.0f - 0.5f * level) / 2.0f;
+    }
+    return (2.0f + 0.5f * level) / (2.0f + level);
+}
+
 void Hero::damage(int dmg, Actor* src) {
     if (Debug::godMode) {
         return;
     }
     restoreHealth = false;
+
+    // Ring of Elements resistance & vulnerability check
+    int elemLevel = 0;
+    bool hasElemRing = false;
+    if (belongings.equippedRing1 && belongings.equippedRing1->asRing() && belongings.equippedRing1->asRing()->effect == "Elements") {
+        elemLevel += belongings.equippedRing1->asRing()->level;
+        hasElemRing = true;
+    }
+    if (belongings.equippedRing2 && belongings.equippedRing2->asRing() && belongings.equippedRing2->asRing()->effect == "Elements") {
+        elemLevel += belongings.equippedRing2->asRing()->level;
+        hasElemRing = true;
+    }
+    if (hasElemRing && src) {
+        bool isElemSrc = false;
+        Buff* b = src->asBuff();
+        if (b) {
+            BuffType bt = b->type();
+            if (bt == BuffType::Burning || bt == BuffType::Poison) {
+                isElemSrc = true;
+            }
+        }
+        Char* c = src->asChar();
+        if (c && c->asMob()) {
+            Mob::MobType mt = c->asMob()->mobType();
+            if (mt == Mob::MobType::Warlock || mt == Mob::MobType::Eye || mt == Mob::MobType::BurningFist) {
+                isElemSrc = true;
+            }
+        }
+        if (isElemSrc) {
+            if (elemLevel >= 0) {
+                if (Random::Int(elemLevel + 3) >= 3) {
+                    dmg = Random::IntRange(0, dmg);
+                }
+            } else {
+                // Degraded vulnerability
+                dmg = static_cast<int>(dmg * (1.0f + 0.25f * (-elemLevel)));
+            }
+        }
+    }
+
     Char::damage(dmg, src);
     if (subClass == HeroSubClass::Berserker && HP > 0 && HP <= HT * 0.40f) {
         if (!getBuff<Fury>()) {
@@ -1122,21 +1196,40 @@ bool Hero::shoot(Char* enemyChar, MissileWeapon* wep) {
 }
 
 int Hero::attackSkill(Char* target) {
+    int bonus = 0;
+    if (belongings.equippedRing1 && belongings.equippedRing1->asRing() && belongings.equippedRing1->asRing()->effect == "Accuracy") {
+        bonus += belongings.equippedRing1->asRing()->level;
+    }
+    if (belongings.equippedRing2 && belongings.equippedRing2->asRing() && belongings.equippedRing2->asRing()->effect == "Accuracy") {
+        bonus += belongings.equippedRing2->asRing()->level;
+    }
+    float accuracy = (bonus == 0) ? 1.0f : static_cast<float>(std::pow(1.4, bonus));
+
     int skill = 10 + level * 2;
     if (rangedWeapon && target && PathFinder::distanceChebyshev(pos, target->pos) == 1) {
-        skill /= 2; // Point-blank ranged penalty matching Java (accuracy *= 0.5f)
+        accuracy *= 0.5f; // Point-blank ranged penalty matching Java (accuracy *= 0.5f)
     }
     if (rangedWeapon) {
-        skill = static_cast<int>(skill * rangedWeapon->acuracyFactor(this));
+        skill = static_cast<int>(skill * accuracy * rangedWeapon->acuracyFactor(this));
     } else if (belongings.equippedWeapon) {
-        skill = static_cast<int>(skill * belongings.equippedWeapon->acuracyFactor(this));
+        skill = static_cast<int>(skill * accuracy * belongings.equippedWeapon->acuracyFactor(this));
+    } else {
+        skill = static_cast<int>(skill * accuracy);
     }
     return skill;
 }
 
 int Hero::defenseSkill(Char* attacker) {
     (void)attacker;
-    float evasion = 1.0f;
+    int bonus = 0;
+    if (belongings.equippedRing1 && belongings.equippedRing1->asRing() && belongings.equippedRing1->asRing()->effect == "Evasion") {
+        bonus += belongings.equippedRing1->asRing()->level;
+    }
+    if (belongings.equippedRing2 && belongings.equippedRing2->asRing() && belongings.equippedRing2->asRing()->effect == "Evasion") {
+        bonus += belongings.equippedRing2->asRing()->level;
+    }
+    float evasion = (bonus == 0) ? 1.0f : static_cast<float>(std::pow(1.2, bonus));
+
     if (paralysed) {
         evasion /= 2.0f;
     }
@@ -1253,6 +1346,15 @@ int Hero::attackProc(Char* enemy, int damage) {
 }
 
 int Hero::defenseProc(Char* enemy, int damage) {
+    bool hasThorns = (belongings.equippedRing1 && belongings.equippedRing1->asRing() && belongings.equippedRing1->asRing()->effect == "Thorns") ||
+                     (belongings.equippedRing2 && belongings.equippedRing2->asRing() && belongings.equippedRing2->asRing()->effect == "Thorns");
+    if (hasThorns && enemy) {
+        int dmg = Random::IntRange(0, damage);
+        if (dmg > 0) {
+            enemy->damage(dmg, this);
+        }
+    }
+
     if (belongings.equippedArmor) {
         damage = belongings.equippedArmor->proc(enemy, this, damage);
     }

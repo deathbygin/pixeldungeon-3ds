@@ -175,6 +175,14 @@ public:
     void die(Actor* src) override;
 };
 
+class Bandit : public Thief {
+public:
+    Bandit();
+    std::string description() const override;
+    int attackProc(Char* enemy, int damage) override;
+    void die(Actor* src) override;
+};
+
 class Shaman : public Mob {
 public:
     Shaman();

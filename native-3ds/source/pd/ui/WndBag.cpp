@@ -70,6 +70,8 @@ bool WndBag::isItemEligible(const pd::Item* it) const {
             return it->isUpgradable() && (it->category() == ItemCategory::Armor || (it->category() == ItemCategory::Weapon && !const_cast<Item*>(it)->asWand() && (!const_cast<Item*>(it)->asMissile() || const_cast<Item*>(it)->asBoomerang())));
         case Mode::WEAPON:
             return (const_cast<Item*>(it)->asWeapon() != nullptr && !const_cast<Item*>(it)->asWand() && (!const_cast<Item*>(it)->asMissile() || const_cast<Item*>(it)->asBoomerang()));
+        case Mode::ARMOR:
+            return const_cast<Item*>(it)->asArmor() != nullptr;
         case Mode::WAND:
             return (const_cast<Item*>(it)->asWand() != nullptr && it->isUpgradable());
         case Mode::FOR_SALE:
@@ -130,7 +132,7 @@ bool WndBag::update(pd::Hero* hero, const TouchController& touch, u32 kDown, u32
                 close();
                 return false;
             }
-            if (action == "THROW" || action == "ZAP") {
+            if (action == "THROW" || action == "ZAP" || action == "HEROIC LEAP" || action == "SMOKE BOMB") {
                 outMessage = "START_TARGETING";
                 close();
                 return false;

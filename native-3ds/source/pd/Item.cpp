@@ -1241,11 +1241,11 @@ int Wand::power() const {
     if (Dungeon::hero) {
         if (Dungeon::hero->belongings.equippedRing1 && Dungeon::hero->belongings.equippedRing1->asRing()) {
             Ring* r = Dungeon::hero->belongings.equippedRing1->asRing();
-            if (r->effect == "Power") p += r->level + 1;
+            if (r->effect == "Power") p += r->level;
         }
         if (Dungeon::hero->belongings.equippedRing2 && Dungeon::hero->belongings.equippedRing2->asRing()) {
             Ring* r = Dungeon::hero->belongings.equippedRing2->asRing();
-            if (r->effect == "Power") p += r->level + 1;
+            if (r->effect == "Power") p += r->level;
         }
     }
     return std::max(0, p);
@@ -2434,8 +2434,12 @@ std::string Armor::info() const {
     }
 }
 
+int Armor::DR() const {
+    return tier * (2 + level + (isInscribed() ? 1 : 0));
+}
+
 int Armor::drRoll() const {
-    return Random::IntRange(0, tier * 2 + level);
+    return Random::IntRange(0, std::max(0, DR()));
 }
 
 int Armor::proc(Char* attacker, Char* defender, int damage) {
@@ -3853,8 +3857,12 @@ bool Torch::execute(Hero* hero, const std::string& action) {
     if (!hero) return false;
     if (action == "LIGHT" || action == "USE") {
         hero->spendAndNext(Actor::TICK);
-        hero->affect<Light>();
-        GLog::p("You light a torch. The warm glow pushes back the darkness!");
+        hero->busy();
+        if (auto* hspr = hero->getSprite() ? hero->getSprite()->asHeroSprite() : nullptr) {
+            hspr->operate(hero->pos);
+        }
+        noosa::Audio::play(noosa::Audio::getSample(Assets::SND_ITEM).get());
+
         quantity--;
         if (quantity <= 0) {
             hero->belongings.backpack.erase(
@@ -3862,6 +3870,8 @@ bool Torch::execute(Hero* hero, const std::string& action) {
                                [this](const std::unique_ptr<Item>& it) { return it.get() == this; }),
                 hero->belongings.backpack.end());
         }
+        hero->affect<Light>();
+        GLog::p("You light a torch. The warm glow pushes back the darkness!");
         return true;
     } else if (action == "DROP") {
         return doDropItem(hero, this);
@@ -4486,8 +4496,9 @@ std::unique_ptr<Item> TomeOfMastery::clone(int qty) const {
 // ArmorKit Implementation
 // =============================================================================
 ArmorKit::ArmorKit() {
-    name = "Armor Kit";
+    name = "armor kit";
     image = ItemSpriteSheet::KIT;
+    unique = true;
     identified = true;
     levelKnown = true;
 }
@@ -4500,42 +4511,467 @@ std::vector<std::string> ArmorKit::actions(Hero* hero) {
 bool ArmorKit::execute(Hero* hero, const std::string& action) {
     if (!hero) return false;
     if (action == "APPLY") {
-        if (!hero->belongings.equippedArmor) {
-            GLog::w("You must have armor equipped to use the armor kit!");
-            return false;
-        }
-        Armor* armor = hero->belongings.equippedArmor;
-        armor->level++;
-        armor->STR = std::max(1, armor->STR - 1);
-        Sample::play(Assets::SND_EVOKE);
-        FX::burst(hero->pos, 0x55ff55FF, 12);
-        GLog::p("You applied the armor kit to upgrade your " + armor->name + "! (Defense increased, STR requirement reduced)");
+        ui::BottomScreenUI::instance()->selectItem(ui::WndBag::Mode::ARMOR, "Select an armor to upgrade", [this, hero](Item* target) {
+            if (!target) return;
+            Armor* armor = target->asArmor();
+            if (!armor) return;
 
-        // Remove kit from inventory
-        for (auto it = hero->belongings.backpack.begin(); it != hero->belongings.backpack.end(); ++it) {
-            if (it->get() == this) {
-                quantity--;
-                if (quantity <= 0) {
-                    hero->belongings.backpack.erase(it);
-                }
-                break;
+            if (armor->asClassArmor()) {
+                GLog::w("This armor has already been transformed!");
+                return;
             }
-        }
-        hero->spend(1.0f);
-        hero->next();
-        return true;
+
+            // Remove 1 kit from inventory
+            for (auto it = hero->belongings.backpack.begin(); it != hero->belongings.backpack.end(); ++it) {
+                if (it->get() == this) {
+                    quantity--;
+                    if (quantity <= 0) {
+                        hero->belongings.backpack.erase(it);
+                    }
+                    break;
+                }
+            }
+
+            hero->spend(2.0f);
+            hero->busy();
+
+            GLog::p("You applied the armor kit to upgrade your " + armor->displayName() + "!");
+
+            std::unique_ptr<ClassArmor> classArmor = ClassArmor::upgradeArmor(hero, armor);
+            if (!classArmor) return;
+
+            if (hero->belongings.equippedArmor == armor) {
+                hero->belongings.armorSlot = std::move(classArmor);
+                hero->belongings.equippedArmor = hero->belongings.armorSlot.get();
+                hero->updateArmorTier();
+            } else {
+                for (auto it = hero->belongings.backpack.begin(); it != hero->belongings.backpack.end(); ++it) {
+                    if (it->get() == armor) {
+                        *it = std::move(classArmor);
+                        break;
+                    }
+                }
+            }
+
+            if (hero->getSprite() && hero->getSprite()->asHeroSprite()) {
+                hero->getSprite()->asHeroSprite()->operate(hero->pos);
+            }
+            Sample::play(Assets::SND_EVOKE);
+            FX::burst(hero->pos, 0x55ff55FF, 12);
+            Actor::process();
+        });
+        return false;
     }
     return Item::execute(hero, action);
 }
 
 std::string ArmorKit::info() const {
-    return "This kit contains various materials and tools that allow you to modify and reinforce your armor.";
+    return "Using this kit of small tools and materials anybody can transform any armor into an \"epic armor\", "
+           "which will keep all properties of the original armor, but will also provide its wearer a special ability "
+           "depending on his class. No skills in tailoring, leatherworking or blacksmithing are required.";
 }
 
 std::unique_ptr<Item> ArmorKit::clone(int qty) const {
     auto k = std::make_unique<ArmorKit>();
     k->quantity = qty;
     return k;
+}
+
+// =============================================================================
+// ClassArmor Implementation
+// =============================================================================
+ClassArmor::ClassArmor(std::string n)
+    : Armor(std::move(n), 6, 11) {
+    identified = true;
+    levelKnown = true;
+    cursed = false;
+    cursedKnown = true;
+    hitsToKnow = 0;
+}
+
+int ClassArmor::drRoll() const {
+    return Random::IntRange(0, std::max(0, DR_val));
+}
+
+std::vector<std::string> ClassArmor::actions(Hero* hero) {
+    std::vector<std::string> acts;
+    if (hero && hero->HP >= 3 && hero->belongings.equippedArmor == this) {
+        acts.push_back(special());
+    }
+    if (hero && hero->belongings.equippedArmor == this) {
+        acts.push_back("UNEQUIP");
+        acts.push_back("THROW");
+        acts.push_back("DROP");
+    } else {
+        acts.push_back("EQUIP");
+        acts.push_back("THROW");
+        acts.push_back("DROP");
+    }
+    return acts;
+}
+
+bool ClassArmor::execute(Hero* hero, const std::string& action) {
+    if (!hero) return false;
+    if (action == special()) {
+        if (hero->HP < 3) {
+            GLog::w("Your health is too low!");
+            return false;
+        } else if (hero->belongings.equippedArmor != this) {
+            GLog::w("You need to be wearing this armor to use its special power!");
+            return false;
+        } else {
+            return doSpecial(hero);
+        }
+    }
+    return Armor::execute(hero, action);
+}
+
+std::string ClassArmor::info() const {
+    return desc() + "\n\nDefense: Max DR " + std::to_string(DR_val) +
+           " | STR required: " + std::to_string(STR);
+}
+
+std::unique_ptr<ClassArmor> ClassArmor::upgradeArmor(Hero* owner, Armor* armor) {
+    if (!owner || !armor) return nullptr;
+
+    std::unique_ptr<ClassArmor> classArmor;
+    switch (owner->heroClass) {
+        case Hero::HeroClass::Warrior:
+            classArmor = std::make_unique<WarriorArmor>();
+            break;
+        case Hero::HeroClass::Rogue:
+            classArmor = std::make_unique<RogueArmor>();
+            break;
+        case Hero::HeroClass::Mage:
+            classArmor = std::make_unique<MageArmor>();
+            break;
+        case Hero::HeroClass::Huntress:
+            classArmor = std::make_unique<HuntressArmor>();
+            break;
+        default:
+            classArmor = std::make_unique<WarriorArmor>();
+            break;
+    }
+
+    classArmor->STR = armor->STR;
+    classArmor->DR_val = armor->DR();
+    classArmor->level = armor->level;
+    classArmor->levelKnown = true;
+    classArmor->cursed = false;
+    classArmor->cursedKnown = true;
+    classArmor->identified = true;
+    classArmor->hitsToKnow = 0;
+    classArmor->glyph = armor->glyph;
+    classArmor->defaultAction = classArmor->special();
+
+    return classArmor;
+}
+
+// -----------------------------------------------------------------------------
+// WarriorArmor (Heroic Leap)
+// -----------------------------------------------------------------------------
+WarriorArmor::WarriorArmor()
+    : ClassArmor("warrior suit of armor") {
+    image = ItemSpriteSheet::ARMOR_WARRIOR;
+    defaultAction = special();
+}
+
+std::string WarriorArmor::desc() const {
+    return "While this armor looks heavy, it allows a warrior to perform heroic leap towards "
+           "a targeted location, slamming down to stun all neighbouring enemies.";
+}
+
+bool WarriorArmor::execute(Hero* hero, const std::string& action) {
+    if (action == "EQUIP") {
+        if (hero && hero->heroClass != Hero::HeroClass::Warrior) {
+            GLog::w("Only warriors can use this armor!");
+            return false;
+        }
+    }
+    return ClassArmor::execute(hero, action);
+}
+
+bool WarriorArmor::doSpecial(Hero* hero) {
+    if (!hero) return false;
+    ui::BottomScreenUI::instance()->startTargeting(this);
+    ui::BottomScreenUI::instance()->log("Choose direction to leap", C2D_Color32(0xff, 0xff, 0x66, 0xFF));
+    return false;
+}
+
+void WarriorArmor::cast(Hero* hero, int targetCell) {
+    if (!hero || targetCell == hero->pos) return;
+
+    int cell = Ballistica::cast(hero->pos, targetCell, false, true);
+    if (Actor::findChar(cell) != nullptr && cell != hero->pos) {
+        if (Ballistica::distance > 1) {
+            cell = Ballistica::trace[Ballistica::distance - 2];
+        }
+    }
+
+    hero->HP -= (hero->HP / 3);
+    if (hero->subClass == HeroSubClass::Berserker && hero->HP <= hero->HT * Fury::LEVEL) {
+        hero->affect<Fury>();
+    }
+    hero->removeBuff(BuffType::Invisibility);
+
+    hero->move(cell);
+    if (hero->getSprite()) {
+        hero->getSprite()->place(cell);
+    }
+    if (Dungeon::level) {
+        Dungeon::level->press(cell, hero);
+    }
+    Dungeon::observe();
+
+    for (int n : Level::NEIGHBOURS8) {
+        int neighborCell = cell + n;
+        if (neighborCell >= 0 && neighborCell < Level::LENGTH) {
+            Char* mob = Actor::findChar(neighborCell);
+            if (mob && mob != hero) {
+                mob->prolong<Paralysis>(3.0f);
+            }
+        }
+    }
+
+    FX::burst(cell, 0x887766FF, 12);
+    if (noosa::Camera::main) {
+        noosa::Camera::main->shake(0.5f, 2.0f);
+    }
+    Sample::play(Assets::SND_ROCKS);
+    hero->spend(1.0f);
+    hero->next();
+    Actor::process();
+}
+
+std::unique_ptr<Item> WarriorArmor::clone(int qty) const {
+    auto a = std::make_unique<WarriorArmor>();
+    a->STR = STR;
+    a->DR_val = DR_val;
+    a->level = level;
+    a->levelKnown = levelKnown;
+    a->cursed = cursed;
+    a->cursedKnown = cursedKnown;
+    a->identified = identified;
+    a->glyph = glyph;
+    a->quantity = qty;
+    return a;
+}
+
+// -----------------------------------------------------------------------------
+// MageArmor (Molten Earth)
+// -----------------------------------------------------------------------------
+MageArmor::MageArmor()
+    : ClassArmor("mage robe") {
+    image = ItemSpriteSheet::ARMOR_MAGE;
+    defaultAction = special();
+}
+
+std::string MageArmor::desc() const {
+    return "Wearing this gorgeous robe, a mage can cast a spell of molten earth: all the enemies "
+           "in his field of view will be set on fire and unable to move at the same time.";
+}
+
+bool MageArmor::execute(Hero* hero, const std::string& action) {
+    if (action == "EQUIP") {
+        if (hero && hero->heroClass != Hero::HeroClass::Mage) {
+            GLog::w("Only mages can use this armor!");
+            return false;
+        }
+    }
+    return ClassArmor::execute(hero, action);
+}
+
+bool MageArmor::doSpecial(Hero* hero) {
+    if (!hero) return false;
+
+    for (auto& mob : Dungeon::mobs) {
+        if (mob && mob->isAlive() && Dungeon::visible[mob->pos]) {
+            mob->affect<Burning>();
+            mob->prolong<Roots>(3.0f);
+            FX::burst(mob->pos, 0xff4400FF, 6);
+        }
+    }
+
+    hero->HP -= (hero->HP / 3);
+
+    hero->spend(Actor::TICK);
+    if (hero->getSprite() && hero->getSprite()->asHeroSprite()) {
+        hero->getSprite()->asHeroSprite()->operate(hero->pos);
+    }
+    hero->busy();
+
+    FX::burst(hero->pos, 0xff8800FF, 8);
+    Sample::play(Assets::SND_READ);
+    hero->next();
+    Actor::process();
+    return true;
+}
+
+std::unique_ptr<Item> MageArmor::clone(int qty) const {
+    auto a = std::make_unique<MageArmor>();
+    a->STR = STR;
+    a->DR_val = DR_val;
+    a->level = level;
+    a->levelKnown = levelKnown;
+    a->cursed = cursed;
+    a->cursedKnown = cursedKnown;
+    a->identified = identified;
+    a->glyph = glyph;
+    a->quantity = qty;
+    return a;
+}
+
+// -----------------------------------------------------------------------------
+// RogueArmor (Smoke Bomb)
+// -----------------------------------------------------------------------------
+RogueArmor::RogueArmor()
+    : ClassArmor("rogue garb") {
+    image = ItemSpriteSheet::ARMOR_ROGUE;
+    defaultAction = special();
+}
+
+std::string RogueArmor::desc() const {
+    return "Wearing this dark garb, a rogue can perform a trick, that is called \"smoke bomb\" "
+           "(though no real explosives are used): he blinds enemies who could see him and jumps aside.";
+}
+
+bool RogueArmor::execute(Hero* hero, const std::string& action) {
+    if (action == "EQUIP") {
+        if (hero && hero->heroClass != Hero::HeroClass::Rogue) {
+            GLog::w("Only rogues can use this armor!");
+            return false;
+        }
+    }
+    return ClassArmor::execute(hero, action);
+}
+
+bool RogueArmor::doSpecial(Hero* hero) {
+    if (!hero) return false;
+    ui::BottomScreenUI::instance()->startTargeting(this);
+    ui::BottomScreenUI::instance()->log("Choose a location to jump to", C2D_Color32(0xff, 0xff, 0x66, 0xFF));
+    return false;
+}
+
+void RogueArmor::cast(Hero* hero, int targetCell) {
+    if (!hero) return;
+
+    if (!Dungeon::level || !Dungeon::visible[targetCell] || !(Dungeon::level->passable[targetCell] || Dungeon::level->avoid[targetCell]) || Actor::findChar(targetCell) != nullptr) {
+        GLog::w("You can only jump to an empty location in your field of view");
+        return;
+    }
+
+    hero->HP -= (hero->HP / 3);
+
+    for (auto& mob : Dungeon::mobs) {
+        if (mob && mob->isAlive() && Dungeon::visible[mob->pos]) {
+            mob->prolong<Blindness>(2.0f);
+            mob->state = Mob::State::WANDERING;
+            FX::burst(mob->pos, 0xffffffFF, 4);
+        }
+    }
+
+    hero->move(targetCell);
+    if (hero->getSprite()) {
+        hero->getSprite()->place(targetCell);
+    }
+    FX::burst(targetCell, 0xddddddFF, 10);
+    Sample::play(Assets::SND_PUFF);
+    if (Dungeon::level) {
+        Dungeon::level->press(targetCell, hero);
+    }
+    Dungeon::observe();
+
+    hero->spend(Actor::TICK);
+    hero->next();
+    Actor::process();
+}
+
+std::unique_ptr<Item> RogueArmor::clone(int qty) const {
+    auto a = std::make_unique<RogueArmor>();
+    a->STR = STR;
+    a->DR_val = DR_val;
+    a->level = level;
+    a->levelKnown = levelKnown;
+    a->cursed = cursed;
+    a->cursedKnown = cursedKnown;
+    a->identified = identified;
+    a->glyph = glyph;
+    a->quantity = qty;
+    return a;
+}
+
+// -----------------------------------------------------------------------------
+// HuntressArmor (Spectral Blades)
+// -----------------------------------------------------------------------------
+HuntressArmor::HuntressArmor()
+    : ClassArmor("huntress cloak") {
+    image = ItemSpriteSheet::ARMOR_HUNTRESS;
+    defaultAction = special();
+}
+
+std::string HuntressArmor::desc() const {
+    return "A huntress in such cloak can create a fan of spectral blades. Each of these blades "
+           "will target a single enemy in the huntress's field of view, inflicting damage depending "
+           "on her currently equipped melee weapon.";
+}
+
+bool HuntressArmor::execute(Hero* hero, const std::string& action) {
+    if (action == "EQUIP") {
+        if (hero && hero->heroClass != Hero::HeroClass::Huntress) {
+            GLog::w("Only huntresses can use this armor!");
+            return false;
+        }
+    }
+    return ClassArmor::execute(hero, action);
+}
+
+bool HuntressArmor::doSpecial(Hero* hero) {
+    if (!hero) return false;
+
+    std::vector<Mob*> targets;
+    for (auto& mob : Dungeon::mobs) {
+        if (mob && mob->isAlive() && Dungeon::visible[mob->pos]) {
+            targets.push_back(mob.get());
+        }
+    }
+
+    if (targets.empty()) {
+        GLog::w("No enemies in sight");
+        return false;
+    }
+
+    hero->HP -= (hero->HP / 3);
+
+    for (Mob* mob : targets) {
+        if (hero && mob && mob->isAlive()) {
+            hero->attack(mob);
+            FX::burst(mob->pos, 0x88ccffFF, 6);
+        }
+    }
+
+    if (hero->getSprite() && hero->getSprite()->asHeroSprite()) {
+        hero->getSprite()->asHeroSprite()->operate(hero->pos);
+    }
+    hero->busy();
+    Sample::play(Assets::SND_ZAP);
+    hero->spend(hero->attackDelay());
+    hero->next();
+    Actor::process();
+    return true;
+}
+
+std::unique_ptr<Item> HuntressArmor::clone(int qty) const {
+    auto a = std::make_unique<HuntressArmor>();
+    a->STR = STR;
+    a->DR_val = DR_val;
+    a->level = level;
+    a->levelKnown = levelKnown;
+    a->cursed = cursed;
+    a->cursedKnown = cursedKnown;
+    a->identified = identified;
+    a->glyph = glyph;
+    a->quantity = qty;
+    return a;
 }
 
 // =============================================================================
@@ -4579,7 +5015,78 @@ static const char* s_gemNames[12] = {
     "emerald", "sapphire", "quartz", "agate"
 };
 
+static const char* s_ringEffects[12] = {
+    "Mending", "Detection", "Shadows", "Power",
+    "Herbalism", "Accuracy", "Evasion", "Satiety",
+    "Haste", "Haggler", "Elements", "Thorns"
+};
+
+static const char* s_standardEffects[10] = {
+    "Mending", "Detection", "Shadows", "Power",
+    "Herbalism", "Accuracy", "Evasion", "Satiety",
+    "Haste", "Elements"
+};
+
+static std::vector<int> s_ringGemMap = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 };
 static std::vector<bool> s_ringKnown(12, false);
+
+void Ring::initGems() {
+    s_ringGemMap = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 };
+    for (int i = 11; i > 0; --i) {
+        int j = Random::Int(i + 1);
+        std::swap(s_ringGemMap[i], s_ringGemMap[j]);
+    }
+    std::fill(s_ringKnown.begin(), s_ringKnown.end(), false);
+}
+
+Ring::Gem Ring::gemForEffect(const std::string& eff) {
+    for (int i = 0; i < 12; ++i) {
+        if (eff == s_ringEffects[i]) {
+            int gemIdx = s_ringGemMap[i];
+            return static_cast<Gem>(gemIdx);
+        }
+    }
+    return Gem::DIAMOND;
+}
+
+int Ring::imageForGem(Gem g) {
+    switch (g) {
+        case Gem::DIAMOND:    return ItemSpriteSheet::RING_DIAMOND;
+        case Gem::OPAL:       return ItemSpriteSheet::RING_OPAL;
+        case Gem::GARNET:     return ItemSpriteSheet::RING_GARNET;
+        case Gem::RUBY:       return ItemSpriteSheet::RING_RUBY;
+        case Gem::AMETHYST:   return ItemSpriteSheet::RING_AMETHYST;
+        case Gem::TOPAZ:      return ItemSpriteSheet::RING_TOPAZ;
+        case Gem::ONYX:       return ItemSpriteSheet::RING_ONYX;
+        case Gem::TOURMALINE: return ItemSpriteSheet::RING_TOURMALINE;
+        case Gem::EMERALD:    return ItemSpriteSheet::RING_EMERALD;
+        case Gem::SAPPHIRE:   return ItemSpriteSheet::RING_SAPPHIRE;
+        case Gem::QUARTZ:     return ItemSpriteSheet::RING_QUARTZ;
+        case Gem::AGATE:      return ItemSpriteSheet::RING_AGATE;
+        default:              return ItemSpriteSheet::RING;
+    }
+}
+
+std::string Ring::gemName(Gem g) {
+    size_t idx = static_cast<size_t>(g);
+    return idx < 12 ? s_gemNames[idx] : "gem";
+}
+
+std::unique_ptr<Ring> Ring::createForEffect(const std::string& eff) {
+    if (eff == "Accuracy") return std::make_unique<RingOfAccuracy>();
+    if (eff == "Detection") return std::make_unique<RingOfDetection>();
+    if (eff == "Elements") return std::make_unique<RingOfElements>();
+    if (eff == "Evasion") return std::make_unique<RingOfEvasion>();
+    if (eff == "Haggler") return std::make_unique<RingOfHaggler>();
+    if (eff == "Haste") return std::make_unique<RingOfHaste>();
+    if (eff == "Herbalism") return std::make_unique<RingOfHerbalism>();
+    if (eff == "Mending") return std::make_unique<RingOfMending>();
+    if (eff == "Power") return std::make_unique<RingOfPower>();
+    if (eff == "Satiety") return std::make_unique<RingOfSatiety>();
+    if (eff == "Shadows") return std::make_unique<RingOfShadows>();
+    if (eff == "Thorns") return std::make_unique<RingOfThorns>();
+    return std::make_unique<Ring>(gemForEffect(eff), eff);
+}
 
 bool Ring::isKnown(Gem g) {
     size_t idx = static_cast<size_t>(g);
@@ -4607,10 +5114,11 @@ void Ring::setKnown(Gem g) {
 }
 
 bool Ring::allKnown() {
+    int knownCount = 0;
     for (size_t i = 0; i < 12; ++i) {
-        if (!s_ringKnown[i]) return false;
+        if (s_ringKnown[i]) knownCount++;
     }
-    return true;
+    return knownCount >= 10;
 }
 
 const std::vector<bool>& Ring::getKnownTable() {
@@ -4632,28 +5140,17 @@ void Ring::setKnown() {
 }
 
 std::string Ring::gemName() const {
-    size_t idx = static_cast<size_t>(gem);
-    return idx < 12 ? s_gemNames[idx] : "gem";
+    return gemName(gem);
+}
+
+bool Ring::isUpgradable() const {
+    return effect != "Haggler" && effect != "Thorns";
 }
 
 Ring::Ring(Gem g, std::string eff)
     : gem(g), effect(std::move(eff)) {
     name = "Ring of " + effect;
-    switch (gem) {
-        case Gem::DIAMOND: image = ItemSpriteSheet::RING_DIAMOND; break;
-        case Gem::OPAL: image = ItemSpriteSheet::RING_OPAL; break;
-        case Gem::GARNET: image = ItemSpriteSheet::RING_GARNET; break;
-        case Gem::RUBY: image = ItemSpriteSheet::RING_RUBY; break;
-        case Gem::AMETHYST: image = ItemSpriteSheet::RING_AMETHYST; break;
-        case Gem::TOPAZ: image = ItemSpriteSheet::RING_TOPAZ; break;
-        case Gem::ONYX: image = ItemSpriteSheet::RING_ONYX; break;
-        case Gem::TOURMALINE: image = ItemSpriteSheet::RING_TOURMALINE; break;
-        case Gem::EMERALD: image = ItemSpriteSheet::RING_EMERALD; break;
-        case Gem::SAPPHIRE: image = ItemSpriteSheet::RING_SAPPHIRE; break;
-        case Gem::QUARTZ: image = ItemSpriteSheet::RING_QUARTZ; break;
-        case Gem::AGATE: image = ItemSpriteSheet::RING_AGATE; break;
-        default: image = ItemSpriteSheet::RING; break;
-    }
+    image = imageForGem(gem);
 }
 
 Item* Ring::identify() {
@@ -4662,47 +5159,36 @@ Item* Ring::identify() {
     identified = true;
     levelKnown = true;
     cursedKnown = true;
+    Badges::validateItemLevelAcquired(this);
+    Badges::validateAllRingsIdentified();
     return this;
 }
 
 Item* Ring::random() {
-    static const char* s_effects[] = {
-        "Mending", "Shadows", "Detection", "Accuracy",
-        "Evasion", "Elements", "Haggler", "Haste",
-        "Herbalism", "Power", "Satiety", "Thorns"
-    };
-    int r = Random::Int(12);
-    gem = static_cast<Gem>(r);
-    effect = s_effects[r];
+    int r = Random::Int(10);
+    effect = s_standardEffects[r];
+    gem = gemForEffect(effect);
     name = "Ring of " + effect;
-    switch (gem) {
-        case Gem::DIAMOND: image = ItemSpriteSheet::RING_DIAMOND; break;
-        case Gem::OPAL: image = ItemSpriteSheet::RING_OPAL; break;
-        case Gem::GARNET: image = ItemSpriteSheet::RING_GARNET; break;
-        case Gem::RUBY: image = ItemSpriteSheet::RING_RUBY; break;
-        case Gem::AMETHYST: image = ItemSpriteSheet::RING_AMETHYST; break;
-        case Gem::TOPAZ: image = ItemSpriteSheet::RING_TOPAZ; break;
-        case Gem::ONYX: image = ItemSpriteSheet::RING_ONYX; break;
-        case Gem::TOURMALINE: image = ItemSpriteSheet::RING_TOURMALINE; break;
-        case Gem::EMERALD: image = ItemSpriteSheet::RING_EMERALD; break;
-        case Gem::SAPPHIRE: image = ItemSpriteSheet::RING_SAPPHIRE; break;
-        case Gem::QUARTZ: image = ItemSpriteSheet::RING_QUARTZ; break;
-        case Gem::AGATE: image = ItemSpriteSheet::RING_AGATE; break;
-        default: image = ItemSpriteSheet::RING; break;
-    }
+    image = imageForGem(gem);
 
     identified = false;
     levelKnown = false;
     cursedKnown = false;
     ticksToKnow = TICKS_TO_KNOW;
+
+    int lvl = Random::Int(1, 3);
     if (Random::Float() < 0.30f) {
-        level = (Random::Int(2) == 0) ? 1 : -1;
-        cursed = (level < 0);
+        level = -lvl;
+        cursed = true;
     } else {
-        level = 0;
+        level = lvl;
         cursed = false;
     }
     return this;
+}
+
+void Ring::onCollect(Hero* hero) {
+    (void)hero;
 }
 
 std::vector<std::string> Ring::actions(Hero* hero) {
@@ -4726,6 +5212,7 @@ bool Ring::execute(Hero* hero, const std::string& action) {
             if (hero->heroClass == Hero::HeroClass::Rogue && !isKnown()) {
                 setKnown();
                 GLog::i("This is a " + displayName());
+                Badges::validateItemLevelAcquired(this);
             }
             if (cursed) {
                 FX::burst(hero->pos, 0x550055FFu, 8);
@@ -4733,6 +5220,9 @@ bool Ring::execute(Hero* hero, const std::string& action) {
                 GLog::n("The " + displayName() + " is cursed! You cannot take it off!");
             } else {
                 GLog::i("You put on the " + displayName() + ".");
+            }
+            if (effect == "Detection" && Dungeon::level) {
+                hero->search(Dungeon::level.get(), false);
             }
             hero->spendAndNext(Actor::TICK);
             return true;
@@ -4782,9 +5272,47 @@ std::string Ring::displayName() const {
     return s;
 }
 
+std::string Ring::desc() const {
+    if (!isKnown()) {
+        return "This metal band is adorned with a large " + gemName() + " gem that glitters in the darkness. Who knows what effect it has when worn?";
+    }
+    if (effect == "Accuracy") {
+        return "This ring increases your chance to hit the enemy.";
+    } else if (effect == "Detection") {
+        return "Wearing this ring will allow the wearer to notice hidden secrets - traps and secret doors - without taking time to search. Degraded rings of detection will dull your senses, making it harder to notice secrets even when actively searching for them.";
+    } else if (effect == "Elements") {
+        return "This ring provides resistance to different elements, such as fire, electricity, gases etc. Also it decreases duration of negative effects.";
+    } else if (effect == "Evasion") {
+        return "This ring increases your chance to dodge enemy attack.";
+    } else if (effect == "Haggler") {
+        return "In fact this ring doesn't provide any magic effect, but it demonstrates to shopkeepers and vendors, that the owner of the ring is a member of The Thieves' Guild. Usually they are glad to give a discount in exchange for temporary immunity guarantee. Upgrading this ring won't give any additional bonuses.";
+    } else if (effect == "Haste") {
+        return "This ring accelerates the wearer's flow of time, allowing one to perform all actions a little faster.";
+    } else if (effect == "Herbalism") {
+        return "This ring increases your chance to gather dew and seeds from trampled grass.";
+    } else if (effect == "Mending") {
+        return "This ring increases the body's regenerative properties, allowing one to recover lost health at an accelerated rate. Degraded rings will decrease or even halt one's natural regeneration.";
+    } else if (effect == "Power") {
+        return "Your wands will become more powerful in the energy field that radiates from this ring. Degraded rings of power will instead weaken your wands.";
+    } else if (effect == "Satiety") {
+        return "Wearing this ring you can go without food longer. Degraded rings of satiety will cause the opposite effect.";
+    } else if (effect == "Shadows") {
+        return "Enemies will be less likely to notice you if you wear this ring. Degraded rings of shadows will alert enemies who might otherwise not have noticed your presence.";
+    } else if (effect == "Thorns") {
+        return "Though this ring doesn't provide real thorns, an enemy that attacks you will itself be wounded by a fraction of the damage that it inflicts. Upgrading this ring won't give any additional bonuses.";
+    }
+    return "This metal band is adorned with a large " + gemName() + " gem that glitters in the darkness. Who knows what effect it has when worn?";
+}
+
 std::string Ring::info() const {
-    return "A precious ring adorned with a large " + gemName() + " gem that glitters in the darkness. " +
-           (isKnown() ? ("It is imbued with ancient enchantments of " + effect + ".") : "Who knows what effect it has when worn?");
+    if (Dungeon::hero && isEquipped(Dungeon::hero.get())) {
+        return desc() + "\n\nThe " + displayName() + " is on your finger" +
+               (cursed ? ", and because it is cursed, you are powerless to remove it." : ".");
+    } else if (cursed && cursedKnown) {
+        return desc() + "\n\nYou can feel a malevolent magic lurking within the " + displayName() + ".";
+    } else {
+        return desc();
+    }
 }
 
 std::unique_ptr<Item> Ring::clone(int qty) const {
@@ -4800,7 +5328,216 @@ std::unique_ptr<Item> Ring::clone(int qty) const {
 }
 
 int Ring::price() const {
-    return considerState(50);
+    return considerState(80);
+}
+
+// -----------------------------------------------------------------------------
+// The 12 Canonical Ring Subclasses
+// -----------------------------------------------------------------------------
+RingOfAccuracy::RingOfAccuracy() : Ring(gemForEffect("Accuracy"), "Accuracy") {}
+std::unique_ptr<Item> RingOfAccuracy::clone(int qty) const {
+    (void)qty;
+    auto r = std::make_unique<RingOfAccuracy>();
+    r->gem = gem;
+    r->image = image;
+    r->level = level;
+    r->cursed = cursed;
+    r->identified = identified;
+    r->levelKnown = levelKnown;
+    r->cursedKnown = cursedKnown;
+    r->ticksToKnow = ticksToKnow;
+    return r;
+}
+
+RingOfDetection::RingOfDetection() : Ring(gemForEffect("Detection"), "Detection") {}
+std::unique_ptr<Item> RingOfDetection::clone(int qty) const {
+    (void)qty;
+    auto r = std::make_unique<RingOfDetection>();
+    r->gem = gem;
+    r->image = image;
+    r->level = level;
+    r->cursed = cursed;
+    r->identified = identified;
+    r->levelKnown = levelKnown;
+    r->cursedKnown = cursedKnown;
+    r->ticksToKnow = ticksToKnow;
+    return r;
+}
+
+RingOfElements::RingOfElements() : Ring(gemForEffect("Elements"), "Elements") {}
+std::unique_ptr<Item> RingOfElements::clone(int qty) const {
+    (void)qty;
+    auto r = std::make_unique<RingOfElements>();
+    r->gem = gem;
+    r->image = image;
+    r->level = level;
+    r->cursed = cursed;
+    r->identified = identified;
+    r->levelKnown = levelKnown;
+    r->cursedKnown = cursedKnown;
+    r->ticksToKnow = ticksToKnow;
+    return r;
+}
+
+RingOfEvasion::RingOfEvasion() : Ring(gemForEffect("Evasion"), "Evasion") {}
+std::unique_ptr<Item> RingOfEvasion::clone(int qty) const {
+    (void)qty;
+    auto r = std::make_unique<RingOfEvasion>();
+    r->gem = gem;
+    r->image = image;
+    r->level = level;
+    r->cursed = cursed;
+    r->identified = identified;
+    r->levelKnown = levelKnown;
+    r->cursedKnown = cursedKnown;
+    r->ticksToKnow = ticksToKnow;
+    return r;
+}
+
+RingOfHaggler::RingOfHaggler() : Ring(gemForEffect("Haggler"), "Haggler") {
+    level = 1;
+}
+Item* RingOfHaggler::random() {
+    level = 1;
+    cursed = false;
+    return this;
+}
+void RingOfHaggler::onCollect(Hero* hero) {
+    (void)hero;
+    identify();
+    Badges::validateRingOfHaggler();
+    Badges::validateItemLevelAcquired(this);
+}
+std::unique_ptr<Item> RingOfHaggler::clone(int qty) const {
+    (void)qty;
+    auto r = std::make_unique<RingOfHaggler>();
+    r->gem = gem;
+    r->image = image;
+    r->level = level;
+    r->cursed = cursed;
+    r->identified = identified;
+    r->levelKnown = levelKnown;
+    r->cursedKnown = cursedKnown;
+    r->ticksToKnow = ticksToKnow;
+    return r;
+}
+
+RingOfHaste::RingOfHaste() : Ring(gemForEffect("Haste"), "Haste") {}
+std::unique_ptr<Item> RingOfHaste::clone(int qty) const {
+    (void)qty;
+    auto r = std::make_unique<RingOfHaste>();
+    r->gem = gem;
+    r->image = image;
+    r->level = level;
+    r->cursed = cursed;
+    r->identified = identified;
+    r->levelKnown = levelKnown;
+    r->cursedKnown = cursedKnown;
+    r->ticksToKnow = ticksToKnow;
+    return r;
+}
+
+RingOfHerbalism::RingOfHerbalism() : Ring(gemForEffect("Herbalism"), "Herbalism") {}
+std::unique_ptr<Item> RingOfHerbalism::clone(int qty) const {
+    (void)qty;
+    auto r = std::make_unique<RingOfHerbalism>();
+    r->gem = gem;
+    r->image = image;
+    r->level = level;
+    r->cursed = cursed;
+    r->identified = identified;
+    r->levelKnown = levelKnown;
+    r->cursedKnown = cursedKnown;
+    r->ticksToKnow = ticksToKnow;
+    return r;
+}
+
+RingOfMending::RingOfMending() : Ring(gemForEffect("Mending"), "Mending") {}
+std::unique_ptr<Item> RingOfMending::clone(int qty) const {
+    (void)qty;
+    auto r = std::make_unique<RingOfMending>();
+    r->gem = gem;
+    r->image = image;
+    r->level = level;
+    r->cursed = cursed;
+    r->identified = identified;
+    r->levelKnown = levelKnown;
+    r->cursedKnown = cursedKnown;
+    r->ticksToKnow = ticksToKnow;
+    return r;
+}
+
+RingOfPower::RingOfPower() : Ring(gemForEffect("Power"), "Power") {}
+std::unique_ptr<Item> RingOfPower::clone(int qty) const {
+    (void)qty;
+    auto r = std::make_unique<RingOfPower>();
+    r->gem = gem;
+    r->image = image;
+    r->level = level;
+    r->cursed = cursed;
+    r->identified = identified;
+    r->levelKnown = levelKnown;
+    r->cursedKnown = cursedKnown;
+    r->ticksToKnow = ticksToKnow;
+    return r;
+}
+
+RingOfSatiety::RingOfSatiety() : Ring(gemForEffect("Satiety"), "Satiety") {}
+std::unique_ptr<Item> RingOfSatiety::clone(int qty) const {
+    (void)qty;
+    auto r = std::make_unique<RingOfSatiety>();
+    r->gem = gem;
+    r->image = image;
+    r->level = level;
+    r->cursed = cursed;
+    r->identified = identified;
+    r->levelKnown = levelKnown;
+    r->cursedKnown = cursedKnown;
+    r->ticksToKnow = ticksToKnow;
+    return r;
+}
+
+RingOfShadows::RingOfShadows() : Ring(gemForEffect("Shadows"), "Shadows") {}
+std::unique_ptr<Item> RingOfShadows::clone(int qty) const {
+    (void)qty;
+    auto r = std::make_unique<RingOfShadows>();
+    r->gem = gem;
+    r->image = image;
+    r->level = level;
+    r->cursed = cursed;
+    r->identified = identified;
+    r->levelKnown = levelKnown;
+    r->cursedKnown = cursedKnown;
+    r->ticksToKnow = ticksToKnow;
+    return r;
+}
+
+RingOfThorns::RingOfThorns() : Ring(gemForEffect("Thorns"), "Thorns") {
+    level = 1;
+}
+Item* RingOfThorns::random() {
+    level = 1;
+    cursed = false;
+    return this;
+}
+void RingOfThorns::onCollect(Hero* hero) {
+    (void)hero;
+    identify();
+    Badges::validateRingOfThorns();
+    Badges::validateItemLevelAcquired(this);
+}
+std::unique_ptr<Item> RingOfThorns::clone(int qty) const {
+    (void)qty;
+    auto r = std::make_unique<RingOfThorns>();
+    r->gem = gem;
+    r->image = image;
+    r->level = level;
+    r->cursed = cursed;
+    r->identified = identified;
+    r->levelKnown = levelKnown;
+    r->cursedKnown = cursedKnown;
+    r->ticksToKnow = ticksToKnow;
+    return r;
 }
 
 // =============================================================================

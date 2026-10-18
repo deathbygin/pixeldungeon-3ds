@@ -243,7 +243,7 @@ bool WndItem::update(pd::Hero* hero, const TouchController& touch, u32 kDown, u3
                 return false;
             }
 
-            if (action == "QUICKSLOT" || action == "THROW" || action == "ZAP") {
+            if (action == "QUICKSLOT" || action == "THROW" || action == "ZAP" || action == "HEROIC LEAP" || action == "SMOKE BOMB") {
                 hide();
                 return false;
             }
@@ -282,6 +282,12 @@ void WndItem::draw(C2D_TextBuf textBuf, float baseDepth) const {
     // 2. 9-slice stone window container
     Chrome::get(Chrome::Type::WINDOW).draw(m_winX, m_winY, m_winW, m_winH, zWin);
 
+    // Cursed background highlight indicator
+    if (m_item->visiblyCursed()) {
+        C2D_DrawRectSolid(m_winX + 4.0f, m_winY + 4.0f, zWin + 0.01f, m_winW - 8.0f, m_winH - 8.0f, C2D_Color32(0x55, 0x00, 0x00, 0x33));
+        C2D_DrawRectSolid(m_bodyX - 2.0f, m_headerY - 2.0f, zWin + 0.02f, 20.0f, 20.0f, C2D_Color32(0xCC, 0x00, 0x00, 0x44));
+    }
+
     // 3. Item Sprite Icon (16x16)
     if (m_texItems && m_texItems->isLoaded()) {
         int potW = m_texItems->potWidth();
@@ -302,8 +308,7 @@ void WndItem::draw(C2D_TextBuf textBuf, float baseDepth) const {
 
     // 4. Header: Item Display Name and Subheader
     std::string dName = m_item->displayName();
-    u32 nameCol = (m_item->levelKnown && m_item->level > 0) ? COLOR_TEXT_POSITIVE :
-                  (m_item->cursed && m_item->cursedKnown ? COLOR_TEXT_WARNING : COLOR_TEXT_ACCENT);
+    u32 nameCol = COLOR_TEXT_ACCENT;
 
     float nameX = m_bodyX + 22.0f;
     float titleMaxW = m_usableTextW - 24.0f;

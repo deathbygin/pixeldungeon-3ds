@@ -191,9 +191,19 @@ void WndRanking::drawStatsTab() {
 
     // Cause of death / Outcome
     u32 outcomeCol = m_record.win ? pd::ui::COLOR_TEXT_POSITIVE : pd::ui::COLOR_TEXT_MUTED;
-    pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, m_record.info, m_x + 14.0f, curY, zText, outcomeCol, pd::ui::COLOR_TEXT_SHADOW);
-
-    curY += 14.0f;
+    float maxOutcomeW = m_w - 28.0f;
+    auto outcomeLines = pd::ui::BitmapFont::splitMultiline(pd::ui::BitmapFont::FontType::Font1x, m_record.info, maxOutcomeW);
+    for (auto& line : outcomeLines) {
+        if (pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, line) > maxOutcomeW) {
+            while (!line.empty() && pd::ui::BitmapFont::width(pd::ui::BitmapFont::FontType::Font1x, line + "...") > maxOutcomeW) {
+                line.pop_back();
+            }
+            line += "...";
+        }
+        pd::ui::BitmapFont::drawWithShadow(pd::ui::BitmapFont::FontType::Font1x, line, m_x + 14.0f, curY, zText, outcomeCol, pd::ui::COLOR_TEXT_SHADOW);
+        curY += 10.0f;
+    }
+    curY += 4.0f;
 
     // Divider line
     C2D_DrawRectSolid(m_x + 12.0f, curY, zContent, m_w - 24.0f, 1.0f, C2D_Color32(0x4A, 0x4D, 0x44, 0xFF));

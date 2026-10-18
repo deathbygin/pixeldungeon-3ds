@@ -48,14 +48,31 @@ bool Hunger::act() {
         return true;
     }
 
+    int satietyBonus = 0;
+    if (target == Dungeon::hero.get()) {
+        Hero* hero = static_cast<Hero*>(target);
+        if (hero->belongings.equippedRing1 && hero->belongings.equippedRing1->asRing() && hero->belongings.equippedRing1->asRing()->effect == "Satiety") {
+            satietyBonus += hero->belongings.equippedRing1->asRing()->level;
+        }
+        if (hero->belongings.equippedRing2 && hero->belongings.equippedRing2->asRing() && hero->belongings.equippedRing2->asRing()->effect == "Satiety") {
+            satietyBonus += hero->belongings.equippedRing2->asRing()->level;
+        }
+    }
+
     if (isStarving()) {
-        if (Random::Float() < 0.3f && (target->HP > 1 || !target->paralysed)) {
+        float starveProb = 0.3f;
+        if (satietyBonus > 0) {
+            starveProb /= (1.0f + satietyBonus * 0.2f);
+        } else if (satietyBonus < 0) {
+            starveProb *= (1.0f - satietyBonus * 0.2f);
+        }
+        if (Random::Float() < starveProb && (target->HP > 1 || !target->paralysed)) {
             GLog::n("You are starving!");
             target->damage(1, this);
             target->interrupt();
         }
     } else {
-        float newLevel = level + STEP;
+        float newLevel = level + STEP - satietyBonus;
         if (newLevel >= STARVING) {
             GLog::n("You are starving!");
             target->interrupt();
@@ -99,15 +116,38 @@ bool Regeneration::act() {
         return true;
     }
 
-    if (target->HP < target->HT) {
-        Hunger* h = target->getBuff<Hunger>();
-        if (!h || !h->isStarving()) {
-            target->HP++;
-            FX::floatingText(target->pos, "+1", 0x38b764FF);
+    int bonus = 0;
+    if (Dungeon::hero) {
+        if (Dungeon::hero->belongings.equippedRing1 && Dungeon::hero->belongings.equippedRing1->asRing() && Dungeon::hero->belongings.equippedRing1->asRing()->effect == "Mending") {
+            bonus += Dungeon::hero->belongings.equippedRing1->asRing()->level;
+        }
+        if (Dungeon::hero->belongings.equippedRing2 && Dungeon::hero->belongings.equippedRing2->asRing() && Dungeon::hero->belongings.equippedRing2->asRing()->effect == "Mending") {
+            bonus += Dungeon::hero->belongings.equippedRing2->asRing()->level;
         }
     }
 
-    spend(REGENERATION_DELAY * TICK);
+    Hunger* h = target->getBuff<Hunger>();
+    bool isStarving = (h && h->isStarving());
+
+    if (!isStarving) {
+        if (bonus >= 0) {
+            if (target->HP < target->HT) {
+                target->HP++;
+                FX::floatingText(target->pos, "+1", 0x38b764FF);
+            }
+        } else if (bonus == -1) {
+            // Halts natural regeneration
+        } else { // bonus < -1
+            // Reverses natural regeneration
+            if (target->HP > 1) {
+                target->HP--;
+                FX::floatingText(target->pos, "-1", 0xd63030FF);
+            }
+        }
+    }
+
+    float delay = static_cast<float>(REGENERATION_DELAY / std::pow(1.2, bonus));
+    spend(delay * TICK);
     return true;
 }
 
@@ -121,6 +161,10 @@ std::string Burning::desc() const {
 void Burning::attachTo(Char* ch) {
     Buff::attachTo(ch);
     if (target) {
+        if (target == Dungeon::hero.get()) {
+            Hero* hero = Dungeon::hero.get();
+            durationTicks = std::max(1, static_cast<int>(durationTicks * hero->elementsDurationFactor()));
+        }
         FX::floatingText(target->pos, "burning", 0xee7722FF);
     }
 }
@@ -195,6 +239,10 @@ std::string Poison::desc() const {
 void Poison::attachTo(Char* ch) {
     Buff::attachTo(ch);
     if (target) {
+        if (target == Dungeon::hero.get()) {
+            Hero* hero = Dungeon::hero.get();
+            durationTicks = std::max(1, static_cast<int>(durationTicks * hero->elementsDurationFactor()));
+        }
         FX::floatingText(target->pos, "poisoned", 0x38b764FF);
     }
 }
@@ -298,6 +346,10 @@ std::string Paralysis::desc() const {
 void Paralysis::attachTo(Char* ch) {
     Buff::attachTo(ch);
     if (target) {
+        if (target == Dungeon::hero.get()) {
+            Hero* hero = Dungeon::hero.get();
+            durationTicks = std::max(1, static_cast<int>(durationTicks * hero->elementsDurationFactor()));
+        }
         target->paralysed = true;
         FX::floatingText(target->pos, "paralysed", 0xeecc22FF);
     }
@@ -375,7 +427,11 @@ std::string Frost::desc() const {
 
 void Frost::attachTo(Char* ch) {
     target = ch;
-    Actor::add(this, DURATION);
+    float dur = DURATION;
+    if (target == Dungeon::hero.get()) {
+        dur *= Dungeon::hero->elementsDurationFactor();
+    }
+    Actor::add(this, dur);
     if (target) {
         target->paralysed = true;
         Buff* b = target->buff(BuffType::Burning);
@@ -416,7 +472,11 @@ std::string Vertigo::desc() const {
 
 void Vertigo::attachTo(Char* ch) {
     target = ch;
-    Actor::add(this, DURATION);
+    float dur = DURATION;
+    if (target == Dungeon::hero.get()) {
+        dur *= Dungeon::hero->elementsDurationFactor();
+    }
+    Actor::add(this, dur);
     if (target) {
         FX::floatingText(target->pos, "vertigo", 0xeecc22FF);
     }
@@ -431,7 +491,11 @@ std::string Slow::desc() const {
 
 void Slow::attachTo(Char* ch) {
     target = ch;
-    Actor::add(this, DURATION);
+    float dur = DURATION;
+    if (target == Dungeon::hero.get()) {
+        dur *= Dungeon::hero->elementsDurationFactor();
+    }
+    Actor::add(this, dur);
     if (target) {
         FX::floatingText(target->pos, "slowed", 0x888899FF);
     }
@@ -534,7 +598,11 @@ std::string Charm::desc() const {
 
 void Charm::attachTo(Char* ch) {
     target = ch;
-    Actor::add(this, DURATION);
+    float dur = DURATION;
+    if (target == Dungeon::hero.get()) {
+        dur *= Dungeon::hero->elementsDurationFactor();
+    }
+    Actor::add(this, dur);
     if (target) {
         FX::floatingText(target->pos, "charmed", 0xff66ccFF);
     }
@@ -620,14 +688,17 @@ void Levitation::detach() {
 // Light (Torch)
 // -----------------------------------------------------------------------------
 std::string Light::desc() const {
-    return "The radiant glow of a torch extends your vision distance across dark subterranean passages.";
+    int turns = static_cast<int>(std::max(0.0f, std::ceil(timeRemaining)));
+    return "The radiant glow of a torch extends your vision distance across dark subterranean passages.\n\nRemaining: " +
+           std::to_string(turns) + (turns == 1 ? " turn" : " turns");
 }
 
 void Light::attachTo(Char* ch) {
     target = ch;
-    Actor::add(this, DURATION);
+    warned = (timeRemaining <= 20.0f);
+    Actor::add(this, TICK);
     if (ch) {
-        ch->viewDistance = std::max(ch->viewDistance, DISTANCE);
+        ch->viewDistance = std::max(Dungeon::level ? Dungeon::level->viewDistance : 1, DISTANCE);
         Dungeon::observe();
         FX::floatingText(target->pos, "illuminated", 0xffeb88FF);
     }
@@ -639,6 +710,37 @@ void Light::detach() {
         Dungeon::observe();
     }
     Buff::detach();
+}
+
+bool Light::act() {
+    timeRemaining -= TICK;
+    spend(TICK);
+
+    if (timeRemaining <= 20.0f && !warned) {
+        warned = true;
+        GLog::w("Your torch is burning out!");
+        if (target) {
+            target->interrupt();
+        }
+    }
+
+    if (timeRemaining <= 0.0f) {
+        GLog::w("Your torch has burnt out completely.");
+        if (target) {
+            target->interrupt();
+        }
+        detach();
+        return true;
+    }
+
+    return true;
+}
+
+void Light::prolong(float dur) {
+    timeRemaining += dur;
+    if (timeRemaining > 20.0f) {
+        warned = false;
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -761,7 +863,11 @@ std::string Weakness::desc() const {
 
 void Weakness::attachTo(Char* ch) {
     target = ch;
-    Actor::add(this, DURATION);
+    float dur = DURATION;
+    if (target == Dungeon::hero.get()) {
+        dur *= Dungeon::hero->elementsDurationFactor();
+    }
+    Actor::add(this, dur);
     if (target) {
         if (target == Dungeon::hero.get()) {
             static_cast<Hero*>(target)->weakened = true;

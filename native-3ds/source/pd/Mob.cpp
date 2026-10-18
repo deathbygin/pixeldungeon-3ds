@@ -11,6 +11,7 @@
 #include "pd/Assets.h"
 #include "pd/Badges.h"
 #include "pd/Item.h"
+#include "pd/Buff.h"
 #include "pd/CharSprite.h"
 #include "pd/Sample.h"
 #include "pd/Debug.h"
@@ -560,7 +561,40 @@ void Thief::die(Actor* src) {
     if (stolenItem && Dungeon::level) {
         Dungeon::level->drop(std::move(stolenItem), pos);
     }
+    // 1% chance to drop Ring of Haggler (+1)
+    if (Random::Float() < 0.01f && Dungeon::level) {
+        auto haggler = std::make_unique<RingOfHaggler>();
+        haggler->random();
+        Dungeon::level->drop(std::move(haggler), pos);
+    }
     Mob::die(src);
+}
+
+// Crazy Bandit
+Bandit::Bandit() {
+    name = "Crazy Bandit";
+    HP = 20;
+    HT = 20;
+    expAward = 5;
+    baseSpeed = 1.0f;
+}
+
+std::string Bandit::description() const {
+    return "This crazy thief has spent too much time in the dungeon. His eyes are wide with madness.";
+}
+
+int Bandit::attackProc(Char* enemy, int damage) {
+    int res = Thief::attackProc(enemy, damage);
+    if (stolenItem && enemy) {
+        enemy->affect<Blindness>();
+        GLog::w("The bandit throws dust in your eyes!");
+    }
+    return res;
+}
+
+void Bandit::die(Actor* src) {
+    Thief::die(src);
+    Badges::validateRare(this);
 }
 
 // Gnoll Shaman
@@ -817,6 +851,7 @@ Succubus::Succubus() {
     HP = 80;
     HT = 80;
     expAward = 12;
+    viewDistance = Light::DISTANCE;
 }
 
 int Succubus::damageRoll() {
@@ -866,6 +901,7 @@ Eye::Eye() {
     HT = 100;
     expAward = 13;
     flying = true;
+    viewDistance = Light::DISTANCE;
 }
 
 int Eye::attackSkill(Char* targetChar) {
@@ -917,6 +953,7 @@ Scorpio::Scorpio() {
     HP = 95;
     HT = 95;
     expAward = 14;
+    viewDistance = Light::DISTANCE;
 }
 
 int Scorpio::damageRoll() {
@@ -1425,7 +1462,12 @@ void DM300::die(Actor* src) {
     if (Dungeon::level) {
         int dropCell = getSafeDropCell(Dungeon::level.get(), pos);
         Dungeon::level->drop(std::make_unique<SkeletonKey>(15), dropCell);
-        Dungeon::level->drop(std::make_unique<ArmorKit>(), dropCell);
+        // Strict 1-in-3 (33.3%) chance to drop Ring of Thorns (+1)
+        if (Random::Int(3) == 0) {
+            auto thorns = std::make_unique<RingOfThorns>();
+            thorns->random();
+            Dungeon::level->drop(std::move(thorns), dropCell);
+        }
     }
 
     Mob::die(src);
