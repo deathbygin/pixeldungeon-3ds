@@ -6,6 +6,14 @@ DISCLAIMER: AI was used in creating this port - mainly in translating Java funct
 
 ---
 
+## Screenshots
+
+![Pixel Dungeon 3DS title screen](screenshots/title-screen.png)
+
+![Pixel Dungeon 3DS gameplay](screenshots/gameplay.png)
+
+---
+
 ## ALPHA RELEASE
 
 The current release is in an Alpha state. There will likely be bugs and gameplay disparities. Please help resolve these quickly by reporting them in the Issues tab.
