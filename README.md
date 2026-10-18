@@ -8,9 +8,9 @@ DISCLAIMER: AI was used in creating this port - mainly in translating Java funct
 
 ## Screenshots
 
-![Pixel Dungeon 3DS title screen](screenshots/title-screen.png)
+![Pixel Dungeon 3DS title screen](screenshots/title-screen.png =150x150)
 
-![Pixel Dungeon 3DS gameplay](screenshots/gameplay.png)
+![Pixel Dungeon 3DS gameplay](screenshots/gameplay.png =150x150)
 
 ---
 
