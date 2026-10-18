@@ -35,40 +35,10 @@ void WndItem::show(pd::Item* item, pd::Hero* hero, bool allowActions) {
     m_actions.clear();
 
     if (allowActions && hero && hero->isAlive()) {
-        bool isEquipped = (item == hero->belongings.equippedWeapon ||
-                           item == hero->belongings.equippedArmor ||
-                           item == hero->belongings.equippedRing1 ||
-                           item == hero->belongings.equippedRing2);
-
-        if (isEquipped) {
-            m_actions.push_back("UNEQUIP");
-        } else if (item->isEquippable()) {
-            m_actions.push_back("EQUIP");
+        m_actions = item->actions(hero);
+        if (!m_actions.empty()) {
+            m_actions.push_back("QUICKSLOT");
         }
-
-        if (item->category() == ItemCategory::Potion) {
-            m_actions.push_back("DRINK");
-        } else if (item->category() == ItemCategory::Scroll) {
-            m_actions.push_back("READ");
-        }
-
-        if (item->name == "Ration of Food" || item->name == "Pasty" || item->name == "Mystery Meat") {
-            m_actions.push_back("EAT");
-        }
-
-        if (item->asWand()) {
-            m_actions.push_back("ZAP");
-        }
-
-        if (ShortSword* ss = item->asShortSword()) {
-            if (ss->canReforge(hero)) {
-                m_actions.push_back("REFORGE");
-            }
-        }
-
-        m_actions.push_back("THROW");
-        m_actions.push_back("DROP");
-        m_actions.push_back("QUICKSLOT");
         m_actions.push_back("CLOSE");
     } else {
         m_actions.push_back("CLOSE");
@@ -389,7 +359,9 @@ void WndItem::draw(C2D_TextBuf textBuf, float baseDepth) const {
         Chrome::get(Chrome::Type::BUTTON).draw(bx, by, m_btnW, m_btnH, zContent,
                                                0xFFFFFFFF, isSelected ? 1.4f : 1.0f);
 
-        u32 btnCol = (i == 0) ? COLOR_TEXT_ACCENT : COLOR_TEXT_PRIMARY;
+        bool isDefault = (!m_item->defaultAction.empty() && m_actions[i] == m_item->defaultAction) ||
+                         (m_item->defaultAction.empty() && i == 0);
+        u32 btnCol = isDefault ? COLOR_TEXT_ACCENT : COLOR_TEXT_PRIMARY;
         float tw = BitmapFont::width(BitmapFont::FontType::Font1x, m_actions[i]);
         float tx = bx + (m_btnW - tw) * 0.5f;
         BitmapFont::draw(BitmapFont::FontType::Font1x, m_actions[i], tx, by + 5.0f, zText, btnCol);

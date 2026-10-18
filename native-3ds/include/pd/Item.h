@@ -43,6 +43,7 @@ public:
     bool cursed = false;
     bool cursedKnown = false;
     bool levelKnown = false;
+    bool unique = false;
     std::string defaultAction = "";
 
     Item() = default;
@@ -64,7 +65,7 @@ public:
     virtual bool isEquippable() const { return false; }
     virtual bool isStackable() const { return false; }
     virtual bool isUpgradable() const { return false; }
-    virtual bool isUnique() const { return false; }
+    virtual bool isUnique() const { return unique; }
     virtual void upgrade() {
         if (!isUpgradable()) return;
         level++;
@@ -917,7 +918,6 @@ public:
     bool isStackable() const override { return false; }
     bool isUpgradable() const override { return false; }
     bool isIdentified() const override { return true; }
-    bool isUnique() const override { return true; }
     std::vector<std::string> actions(Hero* hero) override;
     bool execute(Hero* hero, const std::string& action) override;
     std::string info() const override;

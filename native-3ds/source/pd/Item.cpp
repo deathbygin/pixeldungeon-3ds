@@ -4397,6 +4397,7 @@ TomeOfMastery::TomeOfMastery() {
     identified = true;
     levelKnown = true;
     defaultAction = "READ";
+    unique = true;
 }
 
 std::string TomeOfMastery::displayName() const {
@@ -4408,7 +4409,7 @@ std::string TomeOfMastery::displayName() const {
 
 std::vector<std::string> TomeOfMastery::actions(Hero* hero) {
     (void)hero;
-    return { "READ", "DROP" };
+    return { "READ", "DROP", "THROW" };
 }
 
 bool TomeOfMastery::execute(Hero* hero, const std::string& action) {
