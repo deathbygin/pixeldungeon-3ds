@@ -26,7 +26,7 @@ void Ripple::reset(int cell) {
     sprite->z = 0.27f;
     sprite->visible = true;
 
-    uint32_t col = Dungeon::waterColor();
+    uint32_t col = Dungeon::waterColor(-1, cell);
     uint8_t r = static_cast<uint8_t>((col >> 24) & 0xFF);
     uint8_t g = static_cast<uint8_t>((col >> 16) & 0xFF);
     uint8_t b = static_cast<uint8_t>((col >> 8) & 0xFF);

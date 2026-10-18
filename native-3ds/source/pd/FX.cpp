@@ -482,7 +482,27 @@ void FX::blood(int cell, int count) {
 }
 
 void FX::waterSplash(int cell, int count) {
-    splash(cell, Dungeon::waterColor(), count);
+    if (cell < 0 || cell >= Level::LENGTH) return;
+    if (!Dungeon::visible[cell] && (!Dungeon::hero || cell != Dungeon::hero->pos)) return;
+    float cx = (cell % Level::WIDTH) * 16.0f + 8.0f;
+    float cy = (cell / Level::WIDTH) * 16.0f + 8.0f;
+
+    uint32_t baseCol = Dungeon::waterColor(-1, cell);
+    uint8_t r = static_cast<uint8_t>((baseCol >> 24) & 0xFF);
+    uint8_t g = static_cast<uint8_t>((baseCol >> 16) & 0xFF);
+    uint8_t b = static_cast<uint8_t>((baseCol >> 8) & 0xFF);
+
+    uint8_t hr = static_cast<uint8_t>(std::min(255, r + 55));
+    uint8_t hg = static_cast<uint8_t>(std::min(255, g + 55));
+    uint8_t hb = static_cast<uint8_t>(std::min(255, b + 55));
+    uint32_t highlightCol = (hr << 24) | (hg << 16) | (hb << 8) | 0xFF;
+
+    int half1 = (count + 1) / 2;
+    int half2 = count - half1;
+    burst(cx, cy, baseCol, half1, 40.0f, 80.0f, +100.0f);
+    if (half2 > 0) {
+        burst(cx, cy, highlightCol, half2, 35.0f, 70.0f, +90.0f);
+    }
 }
 
 void FX::slash(int cell) {

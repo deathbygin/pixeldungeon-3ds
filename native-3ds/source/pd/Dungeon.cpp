@@ -99,18 +99,34 @@ bool Dungeon::shopOnLevel(int d) {
     return d == 6 || d == 11 || d == 16 || d == 21;
 }
 
-uint32_t Dungeon::waterColor(int d) {
+uint32_t Dungeon::waterColor(int d, int cell) {
+    if (cell >= 0 && level && cell < Level::LENGTH) {
+        if (level->map[cell] == Terrain::WELL) {
+            auto it = level->wells.find(cell);
+            if (it != level->wells.end()) {
+                switch (it->second) {
+                case Level::WellType::Health:
+                    return 0x20CC66FF; // Crystalline spring emerald
+                case Level::WellType::Awareness:
+                    return 0x3388EEFF; // Celestial indigo / bright blue
+                case Level::WellType::Transmutation:
+                    return 0xEEBB22FF; // Shimmering golden amber
+                }
+            }
+        }
+    }
+
     if (d <= 0) d = depth;
     if (d <= 5) {
-        return 0x6B8E23FF; // Sewers (Depths 1-5): Murky sewer green / olive tint
+        return 0x3E8AC2FF; // Sewers (Depths 1-5): Clean cool blueish dungeon water (R=62, G=138, B=194)
     } else if (d <= 10) {
-        return 0x5A7880FF; // Prison (Depths 6-10): Cold stagnant greyish cyan / blue
+        return 0x4A7D8FFF; // Prison (Depths 6-10): Cold stagnant slate / cyan-tinted water (R=74, G=125, B=143)
     } else if (d <= 15) {
-        return 0x2A5078FF; // Caves (Depths 11-15): Dark subterranean turquoise
+        return 0x2E8B99FF; // Caves (Depths 11-15): Freezing cold subterranean turquoise / teal (R=46, G=139, B=153)
     } else if (d <= 20) {
-        return 0x264875FF; // Dwarven Metropolis (Depths 16-20): Deep crystalline aquamarine / dark indigo
+        return 0x7A364AFF; // Dwarven Metropolis (Depths 16-20): Suspiciously colored water (wine / plum effluent, R=122, G=54, B=74)
     } else {
-        return 0x801500FF; // Demon Halls (Depths 21-25): Caustic crimson / dark blood tint
+        return 0xA61808FF; // Demon Halls (Depths 21-25): Caustic crimson / blood red (R=166, G=24, B=8)
     }
 }
 
