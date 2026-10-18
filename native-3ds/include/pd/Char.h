@@ -62,6 +62,7 @@ public:
     bool isAlive() const { return HP > 0; }
     bool isCharmedBy(Char* ch) const;
     void unfreeze();
+    void unroot();
 
     virtual bool isImmune(BuffType type) const { (void)type; return false; }
     void addBuff(Buff* b);

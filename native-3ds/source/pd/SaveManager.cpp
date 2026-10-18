@@ -724,6 +724,12 @@ bool SaveManager::loadGame(const std::string& customPath) {
     hero->invisible = invisible;
     hero->paralysed = (paralysed != 0);
     hero->rooted = (rooted != 0);
+    if (hero->rooted && !hero->buff(BuffType::Roots)) {
+        hero->rooted = false;
+    }
+    if (hero->paralysed && !hero->buff(BuffType::Paralysis) && !hero->buff(BuffType::Frost)) {
+        hero->paralysed = false;
+    }
     hero->place(pos);
     Actor::occupyCell(hero);
     Actor::add(hero);

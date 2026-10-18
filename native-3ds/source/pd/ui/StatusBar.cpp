@@ -145,6 +145,13 @@ void StatusBar::draw(const pd::Hero* hero, int depth, C2D_TextBuf textBuf) const
         C2D_DrawText(&textObj, C2D_WithColor, badgeX + 2.0f, expY - 1.0f, 0.5f, 0.28f, 0.28f, C2D_Color32(0xff, 0xff, 0xff, 0xFF));
         badgeX += 48.0f;
     }
+    if (hero->buff(BuffType::Roots)) {
+        C2D_DrawRectSolid(badgeX, expY - 1.0f, 0.46f, 44.0f, 9.0f, C2D_Color32(0x6b, 0x4e, 0x2e, 0xFF));
+        C2D_TextParse(&textObj, textBuf, "ROOTED");
+        C2D_TextOptimize(&textObj);
+        C2D_DrawText(&textObj, C2D_WithColor, badgeX + 2.0f, expY - 1.0f, 0.5f, 0.28f, 0.28f, C2D_Color32(0xff, 0xff, 0xff, 0xFF));
+        badgeX += 48.0f;
+    }
     if (hero->invisible > 0) {
         C2D_DrawRectSolid(badgeX, expY - 1.0f, 0.46f, 50.0f, 9.0f, C2D_Color32(0x38, 0x6e, 0x9e, 0xFF));
         C2D_TextParse(&textObj, textBuf, "INVIS");

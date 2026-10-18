@@ -430,10 +430,16 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
             }
 
             // Swapping with an ally/pet/friendly mob
+            if (rooted && !buff(BuffType::Roots)) {
+                rooted = false;
+            }
             if (rooted) {
                 GLog::w("You are rooted to the ground and cannot move!");
                 waitingForInput = true;
                 return false;
+            }
+            if (mob->rooted && !mob->buff(BuffType::Roots)) {
+                mob->rooted = false;
             }
             if (mob->paralysed || mob->rooted) {
                 GLog::w(mob->name + " is unable to move!");
@@ -497,6 +503,9 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
         }
     }
 
+    if (rooted && !buff(BuffType::Roots)) {
+        rooted = false;
+    }
     if (rooted) {
         GLog::w("You are rooted to the ground and cannot move!");
         waitingForInput = true;

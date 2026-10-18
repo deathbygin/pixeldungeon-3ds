@@ -109,6 +109,7 @@ bool Mob::doAttack(Char* enemyChar) {
 }
 
 bool Mob::getCloser(int targetCell) {
+    if (rooted && !buff(BuffType::Roots)) rooted = false;
     if (rooted || !Dungeon::level) return false;
 
     int step = Dungeon::findPath(this, pos, targetCell,
@@ -123,6 +124,7 @@ bool Mob::getCloser(int targetCell) {
 }
 
 bool Mob::getFurther(int targetCell) {
+    if (rooted && !buff(BuffType::Roots)) rooted = false;
     if (rooted || !Dungeon::level) return false;
 
     int step = Dungeon::flee(this, pos, targetCell,
@@ -943,8 +945,7 @@ bool Scorpio::canAttack(Char* enemyChar) {
 
 int Scorpio::attackProc(Char* enemyChar, int damage) {
     if (enemyChar && Random::Int(2) == 0) {
-        enemyChar->rooted = true;
-        FX::floatingText(enemyChar->pos, "CRIPPLED", 0x884400FF);
+        enemyChar->affect<Cripple>();
         GLog::w("Scorpio's barb cripples you!");
     }
     return damage;
@@ -992,6 +993,7 @@ bool Piranha::act() {
 }
 
 bool Piranha::getCloser(int targetCell) {
+    if (rooted && !buff(BuffType::Roots)) rooted = false;
     if (rooted || !Dungeon::level) return false;
     // Water-only navigation
     static bool waterPass[Level::LENGTH];

@@ -38,6 +38,12 @@ bool Char::act() {
 }
 
 float Char::speed() const {
+    if (paralysed && !buff(BuffType::Paralysis) && !buff(BuffType::Frost)) {
+        const_cast<Char*>(this)->paralysed = false;
+    }
+    if (rooted && !buff(BuffType::Roots)) {
+        const_cast<Char*>(this)->rooted = false;
+    }
     if (paralysed || rooted) return 0.0f;
     float s = baseSpeed;
     if (buff(BuffType::Cripple) != nullptr) {
@@ -242,6 +248,12 @@ void Char::spend(float time) {
 void Char::unfreeze() {
     if (!buff(BuffType::Paralysis) && !buff(BuffType::Frost)) {
         paralysed = false;
+    }
+}
+
+void Char::unroot() {
+    if (!buff(BuffType::Roots)) {
+        rooted = false;
     }
 }
 

@@ -334,12 +334,14 @@ std::string Roots::desc() const {
 }
 
 void Roots::attachTo(Char* ch) {
+    if (!ch || ch->flying) {
+        detach();
+        return;
+    }
     target = ch;
     Actor::add(this, TICK * 5.0f);
-    if (target) {
-        target->rooted = true;
-        FX::floatingText(target->pos, "rooted", 0x88bb44FF);
-    }
+    target->rooted = true;
+    FX::floatingText(target->pos, "rooted", 0x88bb44FF);
 }
 
 void Roots::detach() {
