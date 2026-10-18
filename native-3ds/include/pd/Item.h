@@ -64,6 +64,7 @@ public:
     virtual bool isEquippable() const { return false; }
     virtual bool isStackable() const { return false; }
     virtual bool isUpgradable() const { return false; }
+    virtual bool isUnique() const { return false; }
     virtual void upgrade() {
         if (!isUpgradable()) return;
         level++;
@@ -910,10 +911,13 @@ public:
 // =============================================================================
 class TomeOfMastery : public Item {
 public:
+    static constexpr float TIME_TO_READ = 10.0f;
+
     TomeOfMastery();
     bool isStackable() const override { return false; }
     bool isUpgradable() const override { return false; }
     bool isIdentified() const override { return true; }
+    bool isUnique() const override { return true; }
     std::vector<std::string> actions(Hero* hero) override;
     bool execute(Hero* hero, const std::string& action) override;
     std::string info() const override;

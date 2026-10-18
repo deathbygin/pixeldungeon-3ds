@@ -287,12 +287,17 @@ bool InventoryView::update(pd::Hero* hero, const TouchController& touch, u32 kDo
                 }
 
                 outMessage = chosenAction + " " + it->displayName();
-                it->execute(hero, chosenAction);
-                if (it->quantity <= 0) {
-                    hero->belongings.drop(it);
+                bool used = it->execute(hero, chosenAction);
+                if (used) {
+                    if (it->quantity <= 0) {
+                        hero->belongings.drop(it);
+                    }
+                    close();
+                    return true;
+                } else {
+                    close();
+                    return false;
                 }
-                close();
-                return true;
             }
         }
     } else {

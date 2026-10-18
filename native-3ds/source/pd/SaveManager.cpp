@@ -106,6 +106,10 @@ std::string SaveManager::getSavePath() {
 bool SaveManager::hasSave(const std::string& customPath) {
     std::string path = customPath.empty() ? getSavePath() : customPath;
     FILE* fp = std::fopen(path.c_str(), "rb");
+    if (!fp && customPath.empty()) {
+        std::string altPath = getSaveDirectory() + "game.dat";
+        fp = std::fopen(altPath.c_str(), "rb");
+    }
     if (!fp) return false;
 
     uint32_t magic = 0;
@@ -119,7 +123,12 @@ bool SaveManager::hasSave(const std::string& customPath) {
 
 bool SaveManager::deleteSave(const std::string& customPath) {
     std::string path = customPath.empty() ? getSavePath() : customPath;
-    return (std::remove(path.c_str()) == 0);
+    bool res = (std::remove(path.c_str()) == 0);
+    if (customPath.empty()) {
+        std::string altPath = getSaveDirectory() + "game.dat";
+        std::remove(altPath.c_str());
+    }
+    return res;
 }
 
 void SaveManager::wipeAllData() {
@@ -162,6 +171,10 @@ void SaveManager::wipeAllData() {
 bool SaveManager::getSaveSummary(int& outDepth, int& outLevel, int& outHeroClass, const std::string& customPath) {
     std::string path = customPath.empty() ? getSavePath() : customPath;
     FILE* fp = std::fopen(path.c_str(), "rb");
+    if (!fp && customPath.empty()) {
+        std::string altPath = getSaveDirectory() + "game.dat";
+        fp = std::fopen(altPath.c_str(), "rb");
+    }
     if (!fp) return false;
 
     uint32_t magic = 0;
@@ -172,7 +185,7 @@ bool SaveManager::getSaveSummary(int& outDepth, int& outLevel, int& outHeroClass
         return false;
     }
 
-    if (magic != SAVE_MAGIC || version != SAVE_VERSION) {
+    if (magic != SAVE_MAGIC || (version != 6 && version != SAVE_VERSION)) {
         std::fclose(fp);
         return false;
     }
@@ -199,6 +212,11 @@ bool SaveManager::getSaveSummary(int& outDepth, int& outLevel, int& outHeroClass
     }
 
     int32_t heroClass = 0;
+    std::fread(&heroClass, sizeof(int32_t), 1, fp);
+    if (version >= 7) {
+        int32_t subClass = 0;
+        std::fread(&subClass, sizeof(int32_t), 1, fp);
+    }
     int32_t pos = 0;
     int32_t hp = 20;
     int32_t ht = 20;
@@ -206,7 +224,6 @@ bool SaveManager::getSaveSummary(int& outDepth, int& outLevel, int& outHeroClass
     int32_t exp = 0;
     int32_t lvl = 1;
 
-    std::fread(&heroClass, sizeof(int32_t), 1, fp);
     std::fread(&pos, sizeof(int32_t), 1, fp);
     std::fread(&hp, sizeof(int32_t), 1, fp);
     std::fread(&ht, sizeof(int32_t), 1, fp);
@@ -280,6 +297,7 @@ bool SaveManager::saveGame(const std::string& customPath) {
 
     // 3. Hero State
     int32_t heroClass = static_cast<int32_t>(hero->heroClass);
+    int32_t subClass = static_cast<int32_t>(hero->subClass);
     int32_t pos = hero->pos;
     int32_t hp = hero->HP;
     int32_t ht = hero->HT;
@@ -293,6 +311,7 @@ bool SaveManager::saveGame(const std::string& customPath) {
     uint8_t rooted = hero->rooted ? 1 : 0;
 
     std::fwrite(&heroClass, sizeof(int32_t), 1, fp);
+    std::fwrite(&subClass, sizeof(int32_t), 1, fp);
     std::fwrite(&pos, sizeof(int32_t), 1, fp);
     std::fwrite(&hp, sizeof(int32_t), 1, fp);
     std::fwrite(&ht, sizeof(int32_t), 1, fp);
@@ -525,12 +544,24 @@ bool SaveManager::saveGame(const std::string& customPath) {
     }
 
     std::fclose(fp);
+
+    if (customPath.empty()) {
+        std::string gameDatPath = getSaveDirectory() + "game.dat";
+        if (gameDatPath != path) {
+            saveGame(gameDatPath);
+        }
+    }
+
     return true;
 }
 
 bool SaveManager::loadGame(const std::string& customPath) {
     std::string path = customPath.empty() ? getSavePath() : customPath;
     FILE* fp = std::fopen(path.c_str(), "rb");
+    if (!fp && customPath.empty()) {
+        std::string altPath = getSaveDirectory() + "game.dat";
+        fp = std::fopen(altPath.c_str(), "rb");
+    }
     if (!fp) return false;
 
     // 1. Header
@@ -542,7 +573,7 @@ bool SaveManager::loadGame(const std::string& customPath) {
         return false;
     }
 
-    if (magic != SAVE_MAGIC || version != SAVE_VERSION) {
+    if (magic != SAVE_MAGIC || (version != 6 && version != SAVE_VERSION)) {
         std::fclose(fp);
         return false;
     }
@@ -624,6 +655,7 @@ bool SaveManager::loadGame(const std::string& customPath) {
 
     // 3. Hero State
     int32_t heroClass = 0;
+    int32_t subClass = 0;
     int32_t pos = 0;
     int32_t hp = 20;
     int32_t ht = 20;
@@ -637,6 +669,9 @@ bool SaveManager::loadGame(const std::string& customPath) {
     uint8_t rooted = 0;
 
     std::fread(&heroClass, sizeof(int32_t), 1, fp);
+    if (version >= 7) {
+        std::fread(&subClass, sizeof(int32_t), 1, fp);
+    }
     std::fread(&pos, sizeof(int32_t), 1, fp);
     std::fread(&hp, sizeof(int32_t), 1, fp);
     std::fread(&ht, sizeof(int32_t), 1, fp);
@@ -652,6 +687,7 @@ bool SaveManager::loadGame(const std::string& customPath) {
     Dungeon::hero = std::make_unique<Hero>();
     Hero* hero = Dungeon::hero.get();
     hero->heroClass = static_cast<Hero::HeroClass>(heroClass);
+    hero->subClass = static_cast<HeroSubClass>(subClass);
     hero->pos = pos;
     hero->HP = hp;
     hero->HT = ht;

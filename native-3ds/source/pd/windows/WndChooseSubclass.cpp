@@ -5,8 +5,11 @@
 #include "pd/Sample.h"
 #include "pd/GLog.h"
 #include "pd/FX.h"
+#include "pd/SaveManager.h"
+#include "pd/CharSprite.h"
 #include "pd/ui/Chrome.h"
 #include "pd/ui/BitmapFont.h"
+#include "pd/ui/BottomScreenUI.h"
 #include <sstream>
 #include <algorithm>
 #include <cmath>
@@ -169,16 +172,28 @@ void WndChooseSubclass::applySelection(HeroSubClass way) {
 
     if (m_tome) {
         m_tome->choose(m_hero, way);
+        m_tome = nullptr;
     } else {
         m_hero->subClass = way;
-        m_hero->spendAndNext(10.0f * Actor::TICK);
+        m_hero->spendAndNext(TomeOfMastery::TIME_TO_READ * Actor::TICK);
+
+        HeroSprite* hspr = m_hero->getSprite() ? m_hero->getSprite()->asHeroSprite() : nullptr;
+        if (hspr) {
+            hspr->operate(m_hero->pos);
+        }
+
         Sample::play(Assets::SND_MASTERY);
         FX::burst(m_hero->pos, 0xffd700FF, 16);
         FX::floatingText(m_hero->pos, subClassTitle(way), 0xffd700FF);
-        GLog::w("You have chosen the way of the " + std::string(subClassTitle(way)) + "!");
+        GLog::w("You have chosen the path of the " + std::string(subClassTitle(way)) + "!");
+
         if (way == HeroSubClass::Berserker && m_hero->HP <= m_hero->HT * 0.40f) {
             m_hero->affect<Fury>();
         }
+
+        SaveManager::saveGame();
+        ui::BottomScreenUI::setLastTarget(nullptr);
+        Actor::process();
     }
 
     hide();

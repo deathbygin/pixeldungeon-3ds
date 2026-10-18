@@ -9,7 +9,7 @@ namespace pd {
 class SaveManager {
 public:
     static constexpr uint32_t SAVE_MAGIC = 0x53334450; // 'PD3S' in little-endian
-    static constexpr uint32_t SAVE_VERSION = 6;
+    static constexpr uint32_t SAVE_VERSION = 7;
 
     // Initialize APT sleep/suspend hooks for autosaving
     static void init();

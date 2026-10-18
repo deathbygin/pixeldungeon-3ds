@@ -19,6 +19,7 @@
 #include "noosa/Camera.h"
 #include "pd/ui/BottomScreenUI.h"
 #include "pd/Statistics.h"
+#include "pd/SaveManager.h"
 #include <sstream>
 #include <algorithm>
 
@@ -4395,6 +4396,7 @@ TomeOfMastery::TomeOfMastery() {
     image = ItemSpriteSheet::MASTERY;
     identified = true;
     levelKnown = true;
+    defaultAction = "READ";
 }
 
 std::string TomeOfMastery::displayName() const {
@@ -4412,10 +4414,19 @@ std::vector<std::string> TomeOfMastery::actions(Hero* hero) {
 bool TomeOfMastery::execute(Hero* hero, const std::string& action) {
     if (!hero) return false;
     if (action == "READ") {
+        if (hero->paralysed) {
+            GLog::w("You can't read while paralyzed!");
+            return false;
+        }
+        if (hero->buff(BuffType::Sleep)) {
+            GLog::w("You can't read while asleep!");
+            return false;
+        }
         if (hero->buff(BuffType::Blindness)) {
             GLog::w("You can't read while blinded!");
             return false;
         }
+        Sample::play(Assets::SND_READ);
         ui::BottomScreenUI::instance()->showChooseSubclass(this);
         return false;
     }
@@ -4430,11 +4441,17 @@ void TomeOfMastery::onCollect(Hero* hero) {
 void TomeOfMastery::choose(Hero* hero, HeroSubClass way) {
     if (!hero) return;
     hero->subClass = way;
-    hero->spendAndNext(10.0f * Actor::TICK);
+    hero->spendAndNext(TIME_TO_READ * Actor::TICK);
+
+    HeroSprite* hspr = hero->getSprite() ? hero->getSprite()->asHeroSprite() : nullptr;
+    if (hspr) {
+        hspr->operate(hero->pos);
+    }
+
     Sample::play(Assets::SND_MASTERY);
     FX::burst(hero->pos, 0xffd700FF, 16);
     FX::floatingText(hero->pos, subClassTitle(way), 0xffd700FF);
-    GLog::w("You have chosen the way of the " + std::string(subClassTitle(way)) + "!");
+    GLog::w("You have chosen the path of the " + std::string(subClassTitle(way)) + "!");
 
     if (way == HeroSubClass::Berserker && hero->HP <= hero->HT * 0.40f) {
         hero->affect<Fury>();
@@ -4442,6 +4459,10 @@ void TomeOfMastery::choose(Hero* hero, HeroSubClass way) {
 
     quantity = 0;
     hero->belongings.drop(this);
+
+    SaveManager::saveGame();
+    ui::BottomScreenUI::setLastTarget(nullptr);
+    Actor::process();
 }
 
 std::string TomeOfMastery::info() const {
