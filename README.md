@@ -2,6 +2,8 @@
 
 A port of the classic open-source roguelike **Pixel Dungeon** by Watabou, built for the Nintendo 3DS family of systems.
 
+Works on both New 3DS and Old 3DS.
+
 DISCLAIMER: AI was used in creating this port - mainly in translating Java function to C++. Use this app at your own risk and do not post this code anywhere that AI-generated code is not allowed.
 
 ---
