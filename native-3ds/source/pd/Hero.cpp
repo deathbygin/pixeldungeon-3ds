@@ -19,6 +19,7 @@
 #include "pd/SaveManager.h"
 #include "pd/ui/BottomScreenUI.h"
 #include "noosa/Audio.h"
+#include "noosa/Camera.h"
 #include <algorithm>
 
 namespace pd {
@@ -228,8 +229,15 @@ bool Hero::act() {
     updateRing(belongings.equippedRing1);
     updateRing(belongings.equippedRing2);
 
+    if (paralysed && !buff(BuffType::Paralysis) && !buff(BuffType::Frost)) {
+        paralysed = false;
+    }
+    if (rooted && !buff(BuffType::Roots)) {
+        rooted = false;
+    }
+
     if (restoreHealth) {
-        if (isStarving() || HP >= HT) {
+        if (paralysed || buff(BuffType::Paralysis) != nullptr || buff(BuffType::Frost) != nullptr || isStarving() || HP >= HT) {
             restoreHealth = false;
             waitingForInput = true;
             return false;
@@ -353,7 +361,7 @@ void Hero::swapWith(Mob* ally, Level* currentLevel) {
     m_lastStepAttacked = false;
     m_lastStepSwapped = true;
 
-    spend(TICK / speed());
+    spend(TICK / std::max(0.1f, speed()));
     next();
     waitingForInput = false;
 }
@@ -369,32 +377,30 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
         return false;
     }
 
-    if (paralysed) {
-        GLog::w("You can't move while paralyzed!");
-        waitingForInput = true;
-        return false;
+    if (paralysed && !buff(BuffType::Paralysis) && !buff(BuffType::Frost)) {
+        paralysed = false;
     }
 
-    // Vertigo scrambles direction into a random adjacent passable step
-    if (buff(BuffType::Vertigo) != nullptr && nextCell != pos) {
-        std::vector<int> adj;
+    if (paralysed || buff(BuffType::Paralysis) != nullptr || buff(BuffType::Frost) != nullptr) {
+        GLog::w(buff(BuffType::Frost) != nullptr ? "You can't move while frozen!" : "You can't move while paralyzed!");
+        spend(TICK);
+        next();
+        waitingForInput = false;
+        return true;
+    }
+
+    // Vertigo scrambles direction into a random adjacent step across all 8 neighbors
+    bool hasVertigo = (buff(BuffType::Vertigo) != nullptr);
+    if (hasVertigo && nextCell != pos) {
+        static const int dirX[8] = { 0,  1, 1, 1, 0, -1, -1, -1 };
+        static const int dirY[8] = { -1, -1, 0, 1, 1,  1,  0, -1 };
         int px = pos % Level::WIDTH;
         int py = pos / Level::WIDTH;
-        for (int dy = -1; dy <= 1; ++dy) {
-            for (int dx = -1; dx <= 1; ++dx) {
-                if (dx == 0 && dy == 0) continue;
-                int nx = px + dx;
-                int ny = py + dy;
-                if (nx >= 0 && nx < Level::WIDTH && ny >= 0 && ny < Level::HEIGHT) {
-                    int c = ny * Level::WIDTH + nx;
-                    if (currentLevel->isPassable(c)) {
-                        adj.push_back(c);
-                    }
-                }
-            }
-        }
-        if (!adj.empty()) {
-            nextCell = adj[Random::Int(static_cast<int>(adj.size()))];
+        int r = Random::Int(8);
+        int nx = px + dirX[r];
+        int ny = py + dirY[r];
+        if (nx >= 0 && nx < Level::WIDTH && ny >= 0 && ny < Level::HEIGHT) {
+            nextCell = ny * Level::WIDTH + nx;
         }
     }
 
@@ -434,14 +440,27 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
                 rooted = false;
             }
             if (rooted) {
+                if (noosa::Camera::main) noosa::Camera::main->shake(0.15f, 2.0f);
                 GLog::w("You are rooted to the ground and cannot move!");
-                waitingForInput = true;
-                return false;
+                float stepTime = (buff(BuffType::Cripple) != nullptr) ? (TICK * 2.0f) : TICK;
+                spend(stepTime);
+                next();
+                waitingForInput = false;
+                return true;
             }
             if (mob->rooted && !mob->buff(BuffType::Roots)) {
                 mob->rooted = false;
             }
             if (mob->paralysed || mob->rooted) {
+                if (hasVertigo) {
+                    if (noosa::Camera::main) noosa::Camera::main->shake(0.15f, 2.0f);
+                    GLog::w("You stumble into " + mob->name + "!");
+                    float stepTime = (buff(BuffType::Cripple) != nullptr) ? (TICK * 2.0f) : (TICK / std::max(0.1f, speed()));
+                    spend(stepTime);
+                    next();
+                    waitingForInput = false;
+                    return true;
+                }
                 GLog::w(mob->name + " is unable to move!");
                 waitingForInput = true;
                 return false;
@@ -451,6 +470,15 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
             bool allyCanEnter = mob->flying || (currentLevel->isPassable(pos) && !currentLevel->pit[pos]);
 
             if (!heroCanEnter || !allyCanEnter) {
+                if (hasVertigo) {
+                    if (noosa::Camera::main) noosa::Camera::main->shake(0.15f, 2.0f);
+                    GLog::w("You stumble into " + mob->name + "!");
+                    float stepTime = (buff(BuffType::Cripple) != nullptr) ? (TICK * 2.0f) : (TICK / std::max(0.1f, speed()));
+                    spend(stepTime);
+                    next();
+                    waitingForInput = false;
+                    return true;
+                }
                 waitingForInput = true;
                 return false;
             }
@@ -507,9 +535,13 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
         rooted = false;
     }
     if (rooted) {
+        if (noosa::Camera::main) noosa::Camera::main->shake(0.15f, 2.0f);
         GLog::w("You are rooted to the ground and cannot move!");
-        waitingForInput = true;
-        return false;
+        float stepTime = (buff(BuffType::Cripple) != nullptr) ? (TICK * 2.0f) : TICK;
+        spend(stepTime);
+        next();
+        waitingForInput = false;
+        return true;
     }
 
     int tile = currentLevel->get(nextCell);
@@ -534,6 +566,15 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
             waitingForInput = false;
             return true;
         } else {
+            if (hasVertigo) {
+                if (noosa::Camera::main) noosa::Camera::main->shake(0.15f, 2.0f);
+                GLog::w("You stumble into a locked door!");
+                float stepTime = (buff(BuffType::Cripple) != nullptr) ? (TICK * 2.0f) : (TICK / std::max(0.1f, speed()));
+                spend(stepTime);
+                next();
+                waitingForInput = false;
+                return true;
+            }
             GLog::w("This door is locked. You need an iron key to open it.");
             waitingForInput = true;
             return false;
@@ -551,6 +592,15 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
             waitingForInput = false;
             return true;
         } else {
+            if (hasVertigo) {
+                if (noosa::Camera::main) noosa::Camera::main->shake(0.15f, 2.0f);
+                GLog::w("You stumble into the locked stairs!");
+                float stepTime = (buff(BuffType::Cripple) != nullptr) ? (TICK * 2.0f) : (TICK / std::max(0.1f, speed()));
+                spend(stepTime);
+                next();
+                waitingForInput = false;
+                return true;
+            }
             GLog::w("Heavy bars block the stairs. You need a skeleton key to unlock it.");
             waitingForInput = true;
             return false;
@@ -558,6 +608,15 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
     }
 
     if (tile == Terrain::BARRICADE || tile == Terrain::BOOKSHELF) {
+        if (hasVertigo) {
+            if (noosa::Camera::main) noosa::Camera::main->shake(0.15f, 2.0f);
+            GLog::w("You stumble into a barricade!");
+            float stepTime = (buff(BuffType::Cripple) != nullptr) ? (TICK * 2.0f) : (TICK / std::max(0.1f, speed()));
+            spend(stepTime);
+            next();
+            waitingForInput = false;
+            return true;
+        }
         GLog::i("The wooden barricade blocks your way. Perhaps fire can clear it.");
         waitingForInput = true;
         return false;
@@ -584,7 +643,7 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
 
     if (currentLevel->pit[nextCell]) {
         move(nextCell);
-        spend(TICK / speed());
+        spend(TICK / std::max(0.1f, speed()));
         next();
         if (!flying) {
             currentLevel->press(nextCell, this);
@@ -600,7 +659,7 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
         }
 
         move(nextCell);
-        spend(TICK / speed());
+        spend(TICK / std::max(0.1f, speed()));
         next();
 
         // Level press (traps, high grass, etc.)
@@ -633,6 +692,16 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
             }
         }
 
+        waitingForInput = false;
+        return true;
+    }
+
+    if (hasVertigo) {
+        if (noosa::Camera::main) noosa::Camera::main->shake(0.15f, 2.0f);
+        GLog::w("You stumble into a wall!");
+        float stepTime = (buff(BuffType::Cripple) != nullptr) ? (TICK * 2.0f) : (TICK / std::max(0.1f, speed()));
+        spend(stepTime);
+        next();
         waitingForInput = false;
         return true;
     }

@@ -786,6 +786,13 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
     switch (tbAction) {
         case Toolbar::Action::WAIT: {
             if (!hero->isAlive()) return false;
+            if (hero->paralysed || hero->buff(BuffType::Paralysis) != nullptr || hero->buff(BuffType::Frost) != nullptr) {
+                GLog::w(hero->buff(BuffType::Frost) != nullptr ? "You can't move while frozen!" : "You can't move while paralyzed!");
+                hero->spend(pd::Actor::TICK);
+                hero->next();
+                Actor::process();
+                return true;
+            }
             if (level && hero) {
                 if (level->map[hero->pos] == Terrain::EXIT) {
                     promptStairs(true);
@@ -812,6 +819,13 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
 
         case Toolbar::Action::SEARCH: {
             if (!hero->isAlive()) return false;
+            if (hero->paralysed || hero->buff(BuffType::Paralysis) != nullptr || hero->buff(BuffType::Frost) != nullptr) {
+                GLog::w(hero->buff(BuffType::Frost) != nullptr ? "You can't search while frozen!" : "You can't search while paralyzed!");
+                hero->spend(pd::Actor::TICK);
+                hero->next();
+                Actor::process();
+                return true;
+            }
             hero->search(level, true);
             Actor::process();
             return true;
