@@ -649,12 +649,13 @@ std::unique_ptr<Mob> Dungeon::createMobForDepth(int depth) {
         else if (r == 3) return std::make_unique<Swarm>();
         else return std::make_unique<Bat>();
     } else if (depth <= 14) {
-        // Caves: Bats, Brutes, Shamans, Monks
-        int r = Random::Int(4);
+        // Caves: Bats, Brutes, Shamans, Monks, Spinners
+        int r = Random::Int(5);
         if (r == 0) return std::make_unique<Bat>();
         else if (r == 1) return std::make_unique<Brute>();
         else if (r == 2) return std::make_unique<Shaman>();
-        else return std::make_unique<Monk>();
+        else if (r == 3) return std::make_unique<Monk>();
+        else return std::make_unique<Spinner>();
     } else if (depth <= 19) {
         // Metropolis: Monks, Warlocks, Golems, Succubus
         int r = Random::Int(4);

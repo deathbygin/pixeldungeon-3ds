@@ -142,12 +142,25 @@ bool Burning::act() {
     if (target == Dungeon::hero.get()) {
         Hero* hero = Dungeon::hero.get();
         std::vector<size_t> scrollIndices;
+        std::vector<size_t> meatIndices;
         for (size_t i = 0; i < hero->belongings.backpack.size(); ++i) {
-            if (hero->belongings.backpack[i] && hero->belongings.backpack[i]->category() == ItemCategory::Scroll) {
-                scrollIndices.push_back(i);
+            if (hero->belongings.backpack[i]) {
+                if (hero->belongings.backpack[i]->category() == ItemCategory::Scroll) {
+                    scrollIndices.push_back(i);
+                } else if (hero->belongings.backpack[i]->name == "Mystery Meat" || hero->belongings.backpack[i]->name == "mystery meat") {
+                    meatIndices.push_back(i);
+                }
             }
         }
-        if (!scrollIndices.empty() && Random::Int(2) == 0) {
+        if (!meatIndices.empty()) {
+            size_t idx = meatIndices[Random::Int(static_cast<int>(meatIndices.size()))];
+            int qty = hero->belongings.backpack[idx]->quantity;
+            auto steak = std::make_unique<ChargrilledMeat>();
+            steak->quantity = qty;
+            hero->belongings.backpack[idx] = std::move(steak);
+            GLog::w("Your mystery meat is chargrilled!");
+            FX::burst(hero->pos, 0xee7722FF, 6);
+        } else if (!scrollIndices.empty() && Random::Int(2) == 0) {
             size_t idx = scrollIndices[Random::Int(static_cast<int>(scrollIndices.size()))];
             std::string name = hero->belongings.backpack[idx]->displayName();
             hero->belongings.backpack.erase(hero->belongings.backpack.begin() + idx);
@@ -366,6 +379,21 @@ void Frost::attachTo(Char* ch) {
         Buff* b = target->buff(BuffType::Burning);
         if (b) b->detach();
         FX::floatingText(target->pos, "frozen", 0x64beffff);
+
+        if (target == Dungeon::hero.get()) {
+            Hero* hero = Dungeon::hero.get();
+            for (auto& it : hero->belongings.backpack) {
+                if (it && (it->name == "Mystery Meat" || it->name == "mystery meat")) {
+                    int qty = it->quantity;
+                    auto carpaccio = std::make_unique<FrozenCarpaccio>();
+                    carpaccio->quantity = qty;
+                    it = std::move(carpaccio);
+                    GLog::w("Your mystery meat is frozen into carpaccio!");
+                    FX::burst(hero->pos, 0x66ccffFF, 6);
+                    break;
+                }
+            }
+        }
     }
 }
 

@@ -167,6 +167,8 @@ void WndItemSpawner::initCategories() {
         cat.items = {
             { "Ration", ItemSpriteSheet::RATION, []() { return std::make_unique<Food>(); } },
             { "Mystery Meat", ItemSpriteSheet::MEAT, []() { return std::make_unique<MysteryMeat>(); } },
+            { "Chargrilled Meat", ItemSpriteSheet::STEAK, []() { return std::make_unique<ChargrilledMeat>(); } },
+            { "Frozen Carpaccio", ItemSpriteSheet::CARPACCIO, []() { return std::make_unique<FrozenCarpaccio>(); } },
             { "Dew Vial", ItemSpriteSheet::VIAL, []() { return std::make_unique<DewVial>(); } },
             { "Iron Key", ItemSpriteSheet::IRON_KEY, []() { return std::make_unique<IronKey>(Dungeon::depth); } },
             { "Golden Key", ItemSpriteSheet::GOLDEN_KEY, []() { return std::make_unique<GoldenKey>(Dungeon::depth); } },

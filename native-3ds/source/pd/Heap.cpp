@@ -189,6 +189,13 @@ void Heap::burn() {
         } else if ((*it)->name == "Dewdrop") {
             it = items.erase(it);
             burnt = true;
+        } else if ((*it)->name == "Mystery Meat" || (*it)->name == "mystery meat") {
+            int qty = (*it)->quantity;
+            auto steak = std::make_unique<ChargrilledMeat>();
+            steak->quantity = qty;
+            *it = std::move(steak);
+            burnt = true;
+            ++it;
         } else if ((*it)->name == "honeypot" || (*it)->name == "Honeypot") {
             auto hp = std::move(*it);
             it = items.erase(it);
@@ -201,7 +208,10 @@ void Heap::burn() {
 
     if (burnt) {
         Sample::playAt(Assets::SND_BURNING, pos);
-        FX::burst((pos % 32) * 16.0f + 8.0f, (pos / 32) * 16.0f + 8.0f, 0xee7722FF, 6);
+        FX::burst(pos, 0xee7722FFu, 6);
+        if (items.empty() && Dungeon::level) {
+            Dungeon::level->removeHeap(this);
+        }
     }
 }
 
@@ -221,11 +231,19 @@ void Heap::freeze() {
     }
     if (type != Type::HEAP) return;
 
+    bool frozen = false;
     for (auto& item : items) {
-        if (item && item->name == "Mystery Meat") {
-            item->name = "Frozen Carpaccio";
-            item->image = ItemSpriteSheet::CARPACCIO;
+        if (item && (item->name == "Mystery Meat" || item->name == "mystery meat")) {
+            int qty = item->quantity;
+            auto carpaccio = std::make_unique<FrozenCarpaccio>();
+            carpaccio->quantity = qty;
+            item = std::move(carpaccio);
+            frozen = true;
         }
+    }
+
+    if (frozen) {
+        FX::burst(pos, 0x66ccffFFu, 6);
     }
 }
 

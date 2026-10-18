@@ -3690,6 +3690,8 @@ std::string Scroll::info() const {
 Food::Food() {
     name = "Ration of Food";
     image = ItemSpriteSheet::RATION;
+    energy = static_cast<float>(Hunger::HUNGRY);
+    message = "That food tasted delicious!";
     identified = true;
     levelKnown = true;
     cursedKnown = true;
@@ -3710,10 +3712,10 @@ bool Food::execute(Hero* hero, const std::string& action) {
 
         Hunger* hunger = hero->getBuff<Hunger>();
         if (hunger) {
-            hunger->satisfy(Hunger::HUNGRY);
+            hunger->satisfy(energy);
         }
         Statistics::foodEaten++;
-        GLog::i("That food tasted delicious!");
+        GLog::i(message);
         if (hero->heroClass == Hero::HeroClass::Warrior) {
             if (hero->HP < hero->HT) {
                 hero->HP = std::min(hero->HT, hero->HP + 5);
@@ -5086,6 +5088,8 @@ std::unique_ptr<Item> Honeypot::clone(int qty) const {
 MysteryMeat::MysteryMeat() {
     name = "Mystery Meat";
     image = ItemSpriteSheet::MEAT;
+    energy = static_cast<float>(Hunger::STARVING - Hunger::HUNGRY);
+    message = "That food tasted... strange.";
     identified = true;
     levelKnown = true;
     cursedKnown = true;
@@ -5094,35 +5098,27 @@ MysteryMeat::MysteryMeat() {
 bool MysteryMeat::execute(Hero* hero, const std::string& action) {
     if (!hero) return false;
     if (action == "EAT") {
-        Sample::play(Assets::SND_EAT);
-        Hunger* hunger = hero->getBuff<Hunger>();
-        if (hunger) {
-            hunger->satisfy(Hunger::STARVING - Hunger::HUNGRY);
-        }
-        Statistics::foodEaten++;
-        GLog::i("That food tasted... strange.");
+        Food::execute(hero, action);
         switch (Random::Int(5)) {
             case 0:
                 GLog::w("Oh it's hot!");
-                hero->affect<Burning>();
+                hero->affect<Burning>(5);
                 break;
             case 1:
                 GLog::w("You can't feel your legs!");
-                hero->affect<Paralysis>();
+                hero->affect<Roots>();
                 break;
             case 2:
                 GLog::w("You are not feeling well.");
-                hero->affect<Poison>();
+                hero->affect<Poison>(std::max(1, hero->HT / 5));
                 break;
             case 3:
-                GLog::w("You feel sluggish.");
-                hero->affect<Cripple>();
+                GLog::w("You are stuffed.");
+                hero->affect<Slow>();
                 break;
-            default:
+            case 4:
                 break;
         }
-        quantity--;
-        hero->spendAndNext(3.0f * Actor::TICK);
         return true;
     } else if (action == "DROP") {
         return doDropItem(hero, this);
@@ -5140,6 +5136,116 @@ std::unique_ptr<Item> MysteryMeat::clone(int qty) const {
     auto m = std::make_unique<MysteryMeat>();
     m->quantity = qty;
     return m;
+}
+
+// =============================================================================
+// ChargrilledMeat Implementation
+// =============================================================================
+ChargrilledMeat::ChargrilledMeat() {
+    name = "Chargrilled Meat";
+    image = ItemSpriteSheet::STEAK;
+    energy = static_cast<float>(Hunger::STARVING - Hunger::HUNGRY);
+    message = "That food tasted delicious!";
+    identified = true;
+    levelKnown = true;
+    cursedKnown = true;
+}
+
+std::string ChargrilledMeat::info() const {
+    return "It looks like a decent steak.";
+}
+
+std::unique_ptr<Item> ChargrilledMeat::clone(int qty) const {
+    auto m = std::make_unique<ChargrilledMeat>();
+    m->quantity = qty;
+    return m;
+}
+
+std::unique_ptr<ChargrilledMeat> ChargrilledMeat::cook(MysteryMeat* ingredient) {
+    auto result = std::make_unique<ChargrilledMeat>();
+    if (ingredient) {
+        result->quantity = ingredient->quantity;
+    }
+    return result;
+}
+
+// =============================================================================
+// FrozenCarpaccio Implementation
+// =============================================================================
+FrozenCarpaccio::FrozenCarpaccio() {
+    name = "Frozen Carpaccio";
+    image = ItemSpriteSheet::CARPACCIO;
+    energy = static_cast<float>(Hunger::STARVING - Hunger::HUNGRY);
+    message = "That food tasted delicious!";
+    identified = true;
+    levelKnown = true;
+    cursedKnown = true;
+}
+
+bool FrozenCarpaccio::execute(Hero* hero, const std::string& action) {
+    if (!hero) return false;
+    if (action == "EAT") {
+        Food::execute(hero, action);
+        switch (Random::Int(5)) {
+            case 0:
+                GLog::i("You see your hands turn invisible!");
+                hero->affect<Invisibility>();
+                FX::floatingText(hero->pos, "INVISIBLE", 0xa5cde4FF);
+                FX::burst(hero->pos, 0xa5cde4FF, 10);
+                Sample::play(Assets::SND_MELD);
+                break;
+            case 1:
+                GLog::i("You feel your skin hardens!");
+                hero->affect<Barkskin>(std::max(1, hero->HT / 4));
+                FX::floatingText(hero->pos, "BARKSKIN", 0x8b5a2bFF);
+                FX::burst(hero->pos, 0x8b5a2bFF, 8);
+                break;
+            case 2:
+                GLog::i("Refreshing!");
+                hero->removeBuff(BuffType::Poison);
+                hero->removeBuff(BuffType::Cripple);
+                hero->removeBuff(BuffType::Weakness);
+                hero->removeBuff(BuffType::Bleeding);
+                FX::floatingText(hero->pos, "REFRESHED", 0x38b764FF);
+                FX::burst(hero->pos, 0x38b764FF, 8);
+                break;
+            case 3:
+                GLog::i("You feel better!");
+                if (hero->HP < hero->HT) {
+                    int heal = std::min(hero->HT / 4, hero->HT - hero->HP);
+                    hero->HP += heal;
+                    FX::floatingText(hero->pos, "+" + std::to_string(heal), 0x38b764FF);
+                    FX::burst(hero->pos, 0x38b764FF, 8);
+                }
+                break;
+            case 4:
+                break;
+        }
+        return true;
+    } else if (action == "DROP") {
+        return doDropItem(hero, this);
+    } else if (action == "THROW") {
+        return doThrowItem(hero, this);
+    }
+    return false;
+}
+
+std::string FrozenCarpaccio::info() const {
+    return "It's a piece of frozen raw meat. The only way to eat it is by cutting thin slices of it. And this way it's surprisingly good.";
+}
+
+std::unique_ptr<Item> FrozenCarpaccio::clone(int qty) const {
+    auto m = std::make_unique<FrozenCarpaccio>();
+    m->quantity = qty;
+    return m;
+}
+
+std::unique_ptr<FrozenCarpaccio> FrozenCarpaccio::cook(MysteryMeat* ingredient) {
+    auto result = std::make_unique<FrozenCarpaccio>();
+    if (ingredient) {
+        result->quantity = ingredient->quantity;
+    }
+    return result;
 }
 
 // -----------------------------------------------------------------------------

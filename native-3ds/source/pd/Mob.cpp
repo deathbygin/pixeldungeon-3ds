@@ -406,6 +406,13 @@ int Crab::defenseSkill(Char* attackerChar) {
     return 8;
 }
 
+void Crab::die(Actor* src) {
+    if (Random::Int(6) == 0 && Dungeon::level) {
+        Dungeon::level->drop(std::make_unique<MysteryMeat>(), pos);
+    }
+    Mob::die(src);
+}
+
 Skeleton::Skeleton() {
     name = "Skeleton";
     HP = 20;
@@ -641,6 +648,13 @@ int Bat::attackProc(Char* enemyChar, int damage) {
         FX::floatingText(pos, "+" + std::to_string(reg), 0x38b764FF);
     }
     return damage;
+}
+
+void Bat::die(Actor* src) {
+    if (Random::Int(5) == 0 && Dungeon::level) {
+        Dungeon::level->drop(std::make_unique<MysteryMeat>(), pos);
+    }
+    Mob::die(src);
 }
 
 // Gnoll Brute
@@ -2254,6 +2268,63 @@ void Bee::die(Actor* src) {
 
 void Bee::interact() {
     Mob::interact();
+}
+
+// -----------------------------------------------------------------------------
+// Cave Spinner
+// -----------------------------------------------------------------------------
+Spinner::Spinner() {
+    name = "Cave Spinner";
+    HP = 50;
+    HT = 50;
+    expAward = 9;
+}
+
+std::string Spinner::description() const {
+    return "These greenish furry cave spiders try to avoid direct combat, preferring to wait in the distance while their venom slowly kills the victim.";
+}
+
+int Spinner::damageRoll() {
+    return Random::NormalIntRange(12, 16);
+}
+
+int Spinner::attackSkill(Char* targetChar) {
+    (void)targetChar;
+    return 20;
+}
+
+int Spinner::defenseSkill(Char* attackerChar) {
+    (void)attackerChar;
+    return 14;
+}
+
+int Spinner::dr() {
+    return 6;
+}
+
+bool Spinner::act() {
+    bool result = Mob::act();
+    if (state == State::FLEEING && !buff(BuffType::Terror)) {
+        if (enemy && enemy->isAlive() && !enemy->buff(BuffType::Poison)) {
+            state = State::HUNTING;
+        }
+    }
+    return result;
+}
+
+int Spinner::attackProc(Char* enemyChar, int damage) {
+    if (Random::Int(2) == 0 && enemyChar) {
+        enemyChar->affect<Poison>(Random::IntRange(7, 9));
+        state = State::FLEEING;
+    }
+    return damage;
+}
+
+void Spinner::die(Actor* src) {
+    if (Random::Int(8) == 0 && Dungeon::level) {
+        Dungeon::level->drop(std::make_unique<MysteryMeat>(), pos);
+    }
+    Mob::die(src);
 }
 
 } // namespace pd

@@ -50,7 +50,8 @@ public:
         Sheep,
         Mimic,
         Shopkeeper,
-        Bee
+        Bee,
+        Spinner
     };
 
     State state = State::SLEEPING;
@@ -133,6 +134,7 @@ public:
     int damageRoll() override;
     int attackSkill(Char* target) override;
     int defenseSkill(Char* attacker) override;
+    void die(Actor* src) override;
 };
 
 class Skeleton : public Mob {
@@ -196,6 +198,7 @@ public:
     int defenseSkill(Char* attacker) override;
     int dr() override;
     int attackProc(Char* enemy, int damage) override;
+    void die(Actor* src) override;
 };
 
 class Brute : public Mob {
@@ -514,6 +517,20 @@ public:
     void aiStep(Hero* hero, Level* currentLevel) override;
     void die(Actor* src) override;
     void interact() override;
+};
+
+class Spinner : public Mob {
+public:
+    Spinner();
+    MobType mobType() const override { return MobType::Spinner; }
+    std::string description() const override;
+    int damageRoll() override;
+    int attackSkill(Char* target) override;
+    int defenseSkill(Char* attacker) override;
+    int dr() override;
+    int attackProc(Char* enemy, int damage) override;
+    bool act() override;
+    void die(Actor* src) override;
 };
 
 } // namespace pd

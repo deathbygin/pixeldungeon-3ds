@@ -860,6 +860,12 @@ bool SaveManager::loadGame(const std::string& customPath) {
                 item = std::make_unique<Bomb>();
             } else if (iName == "Dew Vial" || iName == "dew vial") {
                 item = std::make_unique<DewVial>();
+            } else if (iName == "Mystery Meat" || iName == "mystery meat") {
+                item = std::make_unique<MysteryMeat>();
+            } else if (iName == "Chargrilled Meat" || iName == "chargrilled meat") {
+                item = std::make_unique<ChargrilledMeat>();
+            } else if (iName == "Frozen Carpaccio" || iName == "frozen carpaccio") {
+                item = std::make_unique<FrozenCarpaccio>();
             } else {
                 item = std::make_unique<Item>();
             }
@@ -881,7 +887,7 @@ bool SaveManager::loadGame(const std::string& customPath) {
             if (Key* k = item->asKey()) {
                 k->depth = (iLvl > 0) ? iLvl : Dungeon::depth;
             } else if (DewVial* dv = item->asDewVial()) {
-                dv->volume = std::clamp<int>(iLvl, 0, DewVial::MAX_VOLUME);
+                dv->volume = std::clamp(static_cast<int>(iLvl), 0, DewVial::MAX_VOLUME);
             }
             if (item->category() == ItemCategory::Potion) {
                 static_cast<Potion*>(item.get())->updatePerception();
@@ -1095,6 +1101,12 @@ bool SaveManager::loadGame(const std::string& customPath) {
                         item = std::make_unique<Bomb>();
                     } else if (iName == "Dew Vial" || iName == "dew vial") {
                         item = std::make_unique<DewVial>();
+                    } else if (iName == "Mystery Meat" || iName == "mystery meat") {
+                        item = std::make_unique<MysteryMeat>();
+                    } else if (iName == "Chargrilled Meat" || iName == "chargrilled meat") {
+                        item = std::make_unique<ChargrilledMeat>();
+                    } else if (iName == "Frozen Carpaccio" || iName == "frozen carpaccio") {
+                        item = std::make_unique<FrozenCarpaccio>();
                     } else {
                         item = std::make_unique<Item>();
                     }
@@ -1116,7 +1128,7 @@ bool SaveManager::loadGame(const std::string& customPath) {
                     if (Key* k = item->asKey()) {
                         k->depth = (iLvl > 0) ? iLvl : Dungeon::depth;
                     } else if (DewVial* dv = item->asDewVial()) {
-                        dv->volume = std::clamp<int>(iLvl, 0, DewVial::MAX_VOLUME);
+                        dv->volume = std::clamp(static_cast<int>(iLvl), 0, DewVial::MAX_VOLUME);
                     }
                     if (item->category() == ItemCategory::Potion) {
                         static_cast<Potion*>(item.get())->updatePerception();
@@ -1184,6 +1196,7 @@ bool SaveManager::loadGame(const std::string& customPath) {
             case Mob::MobType::RottingFist: mob = std::make_unique<RottingFist>(); break;
             case Mob::MobType::Mimic:       mob = std::make_unique<Mimic>(); break;
             case Mob::MobType::Bee:         mob = std::make_unique<Bee>(); break;
+            case Mob::MobType::Spinner:     mob = std::make_unique<Spinner>(); break;
             default:                        mob = std::make_unique<Rat>(); break;
         }
 

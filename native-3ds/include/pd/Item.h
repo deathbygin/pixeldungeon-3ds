@@ -115,6 +115,14 @@ public:
     virtual Scroll* asScroll() { return nullptr; }
     virtual class Key* asKey() { return nullptr; }
     virtual class Keyring* asKeyring() { return nullptr; }
+    virtual class Food* asFood() { return nullptr; }
+    virtual const class Food* asFood() const { return nullptr; }
+    virtual class MysteryMeat* asMysteryMeat() { return nullptr; }
+    virtual const class MysteryMeat* asMysteryMeat() const { return nullptr; }
+    virtual class ChargrilledMeat* asChargrilledMeat() { return nullptr; }
+    virtual const class ChargrilledMeat* asChargrilledMeat() const { return nullptr; }
+    virtual class FrozenCarpaccio* asFrozenCarpaccio() { return nullptr; }
+    virtual const class FrozenCarpaccio* asFrozenCarpaccio() const { return nullptr; }
 };
 
 class Weapon : public Item {
@@ -661,14 +669,21 @@ public:
 
 class Food : public Item {
 public:
+    float energy = 0.0f;
+    std::string message;
+
     Food();
     ItemCategory category() const override { return ItemCategory::Generic; }
     bool isUpgradable() const override { return false; }
+    bool isIdentified() const override { return true; }
     std::vector<std::string> actions(Hero* hero) override;
     bool execute(Hero* hero, const std::string& action) override;
     std::string info() const override;
     std::unique_ptr<Item> clone(int qty = 1) const override;
     int price() const override;
+
+    Food* asFood() override { return this; }
+    const Food* asFood() const override { return this; }
 };
 
 class Dewdrop : public Item {
@@ -1067,7 +1082,7 @@ public:
 };
 
 // =============================================================================
-// MysteryMeat
+// MysteryMeat, ChargrilledMeat, FrozenCarpaccio
 // =============================================================================
 class MysteryMeat : public Food {
 public:
@@ -1075,6 +1090,35 @@ public:
     bool execute(Hero* hero, const std::string& action) override;
     std::string info() const override;
     std::unique_ptr<Item> clone(int qty = 1) const override;
+    int price() const override { return 5 * quantity; }
+
+    MysteryMeat* asMysteryMeat() override { return this; }
+    const MysteryMeat* asMysteryMeat() const override { return this; }
+};
+
+class ChargrilledMeat : public Food {
+public:
+    ChargrilledMeat();
+    std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+    int price() const override { return 5 * quantity; }
+    static std::unique_ptr<ChargrilledMeat> cook(MysteryMeat* ingredient);
+
+    ChargrilledMeat* asChargrilledMeat() override { return this; }
+    const ChargrilledMeat* asChargrilledMeat() const override { return this; }
+};
+
+class FrozenCarpaccio : public Food {
+public:
+    FrozenCarpaccio();
+    bool execute(Hero* hero, const std::string& action) override;
+    std::string info() const override;
+    std::unique_ptr<Item> clone(int qty = 1) const override;
+    int price() const override { return 10 * quantity; }
+    static std::unique_ptr<FrozenCarpaccio> cook(MysteryMeat* ingredient);
+
+    FrozenCarpaccio* asFrozenCarpaccio() override { return this; }
+    const FrozenCarpaccio* asFrozenCarpaccio() const override { return this; }
 };
 
 // =============================================================================
