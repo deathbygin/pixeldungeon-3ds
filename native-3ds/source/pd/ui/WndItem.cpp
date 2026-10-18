@@ -68,9 +68,11 @@ void WndItem::calculateLayout(pd::Hero* hero) {
     m_usableTextW = m_winW - (paddingHor * 2.0f);
     m_bodyX = m_winX + paddingHor;
 
-    // 2. Subheader information (Tier, Strength requirement, Damage, Armor absorbtion, Charges)
+    // 2. Subheader information (Tier, Strength requirement, Damage, Armor absorbtion, Charges, Dew Vial Volume)
     m_subHeader.clear();
-    if (Wand* wand = m_item->asWand()) {
+    if (DewVial* vial = m_item->asDewVial()) {
+        m_subHeader = "Volume: " + std::to_string(vial->volume) + "/10";
+    } else if (Wand* wand = m_item->asWand()) {
         if (wand->levelKnown) {
             m_subHeader = "Charges: " + (wand->curChargeKnown ? std::to_string(wand->curCharges) : "?") + "/" + std::to_string(wand->maxCharges);
         }
@@ -314,7 +316,15 @@ void WndItem::draw(C2D_TextBuf textBuf, float baseDepth) const {
     }
 
     if (!m_subHeader.empty()) {
-        BitmapFont::draw(BitmapFont::FontType::Font1x, m_subHeader, nameX, m_headerY + 16.0f, zText, COLOR_TEXT_MUTED);
+        if (DewVial* vial = m_item->asDewVial()) {
+            std::string label = "Volume: ";
+            float lw = BitmapFont::width(BitmapFont::FontType::Font1x, label);
+            BitmapFont::draw(BitmapFont::FontType::Font1x, label, nameX, m_headerY + 16.0f, zText, COLOR_TEXT_ACCENT);
+            std::string volStr = std::to_string(vial->volume) + "/10";
+            BitmapFont::draw(BitmapFont::FontType::Font1x, volStr, nameX + lw, m_headerY + 16.0f, zText, COLOR_TEXT_PRIMARY);
+        } else {
+            BitmapFont::draw(BitmapFont::FontType::Font1x, m_subHeader, nameX, m_headerY + 16.0f, zText, COLOR_TEXT_MUTED);
+        }
     }
 
     // 5. Divider line between header and description body

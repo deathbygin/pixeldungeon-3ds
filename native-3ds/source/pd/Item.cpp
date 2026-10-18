@@ -4812,9 +4812,11 @@ DewVial::DewVial() {
 
 void DewVial::collectDew(int count) {
     volume = std::min(MAX_VOLUME, volume + count);
-    GLog::i("You collected a dewdrop into your dew vial.");
     if (volume >= MAX_VOLUME) {
+        volume = MAX_VOLUME;
         GLog::p("Your dew vial is full!");
+    } else {
+        GLog::i("Your dew vial collected a drop of dew (" + std::to_string(volume) + "/10)");
     }
 }
 
@@ -4832,11 +4834,16 @@ bool DewVial::execute(Hero* hero, const std::string& action) {
     if (action == "DRINK") {
         if (volume > 0) {
             Sample::play(Assets::SND_DRINK);
-            int healAmount = (hero->HT * volume) / MAX_VOLUME;
-            hero->HP = std::min(hero->HT, hero->HP + healAmount);
-            FX::burst(hero->pos, 0x00ff88FFu, 8);
-            FX::floatingText(hero->pos, "+" + std::to_string(healAmount), 0x38b764FF);
-            GLog::i("You drink the pure dew from the vial, soothing your wounds.");
+            int value = static_cast<int>(std::ceil(std::pow(volume, std::log10(20.0)) / 20.0 * hero->HT));
+            int effect = std::min(hero->HT - hero->HP, value);
+            if (effect > 0) {
+                hero->HP += effect;
+                FX::burst(hero->pos, 0x00ff88FFu, volume > 5 ? 12 : 6);
+                FX::floatingText(hero->pos, "+" + std::to_string(effect), 0x38b764FF);
+                GLog::p("You drink the pure dew from the vial (+" + std::to_string(effect) + " HP).");
+            } else {
+                GLog::i("You drink the pure dew from the vial.");
+            }
             volume = 0;
             hero->spendAndNext(Actor::TICK);
             return true;
@@ -4866,7 +4873,8 @@ void DewVial::autoDrink(Hero* hero) {
         hero->HP = hero->HT;
         Sample::play(Assets::SND_DRINK);
         FX::burst(hero->pos, 0x00ff88FFu, 16);
-        GLog::w("The dew vial was emptied to heal your fatal wounds!");
+        FX::floatingText(hero->pos, "+" + std::to_string(hero->HT), 0x38b764FF);
+        GLog::p("The dew vial bursts with life-giving liquid, restoring you from the brink of death!");
     }
 }
 

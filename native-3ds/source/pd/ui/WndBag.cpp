@@ -479,6 +479,17 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
             C2D_DrawRectSolid(sx, sy, zSlot + 0.01f, 1.0f, SLOT_SIZE, C2D_Color32(0x2a, 0x2b, 0x27, 0xFF));
             C2D_DrawRectSolid(sx + SLOT_SIZE - 1.0f, sy, zSlot + 0.01f, 1.0f, SLOT_SIZE, C2D_Color32(0x2a, 0x2b, 0x27, 0xFF));
 
+            // DewVial full golden aura glow
+            if (DewVial* dv = it ? it->asDewVial() : nullptr) {
+                if (dv->isFull()) {
+                    u32 glowCol = C2D_Color32(0xFF, 0xFF, 0xCC, 0xC0);
+                    C2D_DrawRectSolid(sx - 1.0f, sy - 1.0f, zSlot + 0.015f, SLOT_SIZE + 2.0f, 1.0f, glowCol);
+                    C2D_DrawRectSolid(sx - 1.0f, sy + SLOT_SIZE, zSlot + 0.015f, SLOT_SIZE + 2.0f, 1.0f, glowCol);
+                    C2D_DrawRectSolid(sx - 1.0f, sy - 1.0f, zSlot + 0.015f, 1.0f, SLOT_SIZE + 2.0f, glowCol);
+                    C2D_DrawRectSolid(sx + SLOT_SIZE, sy - 1.0f, zSlot + 0.015f, 1.0f, SLOT_SIZE + 2.0f, glowCol);
+                }
+            }
+
             // Selected Reticle Box
             if (slotIdx == m_selectedSlot) {
                 bool isEligible = isSelectionMode() ? (it && isItemEligible(it)) : true;
@@ -512,7 +523,7 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
                 pI.center.x = pI.center.y = 0.0f; pI.depth = zItem; pI.angle = 0.0f;
                 C2D_DrawImage(imgIt, &pI, nullptr);
 
-                // Top-Left Badge: Key depth indicator OR Stack count
+                // Top-Left Badge: Key depth indicator OR Dew vial volume OR Stack count
                 if (Key* k = it->asKey()) {
                     std::string depthBadge = std::to_string(k->depth);
                     BitmapFont::draw(BitmapFont::FontType::Font1x, depthBadge, sx + 2.0f, sy + 1.0f, zText, COLOR_TEXT_PRIMARY);
@@ -522,6 +533,9 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
                         float qx = sx + SLOT_SIZE - qw - 2.0f;
                         BitmapFont::draw(BitmapFont::FontType::Font1x, qStr, qx, sy + 18.0f, zText, COLOR_TEXT_PRIMARY);
                     }
+                } else if (DewVial* dv = it->asDewVial()) {
+                    std::string vialVol = std::to_string(dv->volume) + "/10";
+                    BitmapFont::draw(BitmapFont::FontType::Font1x, vialVol, sx + 2.0f, sy + 1.0f, zText, COLOR_TEXT_PRIMARY);
                 } else if (it->quantity > 1) {
                     std::string qStr = std::to_string(it->quantity);
                     BitmapFont::draw(BitmapFont::FontType::Font1x, qStr, sx + 2.0f, sy + 1.0f, zText, COLOR_TEXT_PRIMARY);
@@ -575,6 +589,18 @@ void WndBag::draw(const pd::Hero* hero, C2D_TextBuf textBuf) const {
                         float py = sy + 23.0f - row * 3.0f;
                         u32 sqCol = (i < curCh) ? C2D_Color32(0x00, 0xee, 0x00, 0xFF) : C2D_Color32(0x28, 0x2b, 0x26, 0xFF);
                         C2D_DrawRectSolid(px, py, zText, 2.0f, 2.0f, sqCol);
+                    }
+                }
+
+                // Bottom: Dew vial liquid fill bar (20px x 3px)
+                if (DewVial* dv = it->asDewVial()) {
+                    float gaugeX = sx + 4.0f;
+                    float gaugeY = sy + 23.0f;
+                    C2D_DrawRectSolid(gaugeX, gaugeY, zText, 20.0f, 3.0f, C2D_Color32(0x20, 0x20, 0x20, 0xFF));
+                    if (dv->volume > 0) {
+                        float fillW = std::clamp(dv->volume / 10.0f, 0.0f, 1.0f) * 20.0f;
+                        u32 fillCol = dv->isFull() ? C2D_Color32(0xFF, 0xEE, 0x66, 0xFF) : C2D_Color32(0x00, 0xDF, 0xFA, 0xFF);
+                        C2D_DrawRectSolid(gaugeX, gaugeY, zText + 0.005f, fillW, 3.0f, fillCol);
                     }
                 }
             } else if (isEquippedSlot && iTex) {

@@ -679,7 +679,18 @@ bool Hero::pickUp(Level* currentLevel, bool spendTurn) {
     if (!peeked) return false;
 
     // Check if backpack can accept the item before taking it from the ground!
-    if (peeked->name != "Dewdrop" && peeked->name != "Gold") {
+    if (peeked->name == "Dewdrop") {
+        DewVial* vial = nullptr;
+        for (auto& bIt : belongings.backpack) {
+            if (bIt && bIt->asDewVial()) {
+                vial = bIt->asDewVial();
+                break;
+            }
+        }
+        if (HP >= HT && vial && vial->isFull()) {
+            return false; // Leave on ground, hero steps over harmlessly
+        }
+    } else if (peeked->name != "Gold") {
         if (!belongings.canCollect(peeked)) {
             GLog::w("Your pack is too full for " + peeked->displayName());
             return false;
@@ -698,10 +709,7 @@ bool Hero::pickUp(Level* currentLevel, bool spendTurn) {
                 break;
             }
         }
-        if (vial && !vial->isFull()) {
-            vial->collectDew(item->quantity);
-            Sample::play(Assets::SND_DEWDROP);
-        } else {
+        if (HP < HT || vial == nullptr) {
             int value = 1 + (Dungeon::depth - 1) / 5;
             if (heroClass == HeroClass::Huntress) {
                 value++;
@@ -716,6 +724,14 @@ bool Hero::pickUp(Level* currentLevel, bool spendTurn) {
                 GLog::i("You drank a fresh dewdrop.");
             }
             Sample::play(Assets::SND_DEWDROP);
+        } else if (!vial->isFull()) {
+            vial->collectDew(item->quantity);
+            Sample::play(Assets::SND_DEWDROP);
+        } else {
+            if (currentLevel) {
+                currentLevel->drop(std::move(item), pos);
+            }
+            return false;
         }
     } else if (item->name == "Gold") {
         int g = item->quantity;
@@ -915,6 +931,24 @@ void Hero::die(Actor* src) {
         HP = HT;
         return;
     }
+
+    DewVial* vial = nullptr;
+    for (auto& it : belongings.backpack) {
+        if (it && it->asDewVial()) {
+            vial = it->asDewVial();
+            break;
+        }
+    }
+    if (vial && vial->isFull()) {
+        vial->volume = 0;
+        HP = HT;
+        Sample::play(Assets::SND_DRINK);
+        FX::burst(pos, 0x00ff88FFu, 16);
+        FX::floatingText(pos, "+" + std::to_string(HT), 0x38b764FF);
+        GLog::p("The dew vial bursts with life-giving liquid, restoring you from the brink of death!");
+        return;
+    }
+
     Sample::play(Assets::SND_DEATH);
     GLog::n("You died...");
     std::string deathReason = "";
@@ -976,9 +1010,6 @@ void Hero::damage(int dmg, Actor* src) {
     }
     restoreHealth = false;
     Char::damage(dmg, src);
-    if (HP <= 0) {
-        DewVial::autoDrink(this);
-    }
     if (subClass == HeroSubClass::Berserker && HP > 0 && HP <= HT * 0.40f) {
         if (!getBuff<Fury>()) {
             affect<Fury>();

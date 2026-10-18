@@ -31,6 +31,7 @@ public:
     static int scrollsOfUpgrade;
     static int scrollsOfEnchantment;
     static int potionOfStrength;
+    static bool dewVial;
 
     static bool souNeeded();
     static bool soeNeeded();

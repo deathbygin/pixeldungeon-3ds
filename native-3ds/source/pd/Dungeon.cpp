@@ -36,6 +36,7 @@ std::unordered_map<int, std::vector<std::unique_ptr<Item>>> Dungeon::droppedItem
 int Dungeon::scrollsOfUpgrade = 0;
 int Dungeon::scrollsOfEnchantment = 0;
 int Dungeon::potionOfStrength = 0;
+bool Dungeon::dewVial = true;
 
 static bool s_gameEnded = false;
 
@@ -136,6 +137,7 @@ void Dungeon::init() {
     Potion::initColors();
     Scroll::initLabels();
     Wand::initWoods();
+    dewVial = true;
 }
 
 void Dungeon::announceLevelEntrance() {
@@ -187,6 +189,7 @@ void Dungeon::newGame() {
     scrollsOfUpgrade = 0;
     scrollsOfEnchantment = 0;
     potionOfStrength = 0;
+    dewVial = true;
     Potion::initColors();
     Scroll::initLabels();
     Wand::initWoods();

@@ -501,6 +501,12 @@ void RegularLevel::createItems() {
             addItemToSpawn(std::make_unique<Potion>(Potion::PotionType::STRENGTH));
             Dungeon::potionOfStrength++;
         }
+        if (Dungeon::dewVial && Dungeon::depth <= 4) {
+            if (Random::Int(4 - Dungeon::depth) == 0) {
+                addItemToSpawn(std::make_unique<DewVial>());
+                Dungeon::dewVial = false;
+            }
+        }
     }
 
     int nItems = 3;

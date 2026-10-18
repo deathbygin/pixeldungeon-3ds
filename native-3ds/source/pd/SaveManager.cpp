@@ -185,7 +185,7 @@ bool SaveManager::getSaveSummary(int& outDepth, int& outLevel, int& outHeroClass
         return false;
     }
 
-    if (magic != SAVE_MAGIC || (version != 6 && version != SAVE_VERSION)) {
+    if (magic != SAVE_MAGIC || (version != 6 && version != 7 && version != SAVE_VERSION)) {
         std::fclose(fp);
         return false;
     }
@@ -196,6 +196,10 @@ bool SaveManager::getSaveSummary(int& outDepth, int& outLevel, int& outHeroClass
     std::fread(&depth, sizeof(int32_t), 1, fp);
     std::fread(&gold, sizeof(int32_t), 1, fp);
     std::fread(&seed, sizeof(uint64_t), 1, fp);
+    if (version >= 8) {
+        uint8_t dVial = 0;
+        std::fread(&dVial, sizeof(uint8_t), 1, fp);
+    }
 
     if (version >= 3) {
         // Skip potion map (POTION_COUNT * (sizeof(int32_t) + sizeof(uint8_t)))
@@ -263,6 +267,8 @@ bool SaveManager::saveGame(const std::string& customPath) {
     std::fwrite(&depth, sizeof(int32_t), 1, fp);
     std::fwrite(&gold, sizeof(int32_t), 1, fp);
     std::fwrite(&seed, sizeof(uint64_t), 1, fp);
+    uint8_t dVial = Dungeon::dewVial ? 1 : 0;
+    std::fwrite(&dVial, sizeof(uint8_t), 1, fp);
 
     // Save Potion & Scroll mappings & known tables
     const auto& potMap = Potion::getColorMapping();
@@ -353,6 +359,9 @@ bool SaveManager::saveGame(const std::string& customPath) {
         }
 
         int32_t iLvl = it->level;
+        if (const DewVial* dv = const_cast<Item*>(it)->asDewVial()) {
+            iLvl = dv->volume;
+        }
         int32_t iQty = it->quantity;
         uint8_t identified = it->identified ? 1 : 0;
         uint8_t cursed = it->cursed ? 1 : 0;
@@ -472,6 +481,9 @@ bool SaveManager::saveGame(const std::string& customPath) {
             }
 
             int32_t iLvl = it->level;
+            if (const DewVial* dv = const_cast<Item*>(it.get())->asDewVial()) {
+                iLvl = dv->volume;
+            }
             int32_t iQty = it->quantity;
             uint8_t identified = it->identified ? 1 : 0;
             uint8_t cursed = it->cursed ? 1 : 0;
@@ -578,7 +590,7 @@ bool SaveManager::loadGame(const std::string& customPath) {
         return false;
     }
 
-    if (magic != SAVE_MAGIC || (version != 6 && version != SAVE_VERSION)) {
+    if (magic != SAVE_MAGIC || (version != 6 && version != 7 && version != SAVE_VERSION)) {
         std::fclose(fp);
         return false;
     }
@@ -594,6 +606,14 @@ bool SaveManager::loadGame(const std::string& customPath) {
     std::fread(&depth, sizeof(int32_t), 1, fp);
     std::fread(&gold, sizeof(int32_t), 1, fp);
     std::fread(&seed, sizeof(uint64_t), 1, fp);
+
+    if (version >= 8) {
+        uint8_t dVial = 1;
+        std::fread(&dVial, sizeof(uint8_t), 1, fp);
+        Dungeon::dewVial = (dVial != 0);
+    } else {
+        Dungeon::dewVial = true;
+    }
 
     Dungeon::depth = depth;
     Dungeon::gold = gold;
@@ -838,6 +858,8 @@ bool SaveManager::loadGame(const std::string& customPath) {
                 item = std::make_unique<Honeypot>();
             } else if (iName == "Bomb" || iName == "bomb") {
                 item = std::make_unique<Bomb>();
+            } else if (iName == "Dew Vial" || iName == "dew vial") {
+                item = std::make_unique<DewVial>();
             } else {
                 item = std::make_unique<Item>();
             }
@@ -858,6 +880,8 @@ bool SaveManager::loadGame(const std::string& customPath) {
             }
             if (Key* k = item->asKey()) {
                 k->depth = (iLvl > 0) ? iLvl : Dungeon::depth;
+            } else if (DewVial* dv = item->asDewVial()) {
+                dv->volume = std::clamp<int>(iLvl, 0, DewVial::MAX_VOLUME);
             }
             if (item->category() == ItemCategory::Potion) {
                 static_cast<Potion*>(item.get())->updatePerception();
@@ -893,6 +917,13 @@ bool SaveManager::loadGame(const std::string& customPath) {
             } else {
                 hero->belongings.backpack.push_back(std::move(item));
             }
+        }
+    }
+
+    for (const auto& bIt : hero->belongings.backpack) {
+        if (bIt && bIt->asDewVial()) {
+            Dungeon::dewVial = false;
+            break;
         }
     }
 
@@ -1062,6 +1093,8 @@ bool SaveManager::loadGame(const std::string& customPath) {
                         item = std::make_unique<Honeypot>();
                     } else if (iName == "Bomb" || iName == "bomb") {
                         item = std::make_unique<Bomb>();
+                    } else if (iName == "Dew Vial" || iName == "dew vial") {
+                        item = std::make_unique<DewVial>();
                     } else {
                         item = std::make_unique<Item>();
                     }
@@ -1082,6 +1115,8 @@ bool SaveManager::loadGame(const std::string& customPath) {
                     }
                     if (Key* k = item->asKey()) {
                         k->depth = (iLvl > 0) ? iLvl : Dungeon::depth;
+                    } else if (DewVial* dv = item->asDewVial()) {
+                        dv->volume = std::clamp<int>(iLvl, 0, DewVial::MAX_VOLUME);
                     }
                     if (item->category() == ItemCategory::Potion) {
                         static_cast<Potion*>(item.get())->updatePerception();

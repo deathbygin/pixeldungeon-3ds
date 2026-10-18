@@ -110,6 +110,7 @@ public:
     virtual ShortSword* asShortSword() { return nullptr; }
     virtual Ring* asRing() { return nullptr; }
     virtual DewVial* asDewVial() { return nullptr; }
+    virtual const DewVial* asDewVial() const { return nullptr; }
     virtual Potion* asPotion() { return nullptr; }
     virtual Scroll* asScroll() { return nullptr; }
     virtual class Key* asKey() { return nullptr; }
@@ -1012,6 +1013,7 @@ public:
 
     DewVial();
     DewVial* asDewVial() override { return this; }
+    const DewVial* asDewVial() const override { return this; }
     bool isStackable() const override { return false; }
     bool isUpgradable() const override { return false; }
     bool isIdentified() const override { return true; }
