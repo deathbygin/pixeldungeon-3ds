@@ -20,7 +20,7 @@ DISCLAIMER: AI was used in creating this port - mainly in translating Java funct
 
 ## ALPHA RELEASE
 
-The current release is in an Alpha state. There will likely be bugs and gameplay disparities. Crashes will happen. Please help resolve these quickly by reporting them in the Issues tab.
+The current release is in an Alpha state. There will likely be bugs and gameplay disparities. Crashes will happen. Please help resolve these quickly by reporting them in the Issues tab and attaching your Luma crash log if applicable.
 
 ---
 
@@ -39,7 +39,7 @@ The current release is in an Alpha state. There will likely be bugs and gameplay
 
 ---
 
-##Original Github Readme
+## Original Github Readme
 
 Traditional roguelike game with pixel-art graphics and simple interface.
 
