@@ -116,6 +116,9 @@ void Char::move(int step) {
 
     // Stepping into water immediately extinguishes Burning and washes away Ooze
     if (Dungeon::level && step >= 0 && step < Level::LENGTH && Dungeon::level->water[step] && !flying) {
+        FX::ripple(step);
+        FX::waterSplash(step, 4);
+
         if (buff(BuffType::Burning)) {
             removeBuff(BuffType::Burning);
             FX::waterSplash(step, 6);

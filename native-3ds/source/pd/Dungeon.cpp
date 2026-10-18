@@ -99,6 +99,21 @@ bool Dungeon::shopOnLevel(int d) {
     return d == 6 || d == 11 || d == 16 || d == 21;
 }
 
+uint32_t Dungeon::waterColor(int d) {
+    if (d <= 0) d = depth;
+    if (d <= 5) {
+        return 0x6B8E23FF; // Sewers (Depths 1-5): Murky sewer green / olive tint
+    } else if (d <= 10) {
+        return 0x5A7880FF; // Prison (Depths 6-10): Cold stagnant greyish cyan / blue
+    } else if (d <= 15) {
+        return 0x2A5078FF; // Caves (Depths 11-15): Dark subterranean turquoise
+    } else if (d <= 20) {
+        return 0x264875FF; // Dwarven Metropolis (Depths 16-20): Deep crystalline aquamarine / dark indigo
+    } else {
+        return 0x801500FF; // Demon Halls (Depths 21-25): Caustic crimson / dark blood tint
+    }
+}
+
 void Dungeon::dropToChasm(std::unique_ptr<Item> item) {
     if (!item) return;
     int nextDepth = depth + 1;

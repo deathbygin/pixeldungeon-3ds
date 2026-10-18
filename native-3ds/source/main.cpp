@@ -1032,7 +1032,9 @@ int main(int argc, char* argv[]) {
                             // Item was automatically picked up; pickUp() already triggered the authentic sound effect
                             // (SND_ITEM, SND_GOLD, or SND_DEWDROP). Suppress footstep so the pickup sound is crystal clear.
                         } else if (hero->pos == targetCell) {
-                            Sample::play((level && level->water[targetCell]) ? Assets::SND_WATER : Assets::SND_STEP, 0.8f, Random::Float(0.95f, 1.05f));
+                            if (!hero->flying) {
+                                Sample::play((level && level->water[targetCell]) ? Assets::SND_WATER : Assets::SND_STEP, 0.8f, Random::Float(0.95f, 1.05f));
+                            }
                         }
 
                         // Run continuous turn timeline scheduler

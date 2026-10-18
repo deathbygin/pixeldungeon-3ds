@@ -39,6 +39,7 @@ public:
 
     static bool bossLevel(int d = -1);
     static bool shopOnLevel(int d = -1);
+    static uint32_t waterColor(int d = -1);
 
     static std::string resultDescription;
     static void fail(const std::string& desc = "");

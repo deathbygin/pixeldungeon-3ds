@@ -1,5 +1,6 @@
 #include "pd/Ripple.h"
 #include "pd/Level.h"
+#include "pd/Dungeon.h"
 
 namespace pd {
 
@@ -24,6 +25,12 @@ void Ripple::reset(int cell) {
     sprite->alpha = 1.0f;
     sprite->z = 0.27f;
     sprite->visible = true;
+
+    uint32_t col = Dungeon::waterColor();
+    uint8_t r = static_cast<uint8_t>((col >> 24) & 0xFF);
+    uint8_t g = static_cast<uint8_t>((col >> 16) & 0xFF);
+    uint8_t b = static_cast<uint8_t>((col >> 8) & 0xFF);
+    sprite->tint = noosa::Color(r, g, b, 255);
 }
 
 void Ripple::update(float dt) {

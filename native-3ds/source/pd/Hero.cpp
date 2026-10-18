@@ -282,6 +282,10 @@ void Hero::swapWith(Mob* ally, Level* currentLevel) {
     if (!ally->flying) {
         currentLevel->press(heroPos, ally);
     }
+    if (currentLevel->water[heroPos] && !ally->flying) {
+        FX::ripple(heroPos);
+        FX::waterSplash(heroPos, 4);
+    }
 
     if (allyPos != heroPos) {
         enableAutoPick(heroPos);
@@ -327,7 +331,7 @@ void Hero::swapWith(Mob* ally, Level* currentLevel) {
         pd::Sign::read(allyPos);
     }
 
-    if (currentLevel->water[allyPos]) {
+    if (currentLevel->water[allyPos] && !flying) {
         FX::ripple(allyPos);
         FX::waterSplash(allyPos, 4);
     }
@@ -604,11 +608,6 @@ bool Hero::stepTo(int nextCell, Level* currentLevel) {
             pd::Sign::read(nextCell);
         }
 
-        if (currentLevel->water[nextCell]) {
-            FX::ripple(nextCell);
-            FX::waterSplash(nextCell, 4);
-        }
-
         // Stepping onto an item tile:
         // Automatically pick up items lying on the floor!
         Heap* heap = currentLevel->getHeap(nextCell);
@@ -824,7 +823,9 @@ bool Hero::search(Level* currentLevel, bool intentional) {
             if (heroSprite) heroSprite->operate(pos);
         }
         FX::floatingText(pos, "search", 0xFFFFFFFF);
-        FX::ripple(pos);
+        if (currentLevel->water[pos] && !flying) {
+            FX::ripple(pos);
+        }
     }
 
     int ax = std::max(0, cx - distance);

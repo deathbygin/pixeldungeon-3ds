@@ -453,7 +453,7 @@ void FX::blood(int cell, int count) {
 }
 
 void FX::waterSplash(int cell, int count) {
-    splash(cell, 0x55aaffFF, count);
+    splash(cell, Dungeon::waterColor(), count);
 }
 
 void FX::slash(int cell) {

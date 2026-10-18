@@ -178,6 +178,10 @@ void Item::onThrow(int cell) {
         }
 
         bool water = Dungeon::level->water[cell] || Dungeon::level->map[cell] == Terrain::WELL;
+        if (water) {
+            FX::ripple(cell);
+            FX::waterSplash(cell, 3);
+        }
         Sample::playAt(water ? Assets::SND_WATER : Assets::SND_STEP, cell, 0.8f, 1.2f);
 
         std::unique_ptr<Item> self(this);

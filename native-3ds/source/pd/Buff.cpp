@@ -170,7 +170,7 @@ bool Burning::act() {
     }
 
     // Stepping into water immediately extinguishes flame
-    if (Dungeon::level && Dungeon::level->water[target->pos]) {
+    if (Dungeon::level && Dungeon::level->water[target->pos] && !target->flying) {
         FX::waterSplash(target->pos, 6);
         detach();
         return true;
