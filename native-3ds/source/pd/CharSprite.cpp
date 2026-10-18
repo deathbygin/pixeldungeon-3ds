@@ -461,6 +461,22 @@ std::unique_ptr<CharSprite> CharSprite::createForMob(Mob* mob) {
             sprite->m_die = noosa::Animation(1.0f / 10.0f, { 0, 7, 8, 9 }, false);
             break;
 
+        case Mob::MobType::BurningFist:
+            sprite->init(Assets::BURNING_FIST, 24, 17);
+            sprite->m_idle = noosa::Animation(1.0f / 2.0f, { 0, 0, 1 }, true);
+            sprite->m_run = noosa::Animation(1.0f / 3.0f, { 0, 1 }, true);
+            sprite->m_attack = noosa::Animation(1.0f / 8.0f, { 0, 5, 6 }, false);
+            sprite->m_die = noosa::Animation(1.0f / 10.0f, { 0, 2, 3, 4 }, false);
+            break;
+
+        case Mob::MobType::RottingFist:
+            sprite->init(Assets::ROTTING_FIST, 24, 17);
+            sprite->m_idle = noosa::Animation(1.0f / 2.0f, { 0, 0, 1 }, true);
+            sprite->m_run = noosa::Animation(1.0f / 3.0f, { 0, 1 }, true);
+            sprite->m_attack = noosa::Animation(1.0f / 2.0f, { 0 }, false);
+            sprite->m_die = noosa::Animation(1.0f / 10.0f, { 0, 2, 3, 4 }, false);
+            break;
+
         case Mob::MobType::MirrorImage: {
             std::string texPath = Assets::WARRIOR;
             if (Dungeon::hero) {

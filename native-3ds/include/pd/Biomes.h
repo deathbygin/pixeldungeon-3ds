@@ -20,6 +20,8 @@ public:
 
 class SewerBossLevel : public RegularLevel {
 public:
+    int stairs = 0;
+
     SewerBossLevel();
     ~SewerBossLevel() override = default;
 
@@ -27,6 +29,9 @@ public:
     std::vector<bool> createWater() override;
     std::vector<bool> createGrass() override;
     void decorate() override;
+
+    void seal();
+    void unseal();
 };
 
 // =============================================================================

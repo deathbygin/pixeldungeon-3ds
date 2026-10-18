@@ -5,6 +5,9 @@
 #include "pd/Dungeon.h"
 #include "pd/Item.h"
 #include "pd/Graph.h"
+#include "pd/GLog.h"
+#include "pd/Assets.h"
+#include "pd/Sample.h"
 #include <cmath>
 #include <algorithm>
 #include <unordered_set>
@@ -80,6 +83,25 @@ std::vector<bool> SewerBossLevel::createGrass() {
     return Patch::generate(0.40f, 4);
 }
 
+void SewerBossLevel::seal() {
+    if (entrance != 0) {
+        set(entrance, Terrain::WATER_TILES);
+        stairs = entrance;
+        entrance = 0;
+        Sample::playAt(Assets::SND_WATER, stairs);
+        GLog::w("Murky water floods the entrance stairs behind you!");
+    }
+}
+
+void SewerBossLevel::unseal() {
+    if (stairs != 0) {
+        entrance = stairs;
+        stairs = 0;
+        set(entrance, Terrain::ENTRANCE);
+        GLog::p("The floodwaters recede, revealing the stairs!");
+    }
+}
+
 bool SewerBossLevel::build() {
     std::fill_n(map, LENGTH, feeling == Feeling::CHASM ? Terrain::CHASM : Terrain::WALL);
     std::fill_n(visited, LENGTH, false);
@@ -87,6 +109,7 @@ bool SewerBossLevel::build() {
     heaps.clear();
     plants.clear();
     secretDoors = 0;
+    stairs = 0;
 
     if (!initRooms()) return false;
 
@@ -97,31 +120,34 @@ bool SewerBossLevel::build() {
     do {
         int innerRetry = 0;
         do {
-            if (innerRetry++ > 15) return false;
+            if (innerRetry++ > 25) return false;
             roomEntrance = Random::element(rooms);
         } while (roomEntrance->width() < 4 || roomEntrance->height() < 4);
 
         innerRetry = 0;
         do {
-            if (innerRetry++ > 15) return false;
+            if (innerRetry++ > 25) return false;
             roomExit = Random::element(rooms);
         } while (roomExit == roomEntrance || roomExit->width() < 6 || roomExit->height() < 6 || roomExit->top == 0);
 
         Graph::buildDistanceMap(rooms, roomExit);
         distance = roomEntrance->distance;
 
-        if (retry++ > 15) return false;
-    } while (distance < minDistance);
+        if (retry++ > 25) return false;
+    } while (distance < minDistance || distance >= 1000000);
 
     roomEntrance->type = Room::Type::ENTRANCE;
     roomExit->type = Room::Type::BOSS_EXIT;
 
     Graph::buildDistanceMap(rooms, roomExit);
     auto path = Graph::buildPath(rooms, roomEntrance, roomExit);
+    if (path.empty()) return false;
+
     Graph::setPrice(path, roomEntrance->distance);
 
     Graph::buildDistanceMap(rooms, roomExit);
     path = Graph::buildPath(rooms, roomEntrance, roomExit);
+    if (path.empty()) return false;
 
     auto room = roomEntrance;
     for (const auto& next : path) {
@@ -129,11 +155,12 @@ bool SewerBossLevel::build() {
         room = next;
     }
 
-    if (!roomExit->connected.empty()) {
-        auto connectedRoom = roomExit->connected.begin()->first;
-        if (connectedRoom && roomExit->top == connectedRoom->bottom) {
-            return false;
-        }
+    if (roomExit->connected.empty()) {
+        return false;
+    }
+    auto connectedRoom = roomExit->connected.begin()->first;
+    if (connectedRoom && roomExit->top == connectedRoom->bottom) {
+        return false;
     }
 
     for (auto& r : rooms) {
@@ -285,29 +312,30 @@ bool PrisonBossLevel::build() {
     int retry = 0;
 
     do {
-        if (retry++ > 15) return false;
+        if (retry++ > 25) return false;
 
         int innerRetry = 0;
         do {
-            if (innerRetry++ > 15) return false;
+            if (innerRetry++ > 25) return false;
             roomEntrance = Random::element(rooms);
         } while (roomEntrance->width() < 4 || roomEntrance->height() < 4);
 
         innerRetry = 0;
         do {
-            if (innerRetry++ > 15) return false;
+            if (innerRetry++ > 25) return false;
             roomExit = Random::element(rooms);
         } while (roomExit == roomEntrance || roomExit->width() < 7 || roomExit->height() < 7 || roomExit->top == 0);
 
         Graph::buildDistanceMap(rooms, roomExit);
         auto p = Graph::buildPath(rooms, roomEntrance, roomExit);
         distance = static_cast<int>(p.size());
-    } while (distance < 3);
+    } while (distance < 3 || distance >= 1000000);
 
     roomEntrance->type = Room::Type::ENTRANCE;
     roomExit->type = Room::Type::BOSS_EXIT;
 
     auto path = Graph::buildPath(rooms, roomEntrance, roomExit);
+    if (path.size() < 2) return false;
     Graph::setPrice(path, roomEntrance->distance);
 
     Graph::buildDistanceMap(rooms, roomExit);
@@ -331,12 +359,13 @@ bool PrisonBossLevel::build() {
 
     paint();
 
-    if (!roomExit->connected.empty()) {
-        auto r = roomExit->connected.begin()->first;
-        auto d = roomExit->connected[r];
-        if (d && d->y == roomExit->top) {
-            return false;
-        }
+    if (roomExit->connected.empty()) {
+        return false;
+    }
+    auto r = roomExit->connected.begin()->first;
+    auto d = roomExit->connected[r];
+    if (!d || d->y == roomExit->top) {
+        return false;
     }
 
     paintWater();

@@ -62,6 +62,8 @@ public:
     inline static const std::string SUCCUBUS      = "romfs:/succubus.png";
     inline static const std::string SCORPIO       = "romfs:/scorpio.png";
     inline static const std::string YOG           = "romfs:/yog.png";
+    inline static const std::string BURNING_FIST  = "romfs:/burning_fist.png";
+    inline static const std::string ROTTING_FIST  = "romfs:/rotting_fist.png";
     inline static const std::string SHEEP         = "romfs:/sheep.png";
     inline static const std::string MIMIC         = "romfs:/mimic.png";
     inline static const std::string SHOPKEEPER    = "romfs:/shopkeeper.png";

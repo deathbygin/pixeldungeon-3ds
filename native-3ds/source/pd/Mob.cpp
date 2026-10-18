@@ -16,6 +16,7 @@
 #include "pd/Debug.h"
 #include "pd/Statistics.h"
 #include "pd/Heap.h"
+#include "pd/Biomes.h"
 #include "pd/ui/BottomScreenUI.h"
 #include "noosa/Audio.h"
 #include "noosa/Music.h"
@@ -1129,7 +1130,8 @@ Goo::Goo() {
     HT = 80;
     expAward = 10;
     baseSpeed = 1.0f;
-    state = State::WANDERING;
+    state = State::SLEEPING;
+    pumpedUp = false;
 }
 
 int Goo::damageRoll() {
@@ -1169,9 +1171,27 @@ bool Goo::act() {
     return Mob::act();
 }
 
+void Goo::notice() {
+    Mob::notice();
+    GLog::w("Goo yells: 'GLURP-GLURP!'");
+}
+
+void Goo::move(int step) {
+    if (Dungeon::depth == 5 && Dungeon::level) {
+        auto* sbl = static_cast<SewerBossLevel*>(Dungeon::level.get());
+        sbl->seal();
+    }
+    Mob::move(step);
+}
+
 void Goo::aiStep(Hero* hero, Level* currentLevel) {
     if (!hero || !hero->isAlive() || !currentLevel) {
         spend(TICK);
+        return;
+    }
+
+    if (state == State::SLEEPING) {
+        Mob::aiStep(hero, currentLevel);
         return;
     }
 
@@ -1207,9 +1227,15 @@ void Goo::aiStep(Hero* hero, Level* currentLevel) {
 
 void Goo::die(Actor* src) {
     GLog::h("The black ooze disperses! Goo has been defeated!");
+    GLog::i("Goo yells: 'glurp... glurp...'");
     Badges::validateBossSlain(1);
     Sample::play(Assets::SND_BOSS);
     noosa::Music::play(Assets::TUNE, true);
+
+    if (Dungeon::depth == 5 && Dungeon::level) {
+        auto* sbl = static_cast<SewerBossLevel*>(Dungeon::level.get());
+        sbl->unseal();
+    }
 
     if (Dungeon::level) {
         int dropCell = getSafeDropCell(Dungeon::level.get(), pos);
@@ -1508,12 +1534,131 @@ void Yog::die(Actor* src) {
     Sample::play(Assets::SND_BOSS);
     noosa::Music::play(Assets::HAPPY, true);
 
+    for (auto& m : Dungeon::mobs) {
+        if (m && m.get() != this && (m->mobType() == MobType::RottingFist || m->mobType() == MobType::BurningFist)) {
+            m->HP = 0;
+            m->die(src);
+        }
+    }
+
     if (Dungeon::level) {
         int dropCell = getSafeDropCell(Dungeon::level.get(), pos);
         Dungeon::level->drop(std::make_unique<Amulet>(), dropCell);
         Dungeon::level->drop(std::make_unique<SkeletonKey>(25), dropCell);
     }
 
+    Mob::die(src);
+}
+
+// Rotting Fist Minion
+RottingFist::RottingFist() {
+    name = "rotting fist";
+    HP = 300;
+    HT = 300;
+    expAward = 0;
+    baseSpeed = 1.0f;
+    state = State::WANDERING;
+}
+
+std::string RottingFist::description() const {
+    return "A massive fist made of dark, rotting flesh and writhing tentacles.";
+}
+
+int RottingFist::damageRoll() {
+    return Random::NormalIntRange(24, 36);
+}
+
+int RottingFist::attackSkill(Char* target) {
+    (void)target;
+    return 36;
+}
+
+int RottingFist::dr() {
+    return 15;
+}
+
+int RottingFist::attackProc(Char* enemy, int damage) {
+    if (Random::Int(3) == 0 && enemy) {
+        enemy->affect<Ooze>();
+        FX::burst(enemy->pos, 0x000000FFu, 5);
+        if (enemy == Dungeon::hero.get()) {
+            GLog::w("The rotting fist covers you with caustic ooze!");
+        }
+    }
+    return damage;
+}
+
+bool RottingFist::act() {
+    if (Dungeon::level && Dungeon::level->get(pos) == Terrain::WATER && HP < HT) {
+        HP = std::min(HT, HP + 4);
+        FX::floatingText(pos, "+4", 0x38b764FF);
+    }
+    return Mob::act();
+}
+
+void RottingFist::die(Actor* src) {
+    GLog::w("The rotting fist dissolves into sludge!");
+    for (auto& m : Dungeon::mobs) {
+        if (m && m->mobType() == MobType::Yog) {
+            static_cast<Yog*>(m.get())->fistsAlive = std::max(0, static_cast<Yog*>(m.get())->fistsAlive - 1);
+        }
+    }
+    Mob::die(src);
+}
+
+// Burning Fist Minion
+BurningFist::BurningFist() {
+    name = "burning fist";
+    HP = 200;
+    HT = 200;
+    expAward = 0;
+    baseSpeed = 1.0f;
+    state = State::WANDERING;
+}
+
+std::string BurningFist::description() const {
+    return "A giant fist engulfed in searing magical flames.";
+}
+
+int BurningFist::damageRoll() {
+    return Random::NormalIntRange(20, 32);
+}
+
+int BurningFist::attackSkill(Char* target) {
+    (void)target;
+    return 36;
+}
+
+int BurningFist::dr() {
+    return 15;
+}
+
+void BurningFist::aiStep(Hero* hero, Level* currentLevel) {
+    if (!hero || !hero->isAlive() || !currentLevel) {
+        spend(TICK);
+        return;
+    }
+
+    enemy = hero;
+    if (Ballistica::cast(pos, hero->pos, false, true) == hero->pos) {
+        attack(hero);
+        if (Random::Int(2) == 0) {
+            hero->affect<Burning>();
+        }
+        spend(TICK / speed());
+        return;
+    }
+
+    Mob::aiStep(hero, currentLevel);
+}
+
+void BurningFist::die(Actor* src) {
+    GLog::w("The burning fist is extinguished!");
+    for (auto& m : Dungeon::mobs) {
+        if (m && m->mobType() == MobType::Yog) {
+            static_cast<Yog*>(m.get())->fistsAlive = std::max(0, static_cast<Yog*>(m.get())->fistsAlive - 1);
+        }
+    }
     Mob::die(src);
 }
 

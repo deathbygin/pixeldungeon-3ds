@@ -44,6 +44,8 @@ public:
         DM300,
         King,
         Yog,
+        BurningFist,
+        RottingFist,
         MirrorImage,
         Sheep,
         Mimic,
@@ -68,7 +70,9 @@ public:
     virtual MobType mobType() const { return MobType::Rat; }
     virtual bool isBoss() const {
         MobType t = mobType();
-        return t == MobType::Goo || t == MobType::Tengu || t == MobType::DM300 || t == MobType::King || t == MobType::Yog;
+        return t == MobType::Goo || t == MobType::Tengu || t == MobType::DM300 ||
+               t == MobType::King || t == MobType::Yog ||
+               t == MobType::BurningFist || t == MobType::RottingFist;
     }
     virtual std::string description() const;
     std::string status() const;
@@ -86,7 +90,7 @@ public:
     virtual bool getFurther(int target);
     virtual void nowhereToRun();
 
-    void notice();
+    virtual void notice();
     void beckon(int cell);
     void yell(const std::string& str);
 
@@ -336,6 +340,8 @@ public:
     int attackProc(Char* enemy, int damage) override;
     bool act() override;
     void aiStep(Hero* hero, Level* currentLevel) override;
+    void move(int step) override;
+    void notice() override;
     void die(Actor* src) override;
 };
 
@@ -394,6 +400,31 @@ public:
     int defenseSkill(Char* attacker) override;
     int dr() override;
     void damage(int dmg, Actor* src) override;
+    void aiStep(Hero* hero, Level* currentLevel) override;
+    void die(Actor* src) override;
+};
+
+class RottingFist : public Mob {
+public:
+    RottingFist();
+    MobType mobType() const override { return MobType::RottingFist; }
+    std::string description() const override;
+    int damageRoll() override;
+    int attackSkill(Char* target) override;
+    int dr() override;
+    int attackProc(Char* enemy, int damage) override;
+    bool act() override;
+    void die(Actor* src) override;
+};
+
+class BurningFist : public Mob {
+public:
+    BurningFist();
+    MobType mobType() const override { return MobType::BurningFist; }
+    std::string description() const override;
+    int damageRoll() override;
+    int attackSkill(Char* target) override;
+    int dr() override;
     void aiStep(Hero* hero, Level* currentLevel) override;
     void die(Actor* src) override;
 };

@@ -11,6 +11,7 @@
 #include "pd/FX.h"
 #include "pd/Statistics.h"
 #include "pd/Rankings.h"
+#include "pd/Biomes.h"
 
 namespace pd {
 
@@ -212,7 +213,7 @@ void Dungeon::resetLevel() {
     level = Level::create(depth);
     int tries = 0;
     while (!level->build()) {
-        if (++tries > 20) break;
+        if (++tries > 500) break;
     }
 
     fog = std::make_unique<FogOfWar>(Level::WIDTH, Level::HEIGHT);
@@ -293,7 +294,7 @@ void Dungeon::switchLevel(int newDepth, bool isFall) {
         level = Level::create(depth);
         int tries = 0;
         while (!level->build()) {
-            if (++tries > 20) break;
+            if (++tries > 500) break;
         }
         mobs.clear();
 
@@ -361,20 +362,46 @@ void Dungeon::spawnMobs(int count) {
     if (!level) return;
 
     if (depth == 5) {
-        // Boss floor: Goo
+        // Boss floor: Goo placed in the boss arena (roomExit)
         int cell = -1;
-        for (int attempts = 0; attempts < 100; ++attempts) {
-            int candidate = Random::Int(Level::LENGTH);
-            if (level->isPassable(candidate) && Actor::findChar(candidate) == nullptr) {
-                if (!hero || PathFinder::distanceChebyshev(candidate, hero->pos) >= 5) {
-                    cell = candidate;
-                    break;
+        if (auto* sbl = static_cast<SewerBossLevel*>(level.get())) {
+            if (sbl->roomExit) {
+                std::vector<int> waterCandidates;
+                std::vector<int> openCandidates;
+                for (int y = sbl->roomExit->top + 1; y < sbl->roomExit->bottom; ++y) {
+                    for (int x = sbl->roomExit->left + 1; x < sbl->roomExit->right; ++x) {
+                        int c = y * Level::WIDTH + x;
+                        if (level->isPassable(c) && Actor::findChar(c) == nullptr) {
+                            if (level->water[c]) {
+                                waterCandidates.push_back(c);
+                            } else {
+                                openCandidates.push_back(c);
+                            }
+                        }
+                    }
+                }
+                if (!waterCandidates.empty()) {
+                    cell = Random::element(waterCandidates);
+                } else if (!openCandidates.empty()) {
+                    cell = Random::element(openCandidates);
+                }
+            }
+        }
+        if (cell == -1) {
+            for (int attempts = 0; attempts < 100; ++attempts) {
+                int candidate = Random::Int(Level::LENGTH);
+                if (level->isPassable(candidate) && Actor::findChar(candidate) == nullptr) {
+                    if (!hero || PathFinder::distanceChebyshev(candidate, hero->pos) >= 5) {
+                        cell = candidate;
+                        break;
+                    }
                 }
             }
         }
         if (cell != -1) {
             auto goo = std::make_unique<Goo>();
             goo->place(cell);
+            goo->state = Mob::State::SLEEPING;
             Actor::occupyCell(goo.get());
             Actor::add(goo.get(), 1.0f);
             mobs.push_back(std::move(goo));
@@ -383,20 +410,39 @@ void Dungeon::spawnMobs(int count) {
     }
 
     if (depth == 10) {
-        // Boss floor: Tengu
+        // Boss floor: Tengu in prison arena (roomExit)
         int cell = -1;
-        for (int attempts = 0; attempts < 100; ++attempts) {
-            int candidate = Random::Int(Level::LENGTH);
-            if (level->isPassable(candidate) && Actor::findChar(candidate) == nullptr) {
-                if (!hero || PathFinder::distanceChebyshev(candidate, hero->pos) >= 5) {
-                    cell = candidate;
-                    break;
+        if (auto* pbl = static_cast<PrisonBossLevel*>(level.get())) {
+            if (pbl->roomExit) {
+                std::vector<int> candidates;
+                for (int y = pbl->roomExit->top + 1; y < pbl->roomExit->bottom; ++y) {
+                    for (int x = pbl->roomExit->left + 1; x < pbl->roomExit->right; ++x) {
+                        int c = y * Level::WIDTH + x;
+                        if (level->isPassable(c) && Actor::findChar(c) == nullptr) {
+                            candidates.push_back(c);
+                        }
+                    }
+                }
+                if (!candidates.empty()) {
+                    cell = Random::element(candidates);
+                }
+            }
+        }
+        if (cell == -1) {
+            for (int attempts = 0; attempts < 100; ++attempts) {
+                int candidate = Random::Int(Level::LENGTH);
+                if (level->isPassable(candidate) && Actor::findChar(candidate) == nullptr) {
+                    if (!hero || PathFinder::distanceChebyshev(candidate, hero->pos) >= 5) {
+                        cell = candidate;
+                        break;
+                    }
                 }
             }
         }
         if (cell != -1) {
             auto tengu = std::make_unique<Tengu>();
             tengu->place(cell);
+            tengu->state = Mob::State::SLEEPING;
             Actor::occupyCell(tengu.get());
             Actor::add(tengu.get(), 1.0f);
             mobs.push_back(std::move(tengu));
@@ -405,12 +451,24 @@ void Dungeon::spawnMobs(int count) {
     }
 
     if (depth == 15) {
-        // Boss floor: DM-300
+        // Boss floor: DM-300 in outer cavern away from central room
         int cell = -1;
-        for (int attempts = 0; attempts < 100; ++attempts) {
+        for (int attempts = 0; attempts < 200; ++attempts) {
             int candidate = Random::Int(Level::LENGTH);
-            if (level->isPassable(candidate) && Actor::findChar(candidate) == nullptr) {
-                if (!hero || PathFinder::distanceChebyshev(candidate, hero->pos) >= 5) {
+            int cx = candidate % Level::WIDTH;
+            int cy = candidate / Level::WIDTH;
+            if (cx < Level::WIDTH / 2 - 3 || cx > Level::WIDTH / 2 + 3 ||
+                cy < Level::HEIGHT / 2 - 3 || cy > Level::HEIGHT / 2 + 3) {
+                if (level->isPassable(candidate) && Actor::findChar(candidate) == nullptr) {
+                    cell = candidate;
+                    break;
+                }
+            }
+        }
+        if (cell == -1) {
+            for (int attempts = 0; attempts < 100; ++attempts) {
+                int candidate = Random::Int(Level::LENGTH);
+                if (level->isPassable(candidate) && Actor::findChar(candidate) == nullptr) {
                     cell = candidate;
                     break;
                 }
@@ -419,6 +477,7 @@ void Dungeon::spawnMobs(int count) {
         if (cell != -1) {
             auto dm = std::make_unique<DM300>();
             dm->place(cell);
+            dm->state = Mob::State::SLEEPING;
             Actor::occupyCell(dm.get());
             Actor::add(dm.get(), 1.0f);
             mobs.push_back(std::move(dm));
@@ -427,20 +486,34 @@ void Dungeon::spawnMobs(int count) {
     }
 
     if (depth == 20) {
-        // Boss floor: King of Dwarves
+        // Boss floor: King of Dwarves near throne pedestals
         int cell = -1;
-        for (int attempts = 0; attempts < 100; ++attempts) {
-            int candidate = Random::Int(Level::LENGTH);
-            if (level->isPassable(candidate) && Actor::findChar(candidate) == nullptr) {
-                if (!hero || PathFinder::distanceChebyshev(candidate, hero->pos) >= 5) {
-                    cell = candidate;
-                    break;
+        const int TOP = 2;
+        const int HALL_WIDTH = 7;
+        const int HALL_HEIGHT = 15;
+        const int LEFT = (Level::WIDTH - HALL_WIDTH) / 2;
+        const int CENTER = LEFT + HALL_WIDTH / 2;
+        int throneCell = (TOP + 2) * Level::WIDTH + CENTER;
+        if (level->isPassable(throneCell) && Actor::findChar(throneCell) == nullptr) {
+            cell = throneCell;
+        } else {
+            std::vector<int> hallCells;
+            for (int y = TOP + 1; y < TOP + HALL_HEIGHT / 2; ++y) {
+                for (int x = LEFT + 1; x < LEFT + HALL_WIDTH - 1; ++x) {
+                    int c = y * Level::WIDTH + x;
+                    if (level->isPassable(c) && Actor::findChar(c) == nullptr) {
+                        hallCells.push_back(c);
+                    }
                 }
+            }
+            if (!hallCells.empty()) {
+                cell = Random::element(hallCells);
             }
         }
         if (cell != -1) {
             auto king = std::make_unique<King>();
             king->place(cell);
+            king->state = Mob::State::SLEEPING;
             Actor::occupyCell(king.get());
             Actor::add(king.get(), 1.0f);
             mobs.push_back(std::move(king));
@@ -449,12 +522,35 @@ void Dungeon::spawnMobs(int count) {
     }
 
     if (depth == 25) {
-        // Boss floor: Yog-Dzewa
+        // Boss floor: Yog-Dzewa + Fists
         int cell = -1;
-        for (int attempts = 0; attempts < 100; ++attempts) {
+        const int ROOM_LEFT   = Level::WIDTH / 2 - 1;
+        const int ROOM_RIGHT  = Level::WIDTH / 2 + 1;
+        const int ROOM_TOP    = Level::HEIGHT / 2 - 1;
+        const int ROOM_BOTTOM = Level::HEIGHT / 2 + 1;
+        for (int attempts = 0; attempts < 200; ++attempts) {
             int candidate = Random::Int(Level::LENGTH);
-            if (level->isPassable(candidate) && Actor::findChar(candidate) == nullptr) {
-                if (!hero || PathFinder::distanceChebyshev(candidate, hero->pos) >= 5) {
+            int cx = candidate % Level::WIDTH;
+            int cy = candidate / Level::WIDTH;
+            if (cx < ROOM_LEFT - 2 || cx > ROOM_RIGHT + 2 ||
+                cy < ROOM_TOP - 2 || cy > ROOM_BOTTOM + 2) {
+                if (level->isPassable(candidate) && Actor::findChar(candidate) == nullptr) {
+                    int freeNeighbors = 0;
+                    for (int n : PathFinder::NEIGHBOURS8) {
+                        int nc = candidate + n;
+                        if (nc >= 0 && nc < Level::LENGTH && level->isPassable(nc)) freeNeighbors++;
+                    }
+                    if (freeNeighbors >= 2) {
+                        cell = candidate;
+                        break;
+                    }
+                }
+            }
+        }
+        if (cell == -1) {
+            for (int attempts = 0; attempts < 100; ++attempts) {
+                int candidate = Random::Int(Level::LENGTH);
+                if (level->isPassable(candidate) && Actor::findChar(candidate) == nullptr) {
                     cell = candidate;
                     break;
                 }
@@ -463,11 +559,39 @@ void Dungeon::spawnMobs(int count) {
         if (cell != -1) {
             auto yog = std::make_unique<Yog>();
             yog->place(cell);
+            yog->state = Mob::State::PASSIVE;
             Actor::occupyCell(yog.get());
             Actor::add(yog.get(), 1.0f);
             mobs.push_back(std::move(yog));
+
+            std::vector<int> neighbors;
+            for (int n : PathFinder::NEIGHBOURS8) {
+                int nc = cell + n;
+                if (nc >= 0 && nc < Level::LENGTH && level->isPassable(nc) && Actor::findChar(nc) == nullptr) {
+                    neighbors.push_back(nc);
+                }
+            }
+            if (neighbors.size() >= 2) {
+                auto rf = std::make_unique<RottingFist>();
+                rf->place(neighbors[0]);
+                rf->state = Mob::State::WANDERING;
+                Actor::occupyCell(rf.get());
+                Actor::add(rf.get(), 1.0f);
+                mobs.push_back(std::move(rf));
+
+                auto bf = std::make_unique<BurningFist>();
+                bf->place(neighbors[1]);
+                bf->state = Mob::State::WANDERING;
+                Actor::occupyCell(bf.get());
+                Actor::add(bf.get(), 1.0f);
+                mobs.push_back(std::move(bf));
+            }
         }
         return;
+    }
+
+    if (depth >= 26) {
+        return; // Amulet chamber - no mobs
     }
 
     int mobCount = count;
