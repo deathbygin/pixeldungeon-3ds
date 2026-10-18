@@ -11,7 +11,7 @@ DISCLAIMER: AI was used in creating this port - mainly in translating Java funct
 <p align="center">
   <img src="screenshots/title-screen.png" width="280" alt="Pixel Dungeon 3DS title screen">
   <img src="screenshots/gameplay.png" width="280" alt="Pixel Dungeon 3DS gameplay">
-  <img src="screenshots/pixeldungeon-3ds-qr-alt.png" width="200" alt="Pixel Dungeon 3DS QR code">
+  <img src="screenshots/pixeldungeon-3ds-qr-alt.jpg" width="200" alt="Pixel Dungeon 3DS QR code">
 </p>
 
 ---
