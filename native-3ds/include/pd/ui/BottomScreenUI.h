@@ -13,6 +13,7 @@
 #include "pd/windows/WndSettings.h"
 #include "pd/windows/WndDebugMenu.h"
 #include "pd/windows/WndItemSpawner.h"
+#include "pd/windows/WndChooseSubclass.h"
 #include "pd/ui/WndOptions.h"
 #include "pd/ui/WndMessage.h"
 
@@ -21,6 +22,7 @@ class Hero;
 class Level;
 class Item;
 class Heap;
+class TomeOfMastery;
 }
 
 #include "pd/LevelTransition.h"
@@ -75,7 +77,8 @@ public:
         return m_wndOptions.isOpen() || m_wndMessage.isOpen() ||
                m_wndBag.isOpen || m_wndHero.isOpen() ||
                m_wndGame.isOpen() || m_wndSettings.isOpen() ||
-               m_wndDebugMenu.isOpen() || m_wndItemSpawner.isOpen();
+               m_wndDebugMenu.isOpen() || m_wndItemSpawner.isOpen() ||
+               m_wndChooseSubclass.isOpen();
     }
 
     pd::windows::GameAction getPendingGameAction() const { return m_pendingGameAction; }
@@ -94,6 +97,7 @@ public:
     void showTradeItem(pd::Heap* heap);
     void showSellDialog(pd::Item* item);
     void openSellSelection();
+    void showChooseSubclass(pd::TomeOfMastery* tome);
     void inspectCell(int cell, pd::Level* level);
 
     // Top-Screen Examine mode
@@ -126,6 +130,7 @@ private:
     pd::windows::WndSettings m_wndSettings;
     pd::windows::WndDebugMenu m_wndDebugMenu;
     pd::windows::WndItemSpawner m_wndItemSpawner;
+    pd::windows::WndChooseSubclass m_wndChooseSubclass;
     WndOptions m_wndOptions;
     WndMessage m_wndMessage;
     pd::windows::GameAction m_pendingGameAction = pd::windows::GameAction::NONE;

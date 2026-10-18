@@ -94,6 +94,7 @@ void BottomScreenUI::reset() {
     m_wndSettings.hide();
     m_wndOptions.hide();
     m_wndMessage.hide();
+    m_wndChooseSubclass.hide();
     m_pendingGameAction = pd::windows::GameAction::NONE;
     m_pendingTransition = LevelTransition::NONE;
     m_isInspecting = false;
@@ -424,6 +425,12 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
         if (!m_wndItemSpawner.isOpen()) {
             m_wndDebugMenu.show(); // Return to Debug Menu
         }
+        return false;
+    }
+
+    // Modal Subclass Selection (WndChooseSubclass)
+    if (m_wndChooseSubclass.isOpen()) {
+        m_wndChooseSubclass.update(m_touch, kDown);
         return false;
     }
 
@@ -1290,6 +1297,17 @@ void BottomScreenUI::draw(const pd::Hero* hero, int depth, C2D_TextBuf textBuf) 
     if (m_wndItemSpawner.isOpen()) {
         m_wndItemSpawner.draw(textBuf, 0.88f);
     }
+
+    // 14. Modal Subclass Selection (WndChooseSubclass)
+    if (m_wndChooseSubclass.isOpen()) {
+        m_wndChooseSubclass.draw(textBuf);
+    }
+}
+
+void BottomScreenUI::showChooseSubclass(pd::TomeOfMastery* tome) {
+    if (m_wndBag.isOpen) m_wndBag.close();
+    if (m_wndHero.isOpen()) m_wndHero.hide();
+    m_wndChooseSubclass.show(tome, Dungeon::hero.get());
 }
 
 void BottomScreenUI::openDebugMenu() {

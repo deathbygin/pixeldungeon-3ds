@@ -919,6 +919,7 @@ public:
     std::string info() const override;
     std::string displayName() const override;
     std::unique_ptr<Item> clone(int qty = 1) const override;
+    void onCollect(Hero* hero) override;
 
     void choose(Hero* hero, HeroSubClass way);
 };

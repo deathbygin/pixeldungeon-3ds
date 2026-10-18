@@ -4412,35 +4412,19 @@ std::vector<std::string> TomeOfMastery::actions(Hero* hero) {
 bool TomeOfMastery::execute(Hero* hero, const std::string& action) {
     if (!hero) return false;
     if (action == "READ") {
-        if (hero->buff(BuffType::Paralysis)) {
-            GLog::w("You can't read while paralyzed!");
+        if (hero->buff(BuffType::Blindness)) {
+            GLog::w("You can't read while blinded!");
             return false;
         }
-        HeroSubClass sc1 = HeroSubClass::None;
-        HeroSubClass sc2 = HeroSubClass::None;
-        switch (hero->heroClass) {
-            case Hero::HeroClass::Warrior:
-                sc1 = HeroSubClass::Gladiator;
-                sc2 = HeroSubClass::Berserker;
-                break;
-            case Hero::HeroClass::Mage:
-                sc1 = HeroSubClass::Battlemage;
-                sc2 = HeroSubClass::Warlock;
-                break;
-            case Hero::HeroClass::Rogue:
-                sc1 = HeroSubClass::Assassin;
-                sc2 = HeroSubClass::Freerunner;
-                break;
-            case Hero::HeroClass::Huntress:
-                sc1 = HeroSubClass::Sniper;
-                sc2 = HeroSubClass::Warden;
-                break;
-        }
-
-        choose(hero, (hero->subClass == sc1) ? sc2 : sc1);
-        return true;
+        ui::BottomScreenUI::instance()->showChooseSubclass(this);
+        return false;
     }
     return Item::execute(hero, action);
+}
+
+void TomeOfMastery::onCollect(Hero* hero) {
+    (void)hero;
+    Badges::validateMastery();
 }
 
 void TomeOfMastery::choose(Hero* hero, HeroSubClass way) {

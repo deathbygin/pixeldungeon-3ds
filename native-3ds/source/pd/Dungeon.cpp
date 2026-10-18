@@ -550,10 +550,6 @@ void Dungeon::observe() {
     level->updateFieldOfView(hero->pos, hero->viewDistance);
     std::copy_n(level->fieldOfView, Level::LENGTH, visible);
 
-    if (fog) {
-        fog->updateVisibility(visible, level->visited, level->mapped);
-    }
-
     bool mindVision = hero->buff(BuffType::MindVision) != nullptr;
 
     for (auto& mob : mobs) {
@@ -563,16 +559,22 @@ void Dungeon::observe() {
             if (hero->heroClass == Hero::HeroClass::Huntress && mob->isAlive()) {
                 if (PathFinder::distanceChebyshev(hero->pos, mob->pos) <= 2) {
                     isVis = true;
+                    visible[mob->pos] = true;
                 }
             }
             if (mindVision && mob->isAlive()) {
                 isVis = true;
+                visible[mob->pos] = true;
             }
             mob->spriteVisible = isVis;
             if (!wasVisible && mob->spriteVisible && hero->restoreHealth) {
                 hero->interrupt();
             }
         }
+    }
+
+    if (fog) {
+        fog->updateVisibility(visible, level->visited, level->mapped);
     }
 }
 

@@ -122,15 +122,18 @@ void Hero::initClass(HeroClass cl) {
             dagger->identify();
             belongings.equip(std::move(dagger));
 
+            auto ring = std::make_unique<Ring>(Ring::Gem::ONYX, "Shadows");
+            ring->upgrade();
+            ring->identify();
+            belongings.ring1Slot = std::move(ring);
+            belongings.equippedRing1 = belongings.ring1Slot.get();
+
             auto darts = std::make_unique<Dart>(8);
             darts->identify();
             belongings.collect(std::move(darts));
 
             // Magic mapping scroll identified
             Scroll::setKnown(Scroll::ScrollType::MAGIC_MAPPING);
-
-            // Ring of Shadows bonus passive
-            affect<Shadows>();
             break;
         }
         case HeroClass::Huntress: {
@@ -147,6 +150,17 @@ void Hero::initClass(HeroClass cl) {
             belongings.collect(std::move(boomerang));
             break;
         }
+    }
+
+    Badges::Badge masteryBadge = Badges::Badge::COUNT;
+    switch (cl) {
+        case HeroClass::Warrior:  masteryBadge = Badges::Badge::MASTERY_WARRIOR; break;
+        case HeroClass::Mage:     masteryBadge = Badges::Badge::MASTERY_MAGE; break;
+        case HeroClass::Rogue:    masteryBadge = Badges::Badge::MASTERY_ROGUE; break;
+        case HeroClass::Huntress: masteryBadge = Badges::Badge::MASTERY_HUNTRESS; break;
+    }
+    if (masteryBadge != Badges::Badge::COUNT && Badges::isUnlocked(masteryBadge)) {
+        belongings.collect(std::make_unique<TomeOfMastery>());
     }
 
     updateAwareness();
@@ -929,6 +943,12 @@ int Hero::stealth() const {
     if (heroClass == HeroClass::Rogue) {
         s += 1;
     }
+    if (belongings.equippedRing1 && belongings.equippedRing1->asRing() && belongings.equippedRing1->asRing()->effect == "Shadows") {
+        s += belongings.equippedRing1->level;
+    }
+    if (belongings.equippedRing2 && belongings.equippedRing2->asRing() && belongings.equippedRing2->asRing()->effect == "Shadows") {
+        s += belongings.equippedRing2->level;
+    }
     if (invisible > 0) {
         s += 5;
     }
@@ -956,7 +976,14 @@ int Hero::attackProc(Char* enemy, int damage) {
             Wand* wand = belongings.equippedWeapon->asWand();
             if (wand) {
                 if (wand->curCharges >= wand->maxCharges) {
-                    // Maximum charges
+                    wand->onZap(enemy->pos);
+                    if (wand->curCharges > 0) {
+                        wand->curCharges--;
+                    }
+                    if (!wand->isIdentified() && --wand->usagesToKnow <= 0) {
+                        wand->identify();
+                        wand->notifyIdentified(this);
+                    }
                 } else if (damage > 0) {
                     wand->restoreCharge(1);
                     GLog::i("Your wand absorbs kinetic essence and regains a charge!");
