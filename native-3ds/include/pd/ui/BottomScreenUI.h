@@ -115,7 +115,7 @@ public:
     Item* getTargetItem() const { return m_targetItem; }
 
     static void setLastTarget(Char* target);
-    Char* getLastTarget() const { return m_lastTarget; }
+    static Char* getLastTarget();
 
     const TouchController& getTouchController() const { return m_touch; }
 

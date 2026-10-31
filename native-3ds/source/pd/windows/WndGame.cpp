@@ -29,7 +29,6 @@ void WndGame::show() {
         items = {
             { "Return to Game",     GameAction::RESUME },
             { "Rankings",           GameAction::RANKINGS },
-            { "Start New Game",     GameAction::START_NEW_GAME },
             { "Settings",           GameAction::SETTINGS },
             { "Main Menu",          GameAction::MAIN_MENU }
         };

@@ -329,15 +329,7 @@ bool Mob::act() {
 }
 
 int Mob::defenseProc(Char* enemyChar, int damage) {
-    if (!enemySeen && enemyChar == Dungeon::hero.get()) {
-        Hero* hero = Dungeon::hero.get();
-        if (hero && hero->subClass == HeroSubClass::Assassin) {
-            damage += Random::IntRange(1, damage);
-            FX::slash(pos);
-            FX::blood(pos, 10);
-            GLog::p("Surprise attack! Critical strike!");
-        }
-    }
+    (void)enemyChar;
     return damage;
 }
 

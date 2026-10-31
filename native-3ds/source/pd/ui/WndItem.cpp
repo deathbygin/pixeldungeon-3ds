@@ -44,6 +44,16 @@ void WndItem::show(pd::Item* item, pd::Hero* hero, bool allowActions) {
         m_actions.push_back("CLOSE");
     }
 
+    // Default cursor selection to defaultAction (e.g. "DRINK", "EAT", "READ") if available
+    if (!m_item->defaultAction.empty()) {
+        for (size_t i = 0; i < m_actions.size(); ++i) {
+            if (m_actions[i] == m_item->defaultAction) {
+                m_selectedAction = static_cast<int>(i);
+                break;
+            }
+        }
+    }
+
     calculateLayout(hero);
 }
 
@@ -180,30 +190,83 @@ bool WndItem::update(pd::Hero* hero, const TouchController& touch, u32 kDown, u3
         }
     }
 
-    // 3. D-Pad button selection and edge scrolling
+    // 3. D-Pad / Circle Pad button selection
     if (!m_actions.empty()) {
+        int prevSelected = m_selectedAction;
         int numActions = static_cast<int>(m_actions.size());
-        if (kDown & KEY_DLEFT) {
-            if (m_selectedAction % m_btnCols > 0) m_selectedAction--;
-        }
-        if (kDown & KEY_DRIGHT) {
-            if (m_selectedAction % m_btnCols < m_btnCols - 1 && m_selectedAction + 1 < numActions) {
+        int curCol = m_selectedAction % m_btnCols;
+        int curRow = m_selectedAction / m_btnCols;
+        int numRows = (numActions + m_btnCols - 1) / m_btnCols;
+
+        // When scrollable, Circle Pad vertical movement is dedicated to analog text scrolling,
+        // so vertical navigation is handled exclusively by D-Pad to prevent accidental jumps.
+        u32 upKeys = m_isScrollable ? KEY_DUP : (KEY_DUP | KEY_CPAD_UP);
+        u32 downKeys = m_isScrollable ? KEY_DDOWN : (KEY_DDOWN | KEY_CPAD_DOWN);
+        u32 leftKeys = KEY_DLEFT | KEY_CPAD_LEFT;
+        u32 rightKeys = KEY_DRIGHT | KEY_CPAD_RIGHT;
+
+        if (kDown & leftKeys) {
+            if (curCol > 0) {
+                m_selectedAction--;
+            } else {
+                // If on left column, wrap to right column in same row if it exists
+                if (m_selectedAction + 1 < numActions) {
+                    m_selectedAction++;
+                } else if (numActions > 1) {
+                    // Single item on this row (e.g. CLOSE), wrap to previous action
+                    m_selectedAction--;
+                }
+            }
+        } else if (kDown & rightKeys) {
+            if (curCol < m_btnCols - 1 && m_selectedAction + 1 < numActions) {
                 m_selectedAction++;
+            } else {
+                // Wrap to left column in same row
+                m_selectedAction = curRow * m_btnCols;
+            }
+        } else if (kDown & upKeys) {
+            if (curRow > 0) {
+                int target = (curRow - 1) * m_btnCols + curCol;
+                if (target < numActions) {
+                    m_selectedAction = target;
+                } else {
+                    m_selectedAction = (curRow - 1) * m_btnCols;
+                }
+            } else {
+                // Wrap from top row to bottom row
+                int target = (numRows - 1) * m_btnCols + curCol;
+                if (target < numActions) {
+                    m_selectedAction = target;
+                } else {
+                    m_selectedAction = numActions - 1;
+                }
+            }
+        } else if (kDown & downKeys) {
+            if (curRow < numRows - 1) {
+                int target = (curRow + 1) * m_btnCols + curCol;
+                if (target < numActions) {
+                    m_selectedAction = target;
+                } else {
+                    // Uneven bottom row: jump to the last available button on bottom row
+                    m_selectedAction = numActions - 1;
+                }
+            } else {
+                // Wrap from bottom row to top row
+                int target = curCol;
+                if (target < numActions) {
+                    m_selectedAction = target;
+                } else {
+                    m_selectedAction = 0;
+                }
             }
         }
-        if (kDown & KEY_DUP) {
-            if (m_selectedAction >= m_btnCols) {
-                m_selectedAction -= m_btnCols;
-            } else if (m_isScrollable) {
-                m_scrollY = std::max(0.0f, m_scrollY - 18.0f);
-            }
-        }
-        if (kDown & KEY_DDOWN) {
-            if (m_selectedAction + m_btnCols < numActions) {
-                m_selectedAction += m_btnCols;
-            } else if (m_isScrollable) {
-                m_scrollY = std::min(m_maxScroll, m_scrollY + 18.0f);
-            }
+
+        // Clamp to valid range
+        if (m_selectedAction < 0) m_selectedAction = 0;
+        if (m_selectedAction >= numActions) m_selectedAction = numActions - 1;
+
+        if (m_selectedAction != prevSelected) {
+            Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
         }
     }
 
@@ -234,6 +297,7 @@ bool WndItem::update(pd::Hero* hero, const TouchController& touch, u32 kDown, u3
         noosa::RectF rBtn(bx, by, m_btnW, m_btnH);
 
         if (touch.clicked(rBtn) || ((kDown & KEY_A) && static_cast<int>(i) == m_selectedAction)) {
+            m_selectedAction = static_cast<int>(i);
             Sample::play(Assets::SND_CLICK, 0.7f, 1.2f);
             std::string action = m_actions[i];
             outAction = action;
@@ -372,14 +436,30 @@ void WndItem::draw(C2D_TextBuf textBuf, float baseDepth) const {
 
         bool isSelected = (static_cast<int>(i) == m_selectedAction);
         Chrome::get(Chrome::Type::BUTTON).draw(bx, by, m_btnW, m_btnH, zContent,
-                                               0xFFFFFFFF, isSelected ? 1.4f : 1.0f);
+                                               isSelected ? C2D_Color32(0xFF, 0xFA, 0xCC, 0xFF) : 0xFFFFFFFF,
+                                               isSelected ? 1.45f : 1.0f);
+
+        if (isSelected) {
+            u32 borderCol = C2D_Color32(0xFF, 0xDD, 0x22, 0xFF);
+            C2D_DrawRectSolid(bx - 1.0f, by - 1.0f, zContent + 0.01f, m_btnW + 2.0f, 1.0f, borderCol);
+            C2D_DrawRectSolid(bx - 1.0f, by + m_btnH, zContent + 0.01f, m_btnW + 2.0f, 1.0f, borderCol);
+            C2D_DrawRectSolid(bx - 1.0f, by, zContent + 0.01f, 1.0f, m_btnH, borderCol);
+            C2D_DrawRectSolid(bx + m_btnW, by, zContent + 0.01f, 1.0f, m_btnH, borderCol);
+        }
 
         bool isDefault = (!m_item->defaultAction.empty() && m_actions[i] == m_item->defaultAction) ||
                          (m_item->defaultAction.empty() && i == 0);
-        u32 btnCol = isDefault ? COLOR_TEXT_ACCENT : COLOR_TEXT_PRIMARY;
+        u32 btnCol;
+        if (isSelected) {
+            btnCol = C2D_Color32(0xFF, 0xEE, 0x33, 0xFF);
+        } else if (isDefault) {
+            btnCol = COLOR_TEXT_ACCENT;
+        } else {
+            btnCol = COLOR_TEXT_PRIMARY;
+        }
         float tw = BitmapFont::width(BitmapFont::FontType::Font1x, m_actions[i]);
         float tx = bx + (m_btnW - tw) * 0.5f;
-        BitmapFont::draw(BitmapFont::FontType::Font1x, m_actions[i], tx, by + 5.0f, zText, btnCol);
+        BitmapFont::drawWithShadow(BitmapFont::FontType::Font1x, m_actions[i], tx, by + 5.0f, zText, btnCol, COLOR_TEXT_SHADOW);
     }
 }
 

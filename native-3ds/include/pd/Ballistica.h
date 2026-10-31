@@ -9,7 +9,7 @@ namespace pd {
 
 class Ballistica {
 public:
-    static inline int trace[Level::WIDTH > Level::HEIGHT ? Level::WIDTH : Level::HEIGHT];
+    static inline int trace[Level::LENGTH];
     static inline int distance = 0;
     static inline int collisionCell = 0;
 
@@ -21,6 +21,11 @@ public:
     }
 
     static int cast(int from, int to, bool magic, bool hitChars) {
+        if (from < 0 || from >= Level::LENGTH || to < 0 || to >= Level::LENGTH) {
+            distance = 0;
+            return collisionCell = std::clamp(from, 0, Level::LENGTH - 1);
+        }
+
         int w = Level::WIDTH;
 
         int x0 = from % w;
@@ -75,7 +80,11 @@ public:
                 return collisionCell = trace[std::max(0, distance - 1)];
             }
 
-            trace[distance++] = cell;
+            if (distance < Level::LENGTH) {
+                trace[distance++] = cell;
+            } else {
+                return collisionCell = trace[distance - 1];
+            }
 
             if (!level->passable[cell] && !level->avoid[cell]) {
                 if (--distance > 0) {
@@ -89,7 +98,9 @@ public:
             }
         }
 
-        trace[distance++] = cell;
+        if (distance < Level::LENGTH) {
+            trace[distance++] = cell;
+        }
         return collisionCell = to;
     }
 };

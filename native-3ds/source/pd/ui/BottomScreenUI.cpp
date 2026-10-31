@@ -146,9 +146,15 @@ static bool canTargetCell(const Hero* hero, const Level* level, const Item* item
 }
 
 void BottomScreenUI::setLastTarget(Char* target) {
-    if (s_instance && target && target != Dungeon::hero.get()) {
-        s_instance->m_lastTarget = target;
+    if (s_instance) {
+        if (!target || target != Dungeon::hero.get()) {
+            s_instance->m_lastTarget = target;
+        }
     }
+}
+
+Char* BottomScreenUI::getLastTarget() {
+    return s_instance ? s_instance->m_lastTarget : nullptr;
 }
 
 void BottomScreenUI::startTargeting(Item* item) {
@@ -164,8 +170,24 @@ void BottomScreenUI::startTargeting(Item* item) {
     if (Dungeon::hero) {
         int maxDist = item->maxDistance(Dungeon::hero.get());
 
+        // Validate m_lastTarget: MUST be currently in Dungeon::mobs and alive!
+        bool lastTargetValid = false;
+        if (m_lastTarget) {
+            for (const auto& m : Dungeon::mobs) {
+                if (m && m.get() == m_lastTarget && m->isAlive()) {
+                    lastTargetValid = true;
+                    break;
+                }
+            }
+            if (!lastTargetValid) {
+                m_lastTarget = nullptr;
+            }
+        }
+
         bool targetValid = false;
-        if (m_lastTarget && m_lastTarget->isAlive() && Dungeon::visible[m_lastTarget->pos]) {
+        if (m_lastTarget && m_lastTarget->isAlive() &&
+            m_lastTarget->pos >= 0 && m_lastTarget->pos < Level::LENGTH &&
+            Dungeon::visible[m_lastTarget->pos]) {
             int dist = PathFinder::distanceChebyshev(Dungeon::hero->pos, m_lastTarget->pos);
             if (dist <= maxDist) {
                 int castCell = Ballistica::cast(Dungeon::hero->pos, m_lastTarget->pos, false, true);
@@ -180,7 +202,7 @@ void BottomScreenUI::startTargeting(Item* item) {
             m_lastTarget = nullptr;
             float minDist = 999.0f;
             for (const auto& m : Dungeon::mobs) {
-                if (m && m->isAlive() && Dungeon::visible[m->pos]) {
+                if (m && m->isAlive() && m->pos >= 0 && m->pos < Level::LENGTH && Dungeon::visible[m->pos]) {
                     int dist = PathFinder::distanceChebyshev(Dungeon::hero->pos, m->pos);
                     if (dist <= maxDist && static_cast<float>(dist) < minDist) {
                         int castCell = Ballistica::cast(Dungeon::hero->pos, m->pos, false, true);
@@ -505,13 +527,45 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
             return false;
         }
 
+        // Validate that m_targetItem is still in hero's belongings
+        bool itemValid = false;
+        if (m_targetItem == hero->belongings.equippedWeapon ||
+            m_targetItem == hero->belongings.equippedArmor ||
+            m_targetItem == hero->belongings.equippedRing1 ||
+            m_targetItem == hero->belongings.equippedRing2) {
+            itemValid = true;
+        } else {
+            for (const auto& it : hero->belongings.backpack) {
+                if (it.get() == m_targetItem) {
+                    itemValid = true;
+                    break;
+                }
+            }
+            if (!itemValid && hero->belongings.keyring) {
+                for (const auto& k : hero->belongings.keyring->keys) {
+                    if (k.get() == m_targetItem) {
+                        itemValid = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if (!itemValid) {
+            cancelTargeting();
+            return false;
+        }
+
+        if (m_targetCell < 0 || m_targetCell >= Level::LENGTH) {
+            m_targetCell = hero->pos;
+        }
+
         // Hardware shortcut R: snap to nearest visible enemy within maxDistance
         if (kDown & KEY_R) {
             float minDist = 9999.0f;
             int bestCell = -1;
             int maxDist = m_targetItem->maxDistance(hero);
             for (const auto& m : Dungeon::mobs) {
-                if (m && m->isAlive() && Dungeon::visible[m->pos]) {
+                if (m && m->isAlive() && m->pos >= 0 && m->pos < Level::LENGTH && Dungeon::visible[m->pos]) {
                     int dist = PathFinder::distanceChebyshev(hero->pos, m->pos);
                     if (dist <= maxDist && static_cast<float>(dist) < minDist) {
                         minDist = static_cast<float>(dist);
@@ -1072,7 +1126,7 @@ void BottomScreenUI::drawRightGlanceCard(const pd::Hero* hero, C2D_TextBuf textB
     if (m_isTargeting) {
         targetChar = Actor::findChar(m_targetCell);
     } else if (m_isExamining) {
-        if (Dungeon::visible[m_examineCell]) {
+        if (m_examineCell >= 0 && m_examineCell < Level::LENGTH && Dungeon::visible[m_examineCell]) {
             targetChar = Actor::findChar(m_examineCell);
         }
     } else {

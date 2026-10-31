@@ -5675,6 +5675,7 @@ void Bomb::onThrow(int cell) {
         return;
     }
     explode(cell);
+    delete this;
 }
 
 void Bomb::explode(int cell) {
@@ -5777,6 +5778,7 @@ void Honeypot::onThrow(int cell) {
         return;
     }
     shatter(cell);
+    delete this;
 }
 
 void Honeypot::shatter(int cell) {

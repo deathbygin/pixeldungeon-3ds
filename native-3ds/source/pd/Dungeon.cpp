@@ -12,6 +12,7 @@
 #include "pd/Statistics.h"
 #include "pd/Rankings.h"
 #include "pd/Biomes.h"
+#include "pd/ui/BottomScreenUI.h"
 
 namespace pd {
 
@@ -292,6 +293,13 @@ void Dungeon::switchLevel(int newDepth, bool isFall) {
 
     bool descending = (newDepth > depth);
     depth = newDepth;
+
+    // Reset any UI targeting/examine modes and clear last target on level transition
+    if (ui::BottomScreenUI::instance()) {
+        ui::BottomScreenUI::instance()->cancelTargeting();
+        ui::BottomScreenUI::instance()->cancelExamine();
+    }
+    ui::BottomScreenUI::setLastTarget(nullptr);
 
     // 2. Clear current timeline (preserve hero & hero buffs)
     Actor::clear();

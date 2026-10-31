@@ -12,6 +12,7 @@
 #include "pd/Sample.h"
 #include "pd/Debug.h"
 #include "pd/GLog.h"
+#include "pd/ui/BottomScreenUI.h"
 #include <algorithm>
 
 namespace pd {
@@ -21,6 +22,17 @@ Char::Char() {
 }
 
 Char::~Char() {
+    if (ui::BottomScreenUI::getLastTarget() == this) {
+        ui::BottomScreenUI::setLastTarget(nullptr);
+    }
+    for (auto& m : Dungeon::mobs) {
+        if (m && m->enemy == this) {
+            m->enemy = nullptr;
+        }
+    }
+    if (sprite) {
+        sprite->link(nullptr);
+    }
     Actor::remove(this);
     if (pos >= 0 && pos < PathFinder::LENGTH && Actor::chars[pos] == this) {
         Actor::chars[pos] = nullptr;
@@ -179,13 +191,21 @@ bool Char::attack(Char* enemy) {
     }
 
     // Check for surprise attack BEFORE breaking invisibility/shadows
+    Hero* heroAttacker = (this == Dungeon::hero.get()) ? Dungeon::hero.get() : nullptr;
     Buff* inv = buff(BuffType::Invisibility);
     Buff* shd = buff(BuffType::Shadows);
-    bool surprise = (inv != nullptr) || (shd != nullptr) || (invisible > 0);
+    bool surprise = false;
 
-    Mob* enemyMob = enemy->asMob();
-    if (enemyMob && (!enemyMob->enemySeen || enemyMob->paralysed || enemyMob->state == Mob::State::SLEEPING)) {
-        surprise = true;
+    if (heroAttacker) {
+        if ((inv != nullptr) || (shd != nullptr) || (invisible > 0)) {
+            surprise = true;
+        } else {
+            Mob* enemyMob = enemy->asMob();
+            if (enemyMob && (!enemyMob->enemySeen || enemyMob->paralysed || enemyMob->buff(BuffType::Paralysis) ||
+                             enemyMob->state == Mob::State::SLEEPING || enemyMob->buff(BuffType::Sleep))) {
+                surprise = true;
+            }
+        }
     }
 
     if (inv) inv->detach();
@@ -194,9 +214,11 @@ bool Char::attack(Char* enemy) {
     float acuRoll = Random::Float(static_cast<float>(attackSkill(enemy)));
     float defRoll = surprise ? 0.0f : Random::Float(static_cast<float>(enemy->defenseSkill(this)));
 
-    if (acuRoll >= defRoll) {
+    if (surprise || acuRoll >= defRoll) {
+        if (surprise && heroAttacker) {
+            FX::floatingText(enemy->pos, "!", 0xffea00FF);
+        }
         int dmg = damageRoll();
-        Hero* heroAttacker = (this == Dungeon::hero.get()) ? Dungeon::hero.get() : nullptr;
         int enemyDr = (heroAttacker && heroAttacker->rangedWeapon && heroAttacker->subClass == HeroSubClass::Sniper)
             ? 0
             : Random::IntRange(0, enemy->dr());
@@ -207,6 +229,13 @@ bool Char::attack(Char* enemy) {
 
         effective = attackProc(enemy, effective);
         effective = enemy->defenseProc(this, effective);
+
+        if (heroAttacker && heroAttacker->subClass == HeroSubClass::Assassin && surprise) {
+            effective = static_cast<int>(std::round(effective * 1.5f));
+            FX::slash(enemy->pos);
+            FX::blood(enemy->pos, 10);
+            GLog::p("Surprise attack! Critical strike!");
+        }
 
         if (heroAttacker && Debug::oneHitKill) {
             effective = std::max(effective, enemy->HP);
@@ -302,6 +331,14 @@ void Char::damage(int dmg, Actor* src) {
 
 void Char::destroy() {
     HP = 0;
+    if (ui::BottomScreenUI::getLastTarget() == this) {
+        ui::BottomScreenUI::setLastTarget(nullptr);
+    }
+    for (auto& m : Dungeon::mobs) {
+        if (m && m->enemy == this) {
+            m->enemy = nullptr;
+        }
+    }
     if (pos >= 0 && pos < PathFinder::LENGTH && Actor::chars[pos] == this) {
         Actor::chars[pos] = nullptr;
     }

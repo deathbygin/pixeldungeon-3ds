@@ -37,10 +37,12 @@ bool Belongings::canCollect(const Item* item) const {
     return !isFull();
 }
 
-bool Belongings::collect(std::unique_ptr<Item>& item) {
+bool Belongings::collect(std::unique_ptr<Item>& item, Hero* hero) {
     if (!item) return false;
 
-    Hero* hero = Dungeon::hero ? Dungeon::hero.get() : nullptr;
+    if (!hero) {
+        hero = Dungeon::hero ? Dungeon::hero.get() : nullptr;
+    }
 
     // Keys bypass backpack and route directly into keyring
     if (item->asKey()) {

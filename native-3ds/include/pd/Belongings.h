@@ -28,8 +28,8 @@ public:
     ~Belongings() = default;
 
     bool canCollect(const Item* item) const;
-    bool collect(std::unique_ptr<Item>& item);
-    bool collect(std::unique_ptr<Item>&& item) { return collect(item); }
+    bool collect(std::unique_ptr<Item>& item, Hero* hero = nullptr);
+    bool collect(std::unique_ptr<Item>&& item, Hero* hero = nullptr) { return collect(item, hero); }
     bool equip(Item* item);
     bool equip(std::unique_ptr<Item> item);
     bool unequip(Item* item);

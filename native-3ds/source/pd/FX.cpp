@@ -338,7 +338,7 @@ void FX::update(float dt) {
 
         // 3. Status Effect Particles on Characters (Burning flame particles & Frost snow motes)
         auto emitCharBuffFX = [&](Char* ch) {
-            if (!ch || !ch->isAlive()) return;
+            if (!ch || !ch->isAlive() || ch->pos < 0 || ch->pos >= Level::LENGTH) return;
             if (!Dungeon::visible[ch->pos] && (!Dungeon::hero || ch != Dungeon::hero.get())) return;
 
             float cx = (ch->pos % Level::WIDTH) * 16.0f + 8.0f;

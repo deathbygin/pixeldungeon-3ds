@@ -821,11 +821,7 @@ bool Hero::pickUp(Level* currentLevel, bool spendTurn) {
         Sample::play(Assets::SND_GOLD, 1.0f, 1.0f, Random::Float(0.9f, 1.1f));
     } else {
         bool wasKey = (item->asKey() != nullptr);
-        Item* itPtr = item.get();
-        if (belongings.collect(item)) {
-            if (itPtr) {
-                itPtr->onCollect(this);
-            }
+        if (belongings.collect(item, this)) {
             if (wasKey) {
                 GLog::p("You found a " + itemName + " (it was added to your key ring)");
             } else {

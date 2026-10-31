@@ -109,7 +109,9 @@ clean:
 #---------------------------------------------------------------------------------
 
 # Build the IVFC RomFS binary required by makerom.
-romfs:
+romfs: romfs.bin
+
+romfs.bin:
 	@echo "Packing romfs..."
 	@$(THREEDSTOOL) -cvtf romfs romfs.bin --romfs-dir $(ROMFS)
 
