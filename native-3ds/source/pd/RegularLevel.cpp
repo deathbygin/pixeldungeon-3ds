@@ -43,7 +43,12 @@ bool RegularLevel::build() {
     heaps.clear();
     plants.clear();
     wells.clear();
+    itemsToSpawn.clear();
     secretDoors = 0;
+
+    if (Dungeon::depth >= 21 && Dungeon::depth <= 24) {
+        addItemToSpawn(std::make_unique<Torch>());
+    }
 
     if (!initRooms()) {
         return false;
@@ -54,11 +59,16 @@ bool RegularLevel::build() {
     int minDistance = static_cast<int>(std::sqrt(rooms.size()));
 
     do {
+        // Capped: if no room is big enough these would spin forever; the caller rebuilds.
+        int innerRetry = 0;
         do {
+            if (innerRetry++ > 50) return false;
             roomEntrance = Random::element(rooms);
         } while (roomEntrance->width() < 4 || roomEntrance->height() < 4);
 
+        innerRetry = 0;
         do {
+            if (innerRetry++ > 50) return false;
             roomExit = Random::element(rooms);
         } while (roomExit == roomEntrance || roomExit->width() < 4 || roomExit->height() < 4);
 
@@ -473,14 +483,14 @@ int RegularLevel::randomDropCell() {
         Room* r = randomRoom(Room::Type::STANDARD, 1);
         if (r) {
             int pos = r->random();
-            if (isPassable(pos) && map[pos] != Terrain::EMPTY_WELL && getHeap(pos) == nullptr) {
+            if (map[pos] == Terrain::EMPTY && getHeap(pos) == nullptr) {
                 return pos;
             }
         }
     }
     for (int attempts = 0; attempts < 100; ++attempts) {
         int pos = Random::Int(LENGTH);
-        if (isPassable(pos) && map[pos] != Terrain::EMPTY_WELL && getHeap(pos) == nullptr) {
+        if (map[pos] == Terrain::EMPTY && getHeap(pos) == nullptr) {
             return pos;
         }
     }
@@ -557,14 +567,14 @@ void RegularLevel::createItems() {
             item = std::move(a);
         }
 
-        Heap* h = drop(std::move(item), cell);
+        Heap* h = drop(std::move(item), cell, type, /*pressCell=*/false);
         if (h) h->type = type;
     }
 
     // Spawn puzzle / special room required items (Keys, Invisibility, Liquid Flame, Levitation, etc.)
     for (auto& itm : itemsToSpawn) {
         int cell = randomDropCell();
-        drop(std::move(itm), cell);
+        drop(std::move(itm), cell, Heap::Type::HEAP, /*pressCell=*/false);
     }
     itemsToSpawn.clear();
 }

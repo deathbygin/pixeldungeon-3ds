@@ -496,22 +496,25 @@ void Painter::paintTunnel(Level* level, Room* room) {
 }
 
 int Painter::xy2p(const Room& room, const Point& xy, int pasWidth, int pasHeight) {
-    if (xy.y == room.top) {
-        return (xy.x - room.left - 1);
-    } else if (xy.x == room.right) {
-        return (xy.y - room.top - 1) + pasWidth;
-    } else if (xy.y == room.bottom) {
-        return (room.right - xy.x - 1) + pasWidth + pasHeight;
+    int per = pasWidth * 2 + pasHeight * 2;
+    if (per <= 0) return 0;
+    int p = 0;
+    if (xy.y <= room.top) {
+        p = std::clamp(xy.x - room.left - 1, 0, std::max(0, pasWidth - 1));
+    } else if (xy.x >= room.right) {
+        p = pasWidth + std::clamp(xy.y - room.top - 1, 0, std::max(0, pasHeight - 1));
+    } else if (xy.y >= room.bottom) {
+        p = pasWidth + pasHeight + std::clamp(room.right - xy.x - 1, 0, std::max(0, pasWidth - 1));
     } else {
-        if (xy.y == room.top + 1) {
-            return 0;
-        } else {
-            return (room.bottom - xy.y - 1) + pasWidth * 2 + pasHeight;
-        }
+        p = pasWidth * 2 + pasHeight + std::clamp(room.bottom - xy.y - 1, 0, std::max(0, pasHeight - 1));
     }
+    return (p % per + per) % per;
 }
 
 Point Painter::p2xy(const Room& room, int p, int pasWidth, int pasHeight) {
+    int per = pasWidth * 2 + pasHeight * 2;
+    if (per <= 0) return Point(room.left + 1, room.top + 1);
+    p = (p % per + per) % per;
     if (p < pasWidth) {
         return Point(room.left + 1 + p, room.top + 1);
     } else if (p < pasWidth + pasHeight) {
@@ -669,7 +672,7 @@ void Painter::paintArmory(Level* level, Room* room) {
         } else {
             prize = randomArmor(1, std::min(5, 1 + Dungeon::depth / 5 + 1));
         }
-        level->drop(std::move(prize), pos);
+        level->drop(std::move(prize), pos, Heap::Type::CHEST, false);
     }
 
     level->addItemToSpawn(std::make_unique<IronKey>(Dungeon::depth));
@@ -711,7 +714,7 @@ void Painter::paintLaboratory(Level* level, Room* room) {
             if (prize) level->addItemToSpawn(std::move(prize));
             prize = std::make_unique<Potion>(static_cast<Potion::PotionType>(Random::Int(static_cast<int>(Potion::POTION_COUNT))));
         }
-        level->drop(std::move(prize), pos);
+        level->drop(std::move(prize), pos, Heap::Type::CHEST, false);
     }
 
     level->addItemToSpawn(std::make_unique<IronKey>(Dungeon::depth));
@@ -762,7 +765,7 @@ void Painter::paintLibrary(Level* level, Room* room) {
             if (prize) level->addItemToSpawn(std::move(prize));
             prize = std::make_unique<Scroll>(static_cast<Scroll::ScrollType>(Random::Int(static_cast<int>(Scroll::SCROLL_COUNT))));
         }
-        level->drop(std::move(prize), pos);
+        level->drop(std::move(prize), pos, Heap::Type::CHEST, false);
     }
 
     level->addItemToSpawn(std::make_unique<IronKey>(Dungeon::depth));
@@ -779,7 +782,7 @@ void Painter::paintGarden(Level* level, Room* room) {
     }
 
     if (Random::Int(2) == 0) {
-        level->drop(std::make_unique<Honeypot>(), room->random());
+        level->drop(std::make_unique<Honeypot>(), room->random(), Heap::Type::HEAP, false);
     } else {
         int bushes = (Random::Int(5) == 0 ? 2 : 1);
         for (int i = 0; i < bushes; ++i) {
@@ -854,10 +857,8 @@ void Painter::paintPool(Level* level, Room* room) {
             }
         }
 
-        Heap* h = level->drop(std::move(prize), pos);
-        if (h && Random::Int(3) == 0) {
-            h->type = Heap::Type::CHEST;
-        }
+        Heap::Type hType = (Random::Int(3) == 0) ? Heap::Type::CHEST : Heap::Type::HEAP;
+        level->drop(std::move(prize), pos, hType, false);
     }
 
     level->addItemToSpawn(std::make_unique<Potion>(Potion::PotionType::INVISIBILITY));
@@ -910,7 +911,7 @@ void Painter::paintPit(Level* level, Room* room) {
     }
     level->pitLandingCell = remains;
 
-    Heap* skel = level->drop(std::make_unique<IronKey>(Dungeon::depth), remains);
+    Heap* skel = level->drop(std::make_unique<IronKey>(Dungeon::depth), remains, Heap::Type::SKELETON, false);
     if (skel) {
         skel->type = Heap::Type::SKELETON;
 
@@ -943,7 +944,7 @@ void Painter::paintStorage(Level* level, Room* room) {
             pos = room->random();
         } while ((level->map[pos] != Terrain::EMPTY_SP || level->getHeap(pos) != nullptr) && ++tries < 50);
 
-        level->drop(randomPrize(level), pos);
+        level->drop(randomPrize(level), pos, Heap::Type::HEAP, false);
     }
 
     auto entrance = room->entrance();
@@ -1002,7 +1003,8 @@ void Painter::paintTraps(Level* level, Room* room) {
     fill(level, *room, 1, trapType);
 
     auto entrance = room->entrance();
-    int x = -1, y = -1;
+    Point c = room->center();
+    int x = c.x, y = c.y;
     int lastRow = (trapType == Terrain::CHASM) ? Terrain::CHASM : Terrain::EMPTY;
 
     if (entrance) {
@@ -1045,11 +1047,11 @@ void Painter::paintTraps(Level* level, Room* room) {
 
     if (Random::Int(3) == 0) {
         if (lastRow == Terrain::CHASM) set(level, pos, Terrain::EMPTY);
-        Heap* h = level->drop(std::move(prize), pos);
+        Heap* h = level->drop(std::move(prize), pos, Heap::Type::CHEST, false);
         if (h) h->type = Heap::Type::CHEST;
     } else {
         set(level, pos, Terrain::PEDESTAL);
-        level->drop(std::move(prize), pos);
+        level->drop(std::move(prize), pos, Heap::Type::HEAP, false);
     }
 
     level->addItemToSpawn(std::make_unique<Potion>(Potion::PotionType::LEVITATION));
@@ -1077,9 +1079,10 @@ void Painter::paintTreasury(Level* level, Room* room) {
             pos = room->random();
         } while ((level->map[pos] != Terrain::EMPTY || level->getHeap(pos) != nullptr) && ++tries < 50);
 
-        Heap* h = level->drop(std::make_unique<Gold>(Random::IntRange(15 * Dungeon::depth, 40 * Dungeon::depth)), pos);
+        Heap::Type targetType = (i == 0 && heapType == Heap::Type::CHEST) ? Heap::Type::MIMIC : heapType;
+        Heap* h = level->drop(std::make_unique<Gold>(Random::IntRange(15 * Dungeon::depth, 40 * Dungeon::depth)), pos, targetType, false);
         if (h) {
-            h->type = (i == 0 && heapType == Heap::Type::CHEST) ? Heap::Type::MIMIC : heapType;
+            h->type = targetType;
         }
     }
 
@@ -1087,7 +1090,7 @@ void Painter::paintTreasury(Level* level, Room* room) {
         for (int i = 0; i < 6; ++i) {
             int pos = room->random();
             if (level->map[pos] == Terrain::EMPTY) {
-                level->drop(std::make_unique<Gold>(Random::IntRange(1, 5)), pos);
+                level->drop(std::make_unique<Gold>(Random::IntRange(1, 5)), pos, Heap::Type::HEAP, false);
             }
         }
     }
@@ -1115,7 +1118,7 @@ void Painter::paintVault(Level* level, Room* room) {
 
     switch (Random::Int(3)) {
     case 0: {
-        Heap* h = level->drop(makeVaultPrize(), cPos);
+        Heap* h = level->drop(makeVaultPrize(), cPos, Heap::Type::LOCKED_CHEST, false);
         if (h) h->type = Heap::Type::LOCKED_CHEST;
         level->addItemToSpawn(std::make_unique<GoldenKey>(Dungeon::depth));
         break;
@@ -1126,12 +1129,19 @@ void Painter::paintVault(Level* level, Room* room) {
         auto r = std::make_unique<Ring>();
         r->random();
 
-        Heap* h1 = level->drop(std::move(w), cPos);
+        Heap* h1 = level->drop(std::move(w), cPos, Heap::Type::CRYSTAL_CHEST, false);
         if (h1) h1->type = Heap::Type::CRYSTAL_CHEST;
 
         const int n8[8] = { +1, -1, +Level::WIDTH, -Level::WIDTH, +1+Level::WIDTH, +1-Level::WIDTH, -1+Level::WIDTH, -1-Level::WIDTH };
-        int cPos2 = cPos + n8[Random::Int(8)];
-        Heap* h2 = level->drop(std::move(r), cPos2);
+        int cPos2 = cPos;
+        for (int i = 0; i < 8; ++i) {
+            int cand = cPos + n8[i];
+            if (cand >= 0 && cand < Level::LENGTH && room->inside(cand) && cand != cPos) {
+                cPos2 = cand;
+                break;
+            }
+        }
+        Heap* h2 = level->drop(std::move(r), cPos2, Heap::Type::CRYSTAL_CHEST, false);
         if (h2) h2->type = Heap::Type::CRYSTAL_CHEST;
 
         level->addItemToSpawn(std::make_unique<GoldenKey>(Dungeon::depth));
@@ -1139,7 +1149,7 @@ void Painter::paintVault(Level* level, Room* room) {
     }
     case 2: {
         set(level, cPos, Terrain::PEDESTAL);
-        level->drop(makeVaultPrize(), cPos);
+        level->drop(makeVaultPrize(), cPos, Heap::Type::HEAP, false);
         break;
     }
     }
@@ -1248,7 +1258,7 @@ void Painter::paintCrypt(Level* level, Room* room) {
         }
     }
 
-    Heap* tomb = level->drop(std::move(prize), cx + cy * Level::WIDTH);
+    Heap* tomb = level->drop(std::move(prize), cx + cy * Level::WIDTH, Heap::Type::TOMB, false);
     if (tomb) {
         tomb->type = Heap::Type::TOMB;
     }
@@ -1410,7 +1420,7 @@ void Painter::paintShop(Level* level, Room* room) {
     size_t placeCount = std::min(range.size(), perimeterSlots.size());
     for (size_t i = 0; i < placeCount; ++i) {
         int cell = perimeterSlots[i];
-        Heap* h = level->drop(std::move(range[i]), cell);
+        Heap* h = level->drop(std::move(range[i]), cell, Heap::Type::FOR_SALE, false);
         if (h) {
             h->type = Heap::Type::FOR_SALE;
         }

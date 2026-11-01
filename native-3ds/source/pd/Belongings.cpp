@@ -161,18 +161,17 @@ bool Belongings::equip(Item* item) {
         if (ring1Slot && ring1Slot->isCursed() && ring2Slot && ring2Slot->isCursed()) {
             return false;
         }
+    } else {
+        return false;
     }
 
+    // Every case where equip(unique_ptr) could refuse is rejected above. That matters: it takes
+    // ownership, so a refusal there would destroy the item instead of returning it to the pack.
     auto it = std::find_if(backpack.begin(), backpack.end(), [item](const auto& p) { return p.get() == item; });
     if (it != backpack.end()) {
         std::unique_ptr<Item> itemPtr = std::move(*it);
         backpack.erase(it);
-        if (equip(std::move(itemPtr))) {
-            return true;
-        } else {
-            backpack.push_back(std::move(itemPtr));
-            return false;
-        }
+        return equip(std::move(itemPtr));
     }
     return false;
 }
@@ -198,6 +197,22 @@ bool Belongings::unequip(Item* item) {
         backpack.push_back(std::move(ring2Slot));
         equippedRing2 = nullptr;
         return true;
+    }
+    return false;
+}
+
+bool Belongings::owns(const Item* item) const {
+    if (!item) return false;
+    if (item == weaponSlot.get() || item == armorSlot.get() || item == ring1Slot.get() || item == ring2Slot.get()) {
+        return true;
+    }
+    for (const auto& it : backpack) {
+        if (it.get() == item) return true;
+    }
+    if (keyring) {
+        for (const auto& k : keyring->keys) {
+            if (k.get() == item) return true;
+        }
     }
     return false;
 }

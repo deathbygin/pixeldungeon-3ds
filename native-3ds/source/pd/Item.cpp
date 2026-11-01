@@ -186,6 +186,8 @@ void Item::onThrow(int cell) {
 
         std::unique_ptr<Item> self(this);
         Dungeon::level->drop(std::move(self), cell);
+    } else {
+        delete this;
     }
 }
 
@@ -217,6 +219,7 @@ static bool doThrowItem(Hero* hero, Item* item) {
         }
     }
 
+    item->castArmed = false;   // a throw, never the item's own targeted action
     item->cast(hero, targetCell);
     return true;
 }
@@ -1184,6 +1187,7 @@ bool Wand::execute(Hero* hero, const std::string& action) {
                 }
             }
         }
+        castArmed = true;
         cast(hero, targetCell);
         return true;
     }
@@ -1346,6 +1350,11 @@ void Wand::onZap(int cell) {
 
 void Wand::cast(Hero* hero, int targetCell) {
     if (!hero) return;
+    if (!castArmed) {
+        Item::cast(hero, targetCell);   // THROW: the wand itself is thrown, not zapped
+        return;
+    }
+    castArmed = false;
 
     if (targetCell == hero->pos) {
         GLog::i("You can't target yourself");
@@ -1810,9 +1819,12 @@ void WandOfFlock::onZap(int cell) {
     }
 
     PathFinder::buildDistanceMap(cell, passable, n);
+    // Copy: mobPress() below can set off traps whose effects rebuild the shared map mid-loop.
+    int distMap[Level::LENGTH];
+    std::copy(PathFinder::distance, PathFinder::distance + Level::LENGTH, distMap);
     int dist = 0;
     if (Actor::findChar(cell)) {
-        PathFinder::distance[cell] = 999999;
+        distMap[cell] = 999999;
         dist = 1;
     }
 
@@ -1822,14 +1834,14 @@ void WandOfFlock::onZap(int cell) {
         bool placed = false;
         while (dist < n && !placed) {
             for (int j = 0; j < Level::LENGTH; ++j) {
-                if (PathFinder::distance[j] == dist) {
+                if (distMap[j] == dist) {
                     auto sheep = std::make_unique<Sheep>();
                     sheep->lifespan = lifespan;
                     sheep->pos = j;
                     if (Dungeon::level) Dungeon::level->mobPress(sheep.get());
                     Dungeon::mobs.push_back(std::move(sheep));
                     FX::burst(j, 0xeeeeeeFF, 4);
-                    PathFinder::distance[j] = 999999;
+                    distMap[j] = 999999;
                     placed = true;
                     break;
                 }
@@ -2182,10 +2194,13 @@ void WandOfAvalanche::onZap(int cell) {
     }
 
     PathFinder::buildDistanceMap(cell, nonSolid, size);
+    // Copy: press() below can set off traps whose effects rebuild the shared map mid-loop.
+    int dist[Level::LENGTH];
+    std::copy(PathFinder::distance, PathFinder::distance + Level::LENGTH, dist);
 
     int shake = 0;
     for (int i = 0; i < Level::LENGTH; ++i) {
-        int d = PathFinder::distance[i];
+        int d = dist[i];
         if (d <= size) {
             Char* ch = Actor::findChar(i);
             if (ch) {
@@ -2877,11 +2892,14 @@ void Potion::shatter(int cell) {
                 notLosBlocking[i] = Dungeon::level ? !Dungeon::level->losBlocking[i] : true;
             }
             PathFinder::buildDistanceMap(cell, notLosBlocking, 2);
+            // Copy: freezing can trigger effects that rebuild the shared map mid-loop.
+            int dist[Level::LENGTH];
+            std::copy(PathFinder::distance, PathFinder::distance + Level::LENGTH, dist);
 
             Blob* fire = FX::getBlob(Blob::BlobType::FIRE);
             bool visibleAny = false;
             for (int i = 0; i < Level::LENGTH; ++i) {
-                if (PathFinder::distance[i] < INT_MAX) {
+                if (dist[i] < INT_MAX) {
                     visibleAny = Freezing::affect(i, fire) || visibleAny;
                 }
             }
@@ -3539,7 +3557,9 @@ bool Scroll::execute(Hero* hero, const std::string& action) {
                         }
                     }
                     for (Heap* h : mimicHeaps) {
-                        h->open(hero);
+                        if (Dungeon::level && Dungeon::level->getHeap(h->pos) == h) {
+                            h->open(hero);
+                        }
                     }
                 }
                 break;
@@ -3863,13 +3883,9 @@ bool Torch::execute(Hero* hero, const std::string& action) {
         }
         noosa::Audio::play(noosa::Audio::getSample(Assets::SND_ITEM).get());
 
+        // The caller removes the item once quantity hits 0; erasing it here would destroy
+        // `this` while the UI still holds the pointer (use-after-free crash on hardware).
         quantity--;
-        if (quantity <= 0) {
-            hero->belongings.backpack.erase(
-                std::remove_if(hero->belongings.backpack.begin(), hero->belongings.backpack.end(),
-                               [this](const std::unique_ptr<Item>& it) { return it.get() == this; }),
-                hero->belongings.backpack.end());
-        }
         hero->affect<Light>();
         GLog::p("You light a torch. The warm glow pushes back the darkness!");
         return true;
@@ -4042,6 +4058,8 @@ void MissileWeapon::miss(int cell) {
     if (Dungeon::level) {
         std::unique_ptr<Item> self(this);
         Dungeon::level->drop(std::move(self), cell);
+    } else {
+        delete this;
     }
 }
 
@@ -4358,7 +4376,7 @@ bool PlantSeed::execute(Hero* hero, const std::string& action) {
     if (action == "PLANT") {
         PlantType pt = plantType;
         quantity--;
-        OnSeedImpact(pt, hero->pos);
+        OnSeedImpact(pt, hero->pos, /*hitsChars=*/false);
         hero->spendAndNext(Actor::TICK);
         return true;
     }
@@ -4626,6 +4644,15 @@ bool ClassArmor::execute(Hero* hero, const std::string& action) {
     return Armor::execute(hero, action);
 }
 
+void ClassArmor::cast(Hero* hero, int targetCell) {
+    if (castArmed) {
+        castArmed = false;
+        castSpecial(hero, targetCell);
+    } else {
+        Armor::cast(hero, targetCell);
+    }
+}
+
 std::string ClassArmor::info() const {
     return desc() + "\n\nDefense: Max DR " + std::to_string(DR_val) +
            " | STR required: " + std::to_string(STR);
@@ -4693,12 +4720,13 @@ bool WarriorArmor::execute(Hero* hero, const std::string& action) {
 
 bool WarriorArmor::doSpecial(Hero* hero) {
     if (!hero) return false;
+    castArmed = true;
     ui::BottomScreenUI::instance()->startTargeting(this);
     ui::BottomScreenUI::instance()->log("Choose direction to leap", C2D_Color32(0xff, 0xff, 0x66, 0xFF));
     return false;
 }
 
-void WarriorArmor::cast(Hero* hero, int targetCell) {
+void WarriorArmor::castSpecial(Hero* hero, int targetCell) {
     if (!hero || targetCell == hero->pos) return;
 
     int cell = Ballistica::cast(hero->pos, targetCell, false, true);
@@ -4847,12 +4875,13 @@ bool RogueArmor::execute(Hero* hero, const std::string& action) {
 
 bool RogueArmor::doSpecial(Hero* hero) {
     if (!hero) return false;
+    castArmed = true;
     ui::BottomScreenUI::instance()->startTargeting(this);
     ui::BottomScreenUI::instance()->log("Choose a location to jump to", C2D_Color32(0xff, 0xff, 0x66, 0xFF));
     return false;
 }
 
-void RogueArmor::cast(Hero* hero, int targetCell) {
+void RogueArmor::castSpecial(Hero* hero, int targetCell) {
     if (!hero) return;
 
     if (!Dungeon::level || !Dungeon::visible[targetCell] || !(Dungeon::level->passable[targetCell] || Dungeon::level->avoid[targetCell]) || Actor::findChar(targetCell) != nullptr) {
@@ -5753,15 +5782,9 @@ bool Honeypot::execute(Hero* hero, const std::string& action) {
     if (!hero) return false;
     if (action == "SHATTER") {
         shatter(hero->pos);
-        for (auto it = hero->belongings.backpack.begin(); it != hero->belongings.backpack.end(); ++it) {
-            if (it->get() == this) {
-                quantity--;
-                if (quantity <= 0) {
-                    hero->belongings.backpack.erase(it);
-                }
-                break;
-            }
-        }
+        // The caller removes the pot once quantity hits 0; erasing it here would destroy
+        // `this` while the UI still holds the pointer (use-after-free crash on hardware).
+        quantity--;
         hero->spendAndNext(Actor::TICK);
         return true;
     } else if (action == "THROW") {
@@ -6060,13 +6083,9 @@ bool Weightstone::execute(Hero* hero, const std::string& action) {
                 w->imbue = (w->imbue == Weapon::Imbue::SPEED) ? Weapon::Imbue::ACCURACY : Weapon::Imbue::SPEED;
                 GLog::p("You balanced your " + w->displayName() + (w->imbue == Weapon::Imbue::SPEED ? " for speed." : " for accuracy."));
                 Sample::play(Assets::SND_MISS);
+                // The caller removes the item once quantity hits 0; erasing it here would destroy
+                // `this` while the UI still holds the pointer (use-after-free crash on hardware).
                 quantity--;
-                if (quantity <= 0) {
-                    hero->belongings.backpack.erase(
-                        std::remove_if(hero->belongings.backpack.begin(), hero->belongings.backpack.end(),
-                                       [this](const std::unique_ptr<Item>& it) { return it.get() == this; }),
-                        hero->belongings.backpack.end());
-                }
                 hero->spendAndNext(2.0f * Actor::TICK);
                 return true;
             }

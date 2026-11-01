@@ -981,6 +981,7 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
                         return false;
                     }
                 }
+                qIt->castArmed = (act != "THROW");
                 startTargeting(qIt);
                 log("Aiming " + qIt->displayName() + "...", COLOR_TEXT_ACCENT);
                 return false;
@@ -988,7 +989,7 @@ bool BottomScreenUI::update(pd::Hero* hero, pd::Level* level, u32 kDown, u32 kHe
                 log(act + " " + qIt->displayName(), COLOR_TEXT_POSITIVE);
                 bool used = qIt->execute(hero, act);
                 if (used) {
-                    if (qIt->quantity <= 0) hero->belongings.drop(qIt);
+                    if (hero->belongings.owns(qIt) && qIt->quantity <= 0) hero->belongings.drop(qIt);
                     Actor::process();
                     return true;
                 }

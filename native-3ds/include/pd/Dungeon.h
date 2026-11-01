@@ -47,6 +47,9 @@ public:
 
     static void init();
     static void newGame();
+    // Drops levels/mobs kept for revisiting other depths. Must be called whenever the
+    // hero is replaced, since cached mobs may still point at the old one.
+    static void clearLevelCache();
     static void resetLevel();
     static void nextLevel();
     static void prevLevel();

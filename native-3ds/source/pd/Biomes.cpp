@@ -580,11 +580,7 @@ void CavesBossLevel::decorate() {
 // =============================================================================
 
 CityLevel::CityLevel() {
-    if (Dungeon::depth == 21) {
-        viewDistance = std::max(25 - Dungeon::depth, 1);
-    } else {
-        viewDistance = 8;
-    }
+    viewDistance = 8;
 }
 
 std::vector<bool> CityLevel::createWater() {
@@ -693,13 +689,12 @@ void CityBossLevel::decorate() {
 }
 
 // =============================================================================
-// Halls (Depths 22-24), Halls Boss (Depth 25) & Last (Depth 26)
+// Halls (Depths 21-24), Halls Boss (Depth 25) & Last (Depth 26)
 // =============================================================================
 
 HallsLevel::HallsLevel() {
     minRoomSize = 6;
     viewDistance = std::max(25 - Dungeon::depth, 1);
-    addItemToSpawn(std::make_unique<Torch>());
 }
 
 std::vector<bool> HallsLevel::createWater() {
@@ -749,11 +744,6 @@ bool HallsBossLevel::build() {
     heaps.clear();
     plants.clear();
     rooms.clear();
-
-    const int ROOM_LEFT   = WIDTH / 2 - 1;
-    const int ROOM_RIGHT  = WIDTH / 2 + 1;
-    const int ROOM_TOP    = HEIGHT / 2 - 1;
-    const int ROOM_BOTTOM = HEIGHT / 2 + 1;
 
     for (int i = 0; i < 5; ++i) {
         int top = Random::Int(2, ROOM_TOP);
@@ -810,6 +800,29 @@ void HallsBossLevel::decorate() {
     }
 }
 
+// Derived from the map (which is saved) rather than a flag, so it survives save/load.
+bool HallsBossLevel::arenaOpen() const {
+    return passable[(ROOM_TOP - 1) * WIDTH + WIDTH / 2];
+}
+
+void HallsBossLevel::onPress(int cell, Char* ch) {
+    if (!ch || ch != Dungeon::hero.get() || cell == entrance || arenaOpen()) return;
+
+    // Stepping off the stairs burns away the chamber walls, revealing Yog's hall
+    for (int x = ROOM_LEFT - 1; x <= ROOM_RIGHT + 1; ++x) {
+        set((ROOM_TOP - 1) * WIDTH + x, Terrain::EMPTY_SP);
+        set((ROOM_BOTTOM + 1) * WIDTH + x, Terrain::EMPTY_SP);
+    }
+    for (int y = ROOM_TOP; y <= ROOM_BOTTOM; ++y) {
+        set(y * WIDTH + ROOM_LEFT - 1, Terrain::EMPTY_SP);
+        set(y * WIDTH + ROOM_RIGHT + 1, Terrain::EMPTY_SP);
+    }
+
+    Sample::play(Assets::SND_BURNING);
+    GLog::n("The walls of the chamber burn away, revealing the hall of Yog-Dzewa!");
+    Dungeon::observe();
+}
+
 LastLevel::LastLevel() {
     viewDistance = 8;
 }
@@ -838,7 +851,7 @@ bool LastLevel::build() {
     map[pedestal] = Terrain::PEDESTAL;
     map[pedestal - 1] = map[pedestal + 1] = Terrain::STATUE_SP;
 
-    drop(std::make_unique<Amulet>(), pedestal);
+    drop(std::make_unique<Amulet>(), pedestal, Heap::Type::HEAP, false);
 
     feeling = Feeling::NONE;
 

@@ -15,7 +15,9 @@ public:
     static constexpr float TICK = 1.0f;
 
     float time = 0.0f;
-    int id = 0;
+    // Unique per actor; the Sniper's mark compares it to tell its target apart.
+    inline static int s_nextId = 1;
+    int id = s_nextId++;
 
     Actor() = default;
     virtual ~Actor() = default;

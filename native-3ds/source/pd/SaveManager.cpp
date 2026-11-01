@@ -166,7 +166,7 @@ void SaveManager::wipeAllData() {
     Dungeon::level.reset();
     Dungeon::mobs.clear();
     Dungeon::fog.reset();
-    Dungeon::droppedItems.clear();
+    Dungeon::clearLevelCache();
     Dungeon::depth = 1;
     Dungeon::gold = 0;
 }
@@ -188,7 +188,7 @@ bool SaveManager::getSaveSummary(int& outDepth, int& outLevel, int& outHeroClass
         return false;
     }
 
-    if (magic != SAVE_MAGIC || (version != 6 && version != 7 && version != 8 && version != 9 && version != 10 && version != SAVE_VERSION)) {
+    if (magic != SAVE_MAGIC || (version != 6 && version != 7 && version != 8 && version != 9 && version != 10 && version != 11 && version != SAVE_VERSION)) {
         std::fclose(fp);
         return false;
     }
@@ -254,7 +254,10 @@ bool SaveManager::saveGame(const std::string& customPath) {
     if (!hero->isAlive()) return false;
 
     std::string path = customPath.empty() ? getSavePath() : customPath;
-    FILE* fp = std::fopen(path.c_str(), "wb");
+    // Write to a temporary file and swap it in at the end, so a save interrupted by
+    // power loss or a full SD card never truncates the existing one.
+    std::string tmpPath = path + ".tmp";
+    FILE* fp = std::fopen(tmpPath.c_str(), "wb");
     if (!fp) return false;
 
     // 1. Header
@@ -456,6 +459,13 @@ bool SaveManager::saveGame(const std::string& customPath) {
     }
     std::fwrite(visitedBuf, sizeof(uint8_t), Level::LENGTH, fp);
 
+    // Cells revealed by Magic Mapping (v12+)
+    uint8_t mappedBuf[Level::LENGTH];
+    for (int i = 0; i < Level::LENGTH; ++i) {
+        mappedBuf[i] = level->mapped[i] ? 1 : 0;
+    }
+    std::fwrite(mappedBuf, sizeof(uint8_t), Level::LENGTH, fp);
+
     // Rooms
     uint32_t roomCount = static_cast<uint32_t>(level->rooms.size());
     std::fwrite(&roomCount, sizeof(uint32_t), 1, fp);
@@ -588,7 +598,17 @@ bool SaveManager::saveGame(const std::string& customPath) {
         std::fwrite(&mState, sizeof(uint32_t), 1, fp);
     }
 
-    std::fclose(fp);
+    bool written = !std::ferror(fp);
+    written = (std::fclose(fp) == 0) && written;
+    if (!written) {
+        std::remove(tmpPath.c_str());
+        return false;
+    }
+    // FAT rename() will not replace an existing file.
+    std::remove(path.c_str());
+    if (std::rename(tmpPath.c_str(), path.c_str()) != 0) {
+        return false;
+    }
 
     if (customPath.empty()) {
         std::string gameDatPath = getSaveDirectory() + "game.dat";
@@ -618,14 +638,28 @@ bool SaveManager::loadGame(const std::string& customPath) {
         return false;
     }
 
-    if (magic != SAVE_MAGIC || (version != 6 && version != 7 && version != 8 && version != 9 && version != 10 && version != SAVE_VERSION)) {
+    if (magic != SAVE_MAGIC || (version != 6 && version != 7 && version != 8 && version != 9 && version != 10 && version != 11 && version != SAVE_VERSION)) {
         std::fclose(fp);
         return false;
     }
 
-    // Clear existing active game world
+    // Clear existing active game world. Other depths are regenerated, so cached ones
+    // from the session being replaced (whose mobs target the old hero) must go too.
     Actor::clear();
     Dungeon::mobs.clear();
+    Dungeon::clearLevelCache();
+
+    // A save cut short by power loss or an SD error must not crash the game, nor leave a
+    // half-built world behind (the sleep hook would then save it over the real file).
+    auto fail = [&]() {
+        std::fclose(fp);
+        Actor::clear();
+        Dungeon::mobs.clear();
+        Dungeon::hero.reset();
+        Dungeon::level.reset();
+        return false;
+    };
+    auto inRange = [](int64_t v, int64_t lo, int64_t hi) { return v >= lo && v < hi; };
 
     // 2. Dungeon State
     int32_t depth = 1;
@@ -634,6 +668,7 @@ bool SaveManager::loadGame(const std::string& customPath) {
     std::fread(&depth, sizeof(int32_t), 1, fp);
     std::fread(&gold, sizeof(int32_t), 1, fp);
     std::fread(&seed, sizeof(uint64_t), 1, fp);
+    if (!inRange(depth, 1, 27)) return fail();
 
     if (version >= 8) {
         uint8_t dVial = 1;
@@ -655,6 +690,7 @@ bool SaveManager::loadGame(const std::string& customPath) {
             uint8_t k = 0;
             std::fread(&m, sizeof(int32_t), 1, fp);
             std::fread(&k, sizeof(uint8_t), 1, fp);
+            if (!inRange(m, 0, Potion::POTION_COUNT)) return fail();
             potMap[i] = m;
             potKnown[i] = (k != 0);
         }
@@ -667,6 +703,7 @@ bool SaveManager::loadGame(const std::string& customPath) {
             uint8_t k = 0;
             std::fread(&m, sizeof(int32_t), 1, fp);
             std::fread(&k, sizeof(uint8_t), 1, fp);
+            if (!inRange(m, 0, Scroll::RUNIC_SCROLL_COUNT)) return fail();
             scrMap[i] = m;
             scrKnown[i] = (k != 0);
         }
@@ -680,6 +717,7 @@ bool SaveManager::loadGame(const std::string& customPath) {
                 uint8_t k = 0;
                 std::fread(&m, sizeof(int32_t), 1, fp);
                 std::fread(&k, sizeof(uint8_t), 1, fp);
+                if (!inRange(m, 0, 12)) return fail();
                 wandMap[i] = m;
                 wandKnown[i] = (k != 0);
             }
@@ -736,6 +774,7 @@ bool SaveManager::loadGame(const std::string& customPath) {
     std::fread(&invisible, sizeof(int32_t), 1, fp);
     std::fread(&paralysed, sizeof(uint8_t), 1, fp);
     std::fread(&rooted, sizeof(uint8_t), 1, fp);
+    if (!inRange(heroClass, 0, 4) || !inRange(pos, 0, Level::LENGTH)) return fail();
 
     Dungeon::hero = std::make_unique<Hero>();
     Hero* hero = Dungeon::hero.get();
@@ -788,15 +827,17 @@ bool SaveManager::loadGame(const std::string& customPath) {
 
     uint32_t itemCount = 0;
     std::fread(&itemCount, sizeof(uint32_t), 1, fp);
+    if (itemCount > 1024) return fail();
 
     for (uint32_t i = 0; i < itemCount; ++i) {
         uint32_t category = 0;
         uint32_t nameLen = 0;
         std::fread(&category, sizeof(uint32_t), 1, fp);
         std::fread(&nameLen, sizeof(uint32_t), 1, fp);
+        if (nameLen >= 256 || std::feof(fp)) return fail();
 
         std::string iName = "";
-        if (nameLen > 0 && nameLen < 256) {
+        if (nameLen > 0) {
             std::vector<char> nameChars(nameLen + 1, 0);
             std::fread(nameChars.data(), sizeof(char), nameLen, fp);
             iName = std::string(nameChars.data());
@@ -890,10 +931,12 @@ bool SaveManager::loadGame(const std::string& customPath) {
         } else if (cat == ItemCategory::Potion) {
             int32_t pType = 0;
             std::fread(&pType, sizeof(int32_t), 1, fp);
+            if (!inRange(pType, 0, Potion::POTION_COUNT)) return fail();
             item = std::make_unique<Potion>(static_cast<Potion::PotionType>(pType));
         } else if (cat == ItemCategory::Scroll) {
             int32_t sType = 0;
             std::fread(&sType, sizeof(int32_t), 1, fp);
+            if (!inRange(sType, 0, Scroll::SCROLL_COUNT)) return fail();
             item = std::make_unique<Scroll>(static_cast<Scroll::ScrollType>(sType));
         } else if (cat == ItemCategory::Ring) {
             int32_t gem = 0, ttk = Ring::TICKS_TO_KNOW;
@@ -901,6 +944,7 @@ bool SaveManager::loadGame(const std::string& customPath) {
                 std::fread(&gem, sizeof(int32_t), 1, fp);
                 std::fread(&ttk, sizeof(int32_t), 1, fp);
             }
+            if (!inRange(gem, 0, Ring::RING_COUNT)) return fail();
             std::string eff = "Mending";
             if (iName.rfind("Ring of ", 0) == 0) {
                 eff = iName.substr(8);
@@ -1028,22 +1072,34 @@ bool SaveManager::loadGame(const std::string& customPath) {
         level->feeling = static_cast<Level::Feeling>(feeling);
     }
 
+    if (!inRange(entrance, 0, Level::LENGTH) || !inRange(exit, 0, Level::LENGTH)) return fail();
     level->entrance = entrance;
     level->exit = exit;
 
     // Map tiles
-    std::fread(level->map, sizeof(int), Level::LENGTH, fp);
+    if (std::fread(level->map, sizeof(int), Level::LENGTH, fp) != static_cast<size_t>(Level::LENGTH)) return fail();
+    for (int i = 0; i < Level::LENGTH; ++i) {
+        if (!inRange(level->map[i], 0, Terrain::SECRET_TELEPORTATION_TRAP + 1)) return fail();
+    }
 
     // Visited flags
     uint8_t visitedBuf[Level::LENGTH];
-    std::fread(visitedBuf, sizeof(uint8_t), Level::LENGTH, fp);
+    if (std::fread(visitedBuf, sizeof(uint8_t), Level::LENGTH, fp) != static_cast<size_t>(Level::LENGTH)) return fail();
     for (int i = 0; i < Level::LENGTH; ++i) {
         level->visited[i] = (visitedBuf[i] != 0);
+    }
+    if (version >= 12) {
+        uint8_t mappedBuf[Level::LENGTH];
+        if (std::fread(mappedBuf, sizeof(uint8_t), Level::LENGTH, fp) != static_cast<size_t>(Level::LENGTH)) return fail();
+        for (int i = 0; i < Level::LENGTH; ++i) {
+            level->mapped[i] = (mappedBuf[i] != 0);
+        }
     }
 
     // Rooms
     uint32_t roomCount = 0;
     std::fread(&roomCount, sizeof(uint32_t), 1, fp);
+    if (roomCount > static_cast<uint32_t>(Level::LENGTH)) return fail();
     level->rooms.clear();
     for (uint32_t r = 0; r < roomCount; ++r) {
         int32_t left = 0, top = 0, right = 0, bottom = 0, rType = 0;
@@ -1052,6 +1108,8 @@ bool SaveManager::loadGame(const std::string& customPath) {
         std::fread(&right, sizeof(int32_t), 1, fp);
         std::fread(&bottom, sizeof(int32_t), 1, fp);
         std::fread(&rType, sizeof(int32_t), 1, fp);
+        if (!inRange(left, 0, Level::WIDTH) || !inRange(right, left, Level::WIDTH) ||
+            !inRange(top, 0, Level::HEIGHT) || !inRange(bottom, top, Level::HEIGHT)) return fail();
         level->rooms.push_back(std::make_shared<Room>(left, top, right, bottom, static_cast<Room::Type>(rType)));
     }
 
@@ -1061,6 +1119,7 @@ bool SaveManager::loadGame(const std::string& customPath) {
     if (version >= 2) {
         uint32_t heapCount = 0;
         std::fread(&heapCount, sizeof(uint32_t), 1, fp);
+        if (heapCount > static_cast<uint32_t>(Level::LENGTH)) return fail();
         for (uint32_t hIdx = 0; hIdx < heapCount; ++hIdx) {
             int32_t hPos = 0;
             int32_t hType = 0;
@@ -1068,6 +1127,8 @@ bool SaveManager::loadGame(const std::string& customPath) {
             std::fread(&hPos, sizeof(int32_t), 1, fp);
             std::fread(&hType, sizeof(int32_t), 1, fp);
             std::fread(&hItems, sizeof(uint32_t), 1, fp);
+            if (!inRange(hPos, 0, Level::LENGTH) || !inRange(hType, 0, static_cast<int>(Heap::Type::HIDDEN) + 1) ||
+                hItems > 1024) return fail();
 
             auto heap = std::make_unique<Heap>(hPos, static_cast<Heap::Type>(hType));
             for (uint32_t itIdx = 0; itIdx < hItems; ++itIdx) {
@@ -1075,6 +1136,7 @@ bool SaveManager::loadGame(const std::string& customPath) {
                 uint32_t nameLen = 0;
                 std::fread(&category, sizeof(uint32_t), 1, fp);
                 std::fread(&nameLen, sizeof(uint32_t), 1, fp);
+                if (nameLen >= 256 || std::feof(fp)) return fail();
 
                 std::string iName = "";
                 if (nameLen > 0) {
@@ -1166,10 +1228,12 @@ bool SaveManager::loadGame(const std::string& customPath) {
                 } else if (cat == ItemCategory::Potion) {
                     int32_t pType = 0;
                     std::fread(&pType, sizeof(int32_t), 1, fp);
+                    if (!inRange(pType, 0, Potion::POTION_COUNT)) return fail();
                     item = std::make_unique<Potion>(static_cast<Potion::PotionType>(pType));
                 } else if (cat == ItemCategory::Scroll) {
                     int32_t sType = 0;
                     std::fread(&sType, sizeof(int32_t), 1, fp);
+                    if (!inRange(sType, 0, Scroll::SCROLL_COUNT)) return fail();
                     item = std::make_unique<Scroll>(static_cast<Scroll::ScrollType>(sType));
                 } else if (cat == ItemCategory::Ring) {
                     int32_t gem = 0, ttk = Ring::TICKS_TO_KNOW;
@@ -1177,6 +1241,7 @@ bool SaveManager::loadGame(const std::string& customPath) {
                         std::fread(&gem, sizeof(int32_t), 1, fp);
                         std::fread(&ttk, sizeof(int32_t), 1, fp);
                     }
+                    if (!inRange(gem, 0, Ring::RING_COUNT)) return fail();
                     std::string eff = "Mending";
                     if (iName.rfind("Ring of ", 0) == 0) {
                         eff = iName.substr(8);
@@ -1260,10 +1325,12 @@ bool SaveManager::loadGame(const std::string& customPath) {
     if (version >= 9) {
         uint32_t wellCount = 0;
         std::fread(&wellCount, sizeof(uint32_t), 1, fp);
+        if (wellCount > static_cast<uint32_t>(Level::LENGTH)) return fail();
         for (uint32_t w = 0; w < wellCount; ++w) {
             int32_t wCell = 0, wType = 0;
             std::fread(&wCell, sizeof(int32_t), 1, fp);
             std::fread(&wType, sizeof(int32_t), 1, fp);
+            if (!inRange(wCell, 0, Level::LENGTH)) return fail();
             level->wells[wCell] = static_cast<Level::WellType>(wType);
             if (level->map[wCell] == Terrain::WELL) {
                 Blob::BlobType btype = (static_cast<Level::WellType>(wType) == Level::WellType::Health) ? Blob::BlobType::WATER_OF_HEALTH :
@@ -1306,6 +1373,7 @@ bool SaveManager::loadGame(const std::string& customPath) {
     // 6. Active Living Mobs State
     uint32_t mobCount = 0;
     std::fread(&mobCount, sizeof(uint32_t), 1, fp);
+    if (mobCount > static_cast<uint32_t>(Level::LENGTH)) return fail();
 
     for (uint32_t m = 0; m < mobCount; ++m) {
         uint32_t mobType = 0;
@@ -1319,6 +1387,7 @@ bool SaveManager::loadGame(const std::string& customPath) {
         std::fread(&mHp, sizeof(int32_t), 1, fp);
         std::fread(&mHt, sizeof(int32_t), 1, fp);
         std::fread(&mState, sizeof(uint32_t), 1, fp);
+        if (!inRange(mPos, 0, Level::LENGTH) || mState > static_cast<uint32_t>(Mob::State::PASSIVE)) return fail();
 
         std::unique_ptr<Mob> mob = nullptr;
         switch (static_cast<Mob::MobType>(mobType)) {

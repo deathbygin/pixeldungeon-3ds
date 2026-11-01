@@ -352,7 +352,7 @@ std::string Plant::desc() const {
 // =============================================================================
 // Unified Seed Impact Dispatcher
 // =============================================================================
-void OnSeedImpact(PlantSeed::PlantType type, int cell) {
+void OnSeedImpact(PlantSeed::PlantType type, int cell, bool hitsChars) {
     if (!Dungeon::level || cell < 0 || cell >= Level::LENGTH) return;
 
     // 1. Chasm / Pit
@@ -433,7 +433,7 @@ void OnSeedImpact(PlantSeed::PlantType type, int cell) {
     }
 
     // 4. Direct Hit on Entity (Hero or Mob)
-    Char* target = Actor::findChar(cell);
+    Char* target = hitsChars ? Actor::findChar(cell) : nullptr;
     if (target != nullptr) {
         const SeedEffect& effect = SeedRegistry::get(type);
         if (effect.activate) {

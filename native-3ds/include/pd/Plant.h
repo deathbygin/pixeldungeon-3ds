@@ -67,7 +67,8 @@ public:
 };
 
 // Unified dispatcher for seed impact (on throw landing, planting, or drop)
-void OnSeedImpact(PlantSeed::PlantType type, int cell);
+// hitsChars: a thrown seed bursts on a character it lands on; a planted one never does.
+void OnSeedImpact(PlantSeed::PlantType type, int cell, bool hitsChars = true);
 
 } // namespace pd
 

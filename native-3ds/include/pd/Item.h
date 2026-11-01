@@ -50,6 +50,10 @@ public:
     bool levelKnown = false;
     bool unique = false;
     std::string defaultAction = "";
+    // The UI aims both THROW and an item's own targeted action (ZAP, HEROIC LEAP, SMOKE BOMB)
+    // through cast(). Whatever starts targeting sets this: true for the item's own action,
+    // false for THROW, so cast() overrides know which one to perform.
+    bool castArmed = false;
 
     Item() = default;
     virtual ~Item() = default;
@@ -588,6 +592,9 @@ public:
     virtual std::string special() const = 0;
     virtual bool doSpecial(Hero* hero) = 0;
 
+    void cast(Hero* hero, int targetCell) override;
+    virtual void castSpecial(Hero* hero, int targetCell) { (void)hero; (void)targetCell; }
+
     static std::unique_ptr<ClassArmor> upgradeArmor(Hero* owner, Armor* armor);
 };
 
@@ -596,7 +603,7 @@ public:
     WarriorArmor();
     std::string special() const override { return "HEROIC LEAP"; }
     bool doSpecial(Hero* hero) override;
-    void cast(Hero* hero, int targetCell) override;
+    void castSpecial(Hero* hero, int targetCell) override;
     int maxDistance(const Hero* hero = nullptr) const override { (void)hero; return 8; }
     std::string desc() const override;
     bool execute(Hero* hero, const std::string& action) override;
@@ -618,7 +625,7 @@ public:
     RogueArmor();
     std::string special() const override { return "SMOKE BOMB"; }
     bool doSpecial(Hero* hero) override;
-    void cast(Hero* hero, int targetCell) override;
+    void castSpecial(Hero* hero, int targetCell) override;
     int maxDistance(const Hero* hero = nullptr) const override { (void)hero; return 8; }
     std::string desc() const override;
     bool execute(Hero* hero, const std::string& action) override;

@@ -30,6 +30,7 @@ public:
 
     // Chebyshev distance (diagonal movement allowed, metric used by Pixel Dungeon)
     static int distanceChebyshev(int a, int b) {
+        if (a < 0 || b < 0 || a >= LENGTH || b >= LENGTH) return 999;
         int ax = a % WIDTH, ay = a / WIDTH;
         int bx = b % WIDTH, by = b / WIDTH;
         int dx = (ax > bx) ? (ax - bx) : (bx - ax);
@@ -39,6 +40,7 @@ public:
 
     // Manhattan distance
     static int distanceManhattan(int a, int b) {
+        if (a < 0 || b < 0 || a >= LENGTH || b >= LENGTH) return 999;
         int ax = a % WIDTH, ay = a / WIDTH;
         int bx = b % WIDTH, by = b / WIDTH;
         int dx = (ax > bx) ? (ax - bx) : (bx - ax);

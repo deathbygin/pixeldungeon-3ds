@@ -120,11 +120,21 @@ public:
 
 class HallsBossLevel : public Level {
 public:
+    // The hero arrives in a sealed 3x3 chamber in the middle of the hall
+    static constexpr int ROOM_LEFT   = WIDTH / 2 - 1;
+    static constexpr int ROOM_RIGHT  = WIDTH / 2 + 1;
+    static constexpr int ROOM_TOP    = HEIGHT / 2 - 1;
+    static constexpr int ROOM_BOTTOM = HEIGHT / 2 + 1;
+
     HallsBossLevel();
     ~HallsBossLevel() override = default;
 
     bool build() override;
     void decorate() override;
+    void onPress(int cell, Char* ch) override;
+
+private:
+    bool arenaOpen() const;
 };
 
 class LastLevel : public Level {

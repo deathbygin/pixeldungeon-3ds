@@ -82,6 +82,11 @@ using namespace noosa;
 using namespace pd;
 using namespace pd::ui;
 
+// libctru runs main() on a heap-allocated stack of __stacksize__ bytes, 32 KB by default
+// (the RSF StackSize does not apply). A single minimp3 frame decode needs ~17 KB and level
+// generation ~14 KB, so the default overflows on hardware once a few frames are nested.
+extern "C" { u32 __stacksize__ = 256 * 1024; }
+
 // Procedural 64x64 texture atlas containing tiles, hero, and mob sprites
 static std::vector<uint8_t> generateGameSpriteSheet() {
     std::vector<uint8_t> pixels(64 * 64 * 4, 0);
@@ -428,6 +433,7 @@ int main(int argc, char* argv[]) {
             bottomUI.reset();
             bottomUI.log("Resumed Depth " + std::to_string(Dungeon::depth) + " from SD Card!", C2D_Color32(0x38, 0x9e, 0x38, 0xFF));
         }
+        return ok;
     };
 
     // Start Title Screen Background Music
@@ -713,7 +719,15 @@ int main(int argc, char* argv[]) {
                 if (interlevelMode == InterlevelMode::NEW_GAME) {
                     startNewDungeonRun(chosenHeroClass);
                 } else if (interlevelMode == InterlevelMode::RESUME) {
-                    resumeExistingRun();
+                    if (!resumeExistingRun()) {
+                        // There is no world to enter; let the player start over instead.
+                        wndOptions.show("LOAD FAILED",
+                            "The save file is damaged and could not be loaded.",
+                            { "Return to Title" },
+                            [&](int) { appState = AppState::TITLE; });
+                        appState = AppState::PROMPT_LOAD;
+                        continue;
+                    }
                 } else if (interlevelMode == InterlevelMode::DESCEND) {
                     Sample::play(Assets::SND_DESCEND);
                     if (Dungeon::hero) {
@@ -1002,8 +1016,10 @@ int main(int argc, char* argv[]) {
                 if (cpad.dy > 45)  dy = -1;
                 if (cpad.dy < -45) dy = 1;
 
-                if (dx != 0 || dy != 0) {
-                    targetCell = (heroY + dy) * Level::WIDTH + (heroX + dx);
+                int tx = heroX + dx;
+                int ty = heroY + dy;
+                if ((dx != 0 || dy != 0) && tx >= 0 && tx < Level::WIDTH && ty >= 0 && ty < Level::HEIGHT) {
+                    targetCell = ty * Level::WIDTH + tx;
                 }
 
                 if (targetCell >= 0 && moveDelay <= 0.0f) {

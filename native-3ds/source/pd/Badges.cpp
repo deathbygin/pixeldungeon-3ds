@@ -155,10 +155,11 @@ void Badges::loadGlobal() {
         std::fread(&count, sizeof(uint32_t), 1, fp);
         for (uint32_t i = 0; i < count; ++i) {
             uint32_t bId = 0;
-            if (std::fread(&bId, sizeof(uint32_t), 1, fp) == 1) {
-                if (bId < static_cast<uint32_t>(Badge::COUNT)) {
-                    s_globalBadges.insert(static_cast<int>(bId));
-                }
+            if (std::fread(&bId, sizeof(uint32_t), 1, fp) != 1) {
+                break; // truncated file: a corrupt count would otherwise spin for billions of reads
+            }
+            if (bId < static_cast<uint32_t>(Badge::COUNT)) {
+                s_globalBadges.insert(static_cast<int>(bId));
             }
         }
         std::fread(&monstersSlainCount, sizeof(int), 1, fp);

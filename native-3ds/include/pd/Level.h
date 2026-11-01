@@ -128,10 +128,12 @@ public:
     void trample(int cell, Char* ch);
     void press(int cell, Char* ch);
     void mobPress(class Mob* mob);
+    // Level-specific reaction to a character entering a cell (boss arenas opening etc.)
+    virtual void onPress(int cell, Char* ch) { (void)cell; (void)ch; }
 
     // Heap management
     Heap* getHeap(int cell) const;
-    Heap* drop(std::unique_ptr<Item> item, int cell);
+    Heap* drop(std::unique_ptr<Item> item, int cell, Heap::Type type = Heap::Type::HEAP, bool pressCell = true);
     void removeHeap(Heap* heap);
 
     // Plant management

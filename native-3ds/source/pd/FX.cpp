@@ -99,9 +99,9 @@ void FX::update(float dt) {
     for (auto& w : s_wounds)    if (w.active) w.update(dt);
     for (auto& t : s_texts)     if (t.active) t.update(dt);
 
-    for (auto& m : s_missiles) {
-        if (m && m->active) {
-            m->update(dt);
+    for (size_t i = 0; i < s_missiles.size(); ++i) {
+        if (s_missiles[i] && s_missiles[i]->active) {
+            s_missiles[i]->update(dt);
         }
     }
     s_missiles.erase(

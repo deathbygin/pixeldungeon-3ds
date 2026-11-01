@@ -49,8 +49,10 @@ void Music::exit() {
 }
 
 void Music::play(const std::string& track, bool loop) {
+    // Audio::init() only initializes Music once ndspInit() succeeds. On hardware without
+    // sdmc:/3ds/dspfirm.cdc it fails, and touching NDSP channels afterwards hangs or crashes.
     if (!s_initialized) {
-        init();
+        return;
     }
 
     if (track.empty()) {
@@ -185,7 +187,9 @@ void Music::stop() {
         mp3dec_ex_close(&s_dec);
         s_decOpen = false;
     }
-    ndspChnReset(BGM_CHANNEL);
+    if (s_initialized) {
+        ndspChnReset(BGM_CHANNEL);
+    }
     for (int i = 0; i < BUFFER_COUNT; ++i) {
         s_waveBufs[i].status = NDSP_WBUF_FREE;
     }

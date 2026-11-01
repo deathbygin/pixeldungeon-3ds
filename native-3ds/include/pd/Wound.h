@@ -10,6 +10,8 @@ namespace pd {
 class Wound {
 public:
     static constexpr float TIME_TO_FADE = 0.8f;
+    // Overall size of the hit slash; 1.0 spans two tiles at the start of the fade.
+    static constexpr float SIZE = 0.5f;
 
     bool active = false;
     float time = 0.0f;

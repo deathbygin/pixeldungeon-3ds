@@ -4,16 +4,17 @@
 
 namespace pd {
 
-Ripple::Ripple() {
-    sprite = Effects::get(Effects::Type::RIPPLE);
-    if (sprite) {
+// Ripples live in a static pool, so the sprite is created on first use: loading the
+// texture from the constructor would run before main() has mounted RomFS.
+Ripple::Ripple() = default;
+
+void Ripple::reset(int cell) {
+    if (!sprite) {
+        sprite = Effects::get(Effects::Type::RIPPLE);
+        if (!sprite) return;
         sprite->origin.x = sprite->width / 2.0f;
         sprite->origin.y = sprite->height / 2.0f;
     }
-}
-
-void Ripple::reset(int cell) {
-    if (!sprite) return;
 
     active = true;
     time = TIME_TO_FADE;

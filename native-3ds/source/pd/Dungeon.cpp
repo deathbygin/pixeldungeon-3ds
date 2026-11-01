@@ -209,10 +209,15 @@ void Dungeon::announceLevelEntrance() {
     }
 }
 
-void Dungeon::newGame() {
-    s_gameEnded = false;
+void Dungeon::clearLevelCache() {
     s_cachedLevels.clear();
     s_cachedMobs.clear();
+    droppedItems.clear();
+}
+
+void Dungeon::newGame() {
+    s_gameEnded = false;
+    clearLevelCache();
     depth = 1;
     gold = 0;
     deepestFloor = 1;
@@ -250,6 +255,11 @@ void Dungeon::resetLevel() {
     level = Level::create(depth);
     int tries = 0;
     while (!level->build()) {
+        for (auto& mob : mobs) {
+            if (mob) Actor::remove(mob.get());
+        }
+        mobs.clear();
+        level = Level::create(depth);
         if (++tries > 500) break;
     }
 
@@ -339,18 +349,26 @@ void Dungeon::switchLevel(int newDepth, bool isFall) {
             }
         }
     } else {
+        mobs.clear();
         level = Level::create(depth);
         int tries = 0;
         while (!level->build()) {
+            for (auto& mob : mobs) {
+                if (mob) Actor::remove(mob.get());
+            }
+            mobs.clear();
+            level = Level::create(depth);
             if (++tries > 500) break;
         }
-        mobs.clear();
 
         int spawnPos;
         if (isFall) {
             spawnPos = level->hasPitRoom() ? level->pitCell() : level->randomRespawnCell();
         } else {
             spawnPos = descending ? level->entrance : level->exit;
+        }
+        if (spawnPos < 0 || spawnPos >= Level::LENGTH) {
+            spawnPos = level->randomRespawnCell();
         }
         hero->place(spawnPos);
         Actor::occupyCell(hero.get());

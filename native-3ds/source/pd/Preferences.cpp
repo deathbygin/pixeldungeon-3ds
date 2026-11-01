@@ -4,6 +4,7 @@
 #include "noosa/Camera.h"
 #include <cstdio>
 #include <algorithm>
+#include <cmath>
 
 namespace pd {
 
@@ -36,7 +37,7 @@ void Preferences::init() {
         std::fclose(fp);
 
         if (read == 1 && data.magic == SETTINGS_MAGIC && data.version == SETTINGS_VERSION) {
-            s_zoom = std::clamp(data.zoom, 1.0f, 3.0f);
+            s_zoom = std::isfinite(data.zoom) ? std::clamp(data.zoom, 1.0f, 3.0f) : 2.0f;
             s_music = (data.music != 0);
             s_soundFx = (data.soundFx != 0);
             s_brightness = (data.brightness != 0);

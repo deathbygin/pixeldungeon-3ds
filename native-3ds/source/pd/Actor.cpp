@@ -83,6 +83,14 @@ bool Actor::process() {
         return false;
     }
 
+    // The loop below only yields when the hero's act() asks for input. A living hero that
+    // fell off the schedule (e.g. HP restored after death removed it) would make it spin
+    // forever, freezing the console, so put it back.
+    Hero* hero = Dungeon::hero.get();
+    if (hero && hero->isAlive() && std::find(all.begin(), all.end(), hero) == all.end()) {
+        add(hero);
+    }
+
     bool doNext = false;
     do {
         now = FLT_MAX;

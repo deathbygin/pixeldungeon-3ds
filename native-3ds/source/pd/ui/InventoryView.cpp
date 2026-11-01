@@ -281,6 +281,7 @@ bool InventoryView::update(pd::Hero* hero, const TouchController& touch, u32 kDo
                 }
 
                 if (chosenAction == "THROW" || chosenAction == "ZAP" || chosenAction == "HEROIC LEAP" || chosenAction == "SMOKE BOMB") {
+                    it->castArmed = (chosenAction != "THROW");
                     outMessage = "START_TARGETING";
                     close();
                     return false;
@@ -289,7 +290,7 @@ bool InventoryView::update(pd::Hero* hero, const TouchController& touch, u32 kDo
                 outMessage = chosenAction + " " + it->displayName();
                 bool used = it->execute(hero, chosenAction);
                 if (used) {
-                    if (it->quantity <= 0) {
+                    if (hero->belongings.owns(it) && it->quantity <= 0) {
                         hero->belongings.drop(it);
                     }
                     close();

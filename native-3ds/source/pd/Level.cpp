@@ -217,12 +217,12 @@ void Level::trample(int cell, Char* ch) {
         }
         // Seed drop: Random.Int(18) <= Random.Int(herbalismLevel + 1)
         if (herbalismLevel >= 0 && Random::Int(18) <= Random::Int(herbalismLevel + 1)) {
-            drop(std::make_unique<PlantSeed>(static_cast<PlantSeed::PlantType>(Random::Int(8))), cell);
+            drop(std::make_unique<PlantSeed>(static_cast<PlantSeed::PlantType>(Random::Int(8))), cell, Heap::Type::HEAP, false);
         }
 
         // Dewdrop drop: Random.Int(6) <= Random.Int(herbalismLevel + 1)
         if (herbalismLevel >= 0 && Random::Int(6) <= Random::Int(herbalismLevel + 1)) {
-            drop(std::make_unique<Dewdrop>(), cell);
+            drop(std::make_unique<Dewdrop>(), cell, Heap::Type::HEAP, false);
         }
 
         Dungeon::observe();
@@ -231,6 +231,8 @@ void Level::trample(int cell, Char* ch) {
 
 void Level::press(int cell, Char* ch) {
     if (cell < 0 || cell >= LENGTH) return;
+
+    onPress(cell, ch);
 
     // Flying / levitating characters pass harmlessly over traps and chasms
     if (ch && ch->flying) return;
@@ -559,7 +561,7 @@ Heap* Level::getHeap(int cell) const {
     return nullptr;
 }
 
-Heap* Level::drop(std::unique_ptr<Item> item, int cell) {
+Heap* Level::drop(std::unique_ptr<Item> item, int cell, Heap::Type type, bool pressCell) {
     if (!item || cell < 0 || cell >= LENGTH) return nullptr;
 
     if (map[cell] == Terrain::CHASM || pit[cell]) {
@@ -569,7 +571,7 @@ Heap* Level::drop(std::unique_ptr<Item> item, int cell) {
 
     Heap* h = getHeap(cell);
     if (!h) {
-        auto newHeap = std::make_unique<Heap>(cell, Heap::Type::HEAP);
+        auto newHeap = std::make_unique<Heap>(cell, type);
         h = newHeap.get();
         heaps.push_back(std::move(newHeap));
     }
@@ -579,7 +581,16 @@ Heap* Level::drop(std::unique_ptr<Item> item, int cell) {
         Dungeon::hero->disableAutoPick(cell);
     }
 
-    press(cell, nullptr);
+    if (pressCell) {
+        press(cell, nullptr);
+    }
+
+    // Safety check: ensure h was not removed/freed (e.g. by press() triggering a trap or effect)
+    auto it = std::find_if(heaps.begin(), heaps.end(),
+                           [h](const std::unique_ptr<Heap>& ptr) { return ptr.get() == h; });
+    if (it == heaps.end()) {
+        return nullptr;
+    }
 
     return h;
 }
@@ -669,12 +680,12 @@ std::unique_ptr<Level> Level::create(int depth) {
     case 17:
     case 18:
     case 19:
-    case 21:
         level = std::make_unique<CityLevel>();
         break;
     case 20:
         level = std::make_unique<CityBossLevel>();
         break;
+    case 21:
     case 22:
     case 23:
     case 24:

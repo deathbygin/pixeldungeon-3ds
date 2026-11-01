@@ -84,7 +84,7 @@ DebugMenuAction WndDebugMenu::update(const pd::ui::TouchController& touch, u32 k
                 GLog::p(std::string("[DEBUG] One-Hit Kill: ") + (Debug::oneHitKill ? "ON" : "OFF"));
                 return DebugMenuAction::TOGGLE_ONE_HIT_KILL;
             } else if (act == DebugMenuAction::HEAL_HERO) {
-                if (Dungeon::hero) {
+                if (Dungeon::hero && Dungeon::hero->isAlive()) { // a dead hero is already off the turn schedule
                     Dungeon::hero->HP = Dungeon::hero->HT;
                     Dungeon::hero->removeBuff(BuffType::Poison);
                     Dungeon::hero->removeBuff(BuffType::Burning);
@@ -128,7 +128,7 @@ DebugMenuAction WndDebugMenu::update(const pd::ui::TouchController& touch, u32 k
                 GLog::p(std::string("[DEBUG] One-Hit Kill: ") + (Debug::oneHitKill ? "ON" : "OFF"));
                 return DebugMenuAction::TOGGLE_ONE_HIT_KILL;
             } else if (b.action == DebugMenuAction::HEAL_HERO) {
-                if (Dungeon::hero) {
+                if (Dungeon::hero && Dungeon::hero->isAlive()) { // a dead hero is already off the turn schedule
                     Dungeon::hero->HP = Dungeon::hero->HT;
                     Dungeon::hero->removeBuff(BuffType::Poison);
                     Dungeon::hero->removeBuff(BuffType::Burning);

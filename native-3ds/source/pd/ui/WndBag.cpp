@@ -133,6 +133,7 @@ bool WndBag::update(pd::Hero* hero, const TouchController& touch, u32 kDown, u32
                 return false;
             }
             if (action == "THROW" || action == "ZAP" || action == "HEROIC LEAP" || action == "SMOKE BOMB") {
+                if (subIt) subIt->castArmed = (action != "THROW");
                 outMessage = "START_TARGETING";
                 close();
                 return false;
@@ -142,7 +143,7 @@ bool WndBag::update(pd::Hero* hero, const TouchController& touch, u32 kDown, u32
             }
             if (turnAdvanced) {
                 outMessage = action + " " + subName;
-                if (subIt && subIt->quantity <= 0) {
+                if (hero->belongings.owns(subIt) && subIt->quantity <= 0) {
                     hero->belongings.drop(subIt);
                 }
                 close();

@@ -34,6 +34,9 @@ public:
     bool equip(std::unique_ptr<Item> item);
     bool unequip(Item* item);
     std::unique_ptr<Item> drop(Item* item);
+    // Whether the item is still held (pack, equipment or keyring). Callers check this before
+    // touching an item after its action: the action may have dropped, burnt or consumed it.
+    bool owns(const Item* item) const;
     Item* getKey(const std::string& keyName, int depth);
     bool consumeKey(const std::string& keyName, int depth);
     Item* getItem(const std::string& itemName);
