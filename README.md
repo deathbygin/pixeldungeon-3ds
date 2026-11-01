@@ -18,9 +18,9 @@ DISCLAIMER: AI was used in creating this port - mainly in translating Java funct
 
 ---
 
-## ALPHA RELEASE
+## BETA RELEASE
 
-The current release is in an Alpha state. There will likely be bugs and gameplay disparities. Crashes will happen. Please help resolve these quickly by reporting them in the Issues tab and attaching your Luma crash log if applicable.
+The current release has moved to a BETA state. There may continue to be gameplay disparities and crashes may occur. Please help resolve these quickly by reporting them in the Issues tab and attaching your Luma crash log if applicable. If updating from the ALPHA release, please start a new game.
 
 ---
 
