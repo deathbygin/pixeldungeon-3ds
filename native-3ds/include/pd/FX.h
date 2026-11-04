@@ -39,7 +39,8 @@ public:
     static void searchCell(int cell);
     static void floatingText(int cell, const std::string& str, uint32_t color);
     static void burst(float wx, float wy, uint32_t color, int count,
-                      float speedMin = 30.0f, float speedMax = 70.0f, float gravity = 80.0f);
+                      float speedMin = 30.0f, float speedMax = 70.0f, float gravity = 80.0f,
+                      float startPlane = noosa::Stereo::PLANE_ENTITY, float planeRise = 3.0f);
     static void burst(int cell, uint32_t color, int count,
                       float speedMin = 30.0f, float speedMax = 70.0f, float gravity = 80.0f) {
         float wx = (cell % 32) * 16.0f + 8.0f;
@@ -87,6 +88,7 @@ private:
         bool active = false;
         std::vector<int> points;
         float time = 0.3f;
+        std::vector<noosa::PointF> jitter; // Per-segment midpoint offset, rolled once per frame so both eyes match
         std::function<void()> callback = nullptr;
     };
     static LightningState s_lightning;

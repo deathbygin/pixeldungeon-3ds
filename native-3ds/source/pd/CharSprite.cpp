@@ -6,6 +6,7 @@
 #include "pd/Dungeon.h"
 #include "pd/Assets.h"
 #include "noosa/Texture.h"
+#include "noosa/Stereo.h"
 #include <algorithm>
 #include <cmath>
 
@@ -85,6 +86,35 @@ void CharSprite::move(int from, int to) {
     }
 }
 
+void CharSprite::jump(int from, int to, std::function<void()> callback) {
+    turnTo(from, to);
+
+    int fx = from % Level::WIDTH;
+    int fy = from / Level::WIDTH;
+    int tx = to % Level::WIDTH;
+    int ty = to / Level::WIDTH;
+
+    m_startX = (fx + 0.5f) * 16.0f - m_width * 0.5f;
+    m_startY = (fy + 1.0f) * 16.0f - m_height;
+    m_targetX = (tx + 0.5f) * 16.0f - m_width * 0.5f;
+    m_targetY = (ty + 1.0f) * 16.0f - m_height;
+
+    int distance = std::max(1, std::max(std::abs(tx - fx), std::abs(ty - fy)));
+    m_jumpHeight = distance * 4.0f;
+    m_jumpDuration = distance * 0.1f;
+    m_jumpElapsed = 0.0f;
+    m_jumpAltitude = 0.0f;
+    m_jumpCallback = std::move(callback);
+
+    m_isMoving = false;
+    m_isJumping = true;
+
+    m_state = State::Run;
+    if (!m_run.frames.empty()) {
+        m_movieClip.play(m_run);
+    }
+}
+
 void CharSprite::attack(int targetCell) {
     if (m_char) {
         turnTo(m_char->pos, targetCell);
@@ -128,7 +158,25 @@ void CharSprite::turnTo(int from, int to) {
 }
 
 void CharSprite::update(float dt) {
-    if (m_isMoving) {
+    bool landed = false;
+
+    if (m_isJumping) {
+        m_jumpElapsed += dt;
+        float t = std::min(1.0f, m_jumpElapsed / m_jumpDuration);
+        m_jumpAltitude = 4.0f * t * (1.0f - t);
+
+        // In stereo, real depth carries half of the height the screen-space arc shows in 2D
+        float arcScale = noosa::Stereo::isActive() ? 0.5f : 1.0f;
+        m_worldX = m_startX + (m_targetX - m_startX) * t;
+        m_worldY = m_startY + (m_targetY - m_startY) * t - m_jumpHeight * m_jumpAltitude * arcScale;
+
+        if (t >= 1.0f) {
+            m_isJumping = false;
+            m_jumpAltitude = 0.0f;
+            landed = true;
+            idle();
+        }
+    } else if (m_isMoving) {
         m_moveTimer -= dt;
         float progress = 1.0f - std::max(0.0f, m_moveTimer / MOVE_INTERVAL);
         progress = std::clamp(progress, 0.0f, 1.0f);
@@ -167,6 +215,26 @@ void CharSprite::update(float dt) {
     }
 
     m_movieClip.update(dt);
+
+    // Last, as landing can run a full game turn
+    if (landed && m_jumpCallback) {
+        auto cb = std::move(m_jumpCallback);
+        m_jumpCallback = nullptr;
+        cb();
+    }
+}
+
+void CharSprite::drawJumpShadow(const noosa::Camera* camera) const {
+    if (!m_isJumping || !camera) return;
+
+    float t = std::min(1.0f, m_jumpElapsed / m_jumpDuration);
+    float groundX = m_startX + (m_targetX - m_startX) * t + m_width * 0.5f;
+    float groundY = m_startY + (m_targetY - m_startY) * t + m_height;
+
+    float sx, sy;
+    camera->worldToScreen(groundX, groundY, sx, sy);
+    float radius = (6.0f - 2.0f * m_jumpAltitude) * camera->getZoom();
+    C2D_DrawCircleSolid(sx, sy - 2.0f * camera->getZoom(), 0.28f, radius, C2D_Color32(0x00, 0x00, 0x00, 0x88));
 }
 
 void CharSprite::draw(const noosa::Camera* camera) {
@@ -188,7 +256,16 @@ void CharSprite::draw(const noosa::Camera* camera) {
         }
     }
 
+    using noosa::Stereo;
+    if (m_isJumping) {
+        Stereo::setDepth(Stereo::PLANE_ENTITY + (Stereo::PLANE_APEX - Stereo::PLANE_ENTITY) * m_jumpAltitude);
+    }
+
     m_movieClip.draw(camera);
+
+    if (m_isJumping) {
+        Stereo::setPlane(Stereo::PLANE_ENTITY);
+    }
 }
 
 // =============================================================================

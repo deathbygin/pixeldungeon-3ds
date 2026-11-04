@@ -203,6 +203,30 @@ bool Texture::updateSubRGBA8(const uint8_t* rgbaPixels, int width, int height) {
     return true;
 }
 
+uint32_t Texture::averageColor(int x, int y, int w, int h) const {
+    if (!m_ownsTex || !m_tex.data) return 0;
+
+    const uint8_t* src = static_cast<const uint8_t*>(m_tex.data);
+    uint32_t r = 0, g = 0, b = 0, count = 0;
+
+    for (int py = std::max(0, y); py < std::min(y + h, m_potHeight); ++py) {
+        for (int px = std::max(0, x); px < std::min(x + w, m_potWidth); ++px) {
+            const uint8_t* pixel = src + getMortonTileOffset(static_cast<uint32_t>(px),
+                                                             static_cast<uint32_t>(py),
+                                                             static_cast<uint32_t>(m_potWidth),
+                                                             4);
+            if (pixel[0] == 0) continue; // Transparent
+            b += pixel[1];
+            g += pixel[2];
+            r += pixel[3];
+            count++;
+        }
+    }
+
+    if (count == 0) return 0;
+    return (r / count) | ((g / count) << 8) | ((b / count) << 16);
+}
+
 void Texture::setFilter(GPU_TEXTURE_FILTER_PARAM mag, GPU_TEXTURE_FILTER_PARAM min) {
     if (m_ownsTex) {
         C3D_TexSetFilter(&m_tex, mag, min);

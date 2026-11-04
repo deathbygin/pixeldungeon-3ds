@@ -3,6 +3,8 @@
 #include "pd/Random.h"
 #include "pd/MissileSprite.h"
 #include "pd/Buff.h"
+#include "pd/CharSprite.h"
+#include "noosa/Stereo.h"
 #include <cmath>
 
 namespace pd {
@@ -32,6 +34,13 @@ float FX::s_blobEmitTimer = 0.0f;
 static float s_flashDuration = 0.0f;
 static float s_flashElapsed = 0.0f;
 static uint32_t s_flashColor = 0xFFFFFFFF;
+
+using noosa::Stereo;
+
+// Gas hangs low over the terrain; anything burning or welling up starts on the floor itself
+static constexpr float GAS_PLANE = Stereo::PLANE_WALL;
+static constexpr float GAS_RISE = 4.0f;
+static constexpr float FLOOR_RISE = Stereo::PLANE_APEX - Stereo::PLANE_FLOOR;
 
 void FX::init() {
     clear();
@@ -128,7 +137,8 @@ void FX::update(float dt) {
                     float vx = Random::Float(-10.0f, 10.0f);
                     float vy = Random::Float(-10.0f, 10.0f);
                     p.reset(s_magicMissile.curX, s_magicMissile.curY, s_magicMissile.color,
-                            Random::Float(2.5f, 4.0f), 0.22f, vx, vy, 0.0f, 0.0f, true);
+                            Random::Float(2.5f, 4.0f), 0.22f, vx, vy, 0.0f, 0.0f, true,
+                            Stereo::PLANE_ENTITY, Stereo::PLANE_APEX);
                     break;
                 }
             }
@@ -137,6 +147,10 @@ void FX::update(float dt) {
 
     if (s_lightning.active) {
         s_lightning.time -= dt;
+        for (auto& j : s_lightning.jitter) {
+            j.x = Random::Float(-4.0f, 4.0f);
+            j.y = Random::Float(-4.0f, 4.0f);
+        }
         if (s_lightning.time <= 0.0f) {
             s_lightning.active = false;
             if (s_lightning.callback) {
@@ -165,10 +179,11 @@ void FX::update(float dt) {
         s_blobEmitTimer = 0.0f;
 
         auto spawnParticle = [](float wx, float wy, uint32_t col, float sz, float life,
-                                float vx, float vy, float ax, float ay, bool shrink) {
+                                float vx, float vy, float ax, float ay, bool shrink,
+                                float startPlane = Stereo::PLANE_ENTITY, float planeRise = 3.0f) {
             for (auto& p : s_particles) {
                 if (!p.active) {
-                    p.reset(wx, wy, col, sz, life, vx, vy, ax, ay, shrink);
+                    p.reset(wx, wy, col, sz, life, vx, vy, ax, ay, shrink, startPlane, planeRise);
                     return true;
                 }
             }
@@ -199,7 +214,7 @@ void FX::update(float dt) {
                         float vx = Random::Float(-5.0f, 5.0f);
                         float vy = Random::Float(-35.0f, -65.0f);
                         float ay = -80.0f; // Rapid buoyant upward acceleration matching FlameParticle
-                        if (!spawnParticle(wx, wy, col, sz, life, vx, vy, 0.0f, ay, true)) {
+                        if (!spawnParticle(wx, wy, col, sz, life, vx, vy, 0.0f, ay, true, Stereo::PLANE_FLOOR, FLOOR_RISE)) {
                             break;
                         }
                     }
@@ -321,7 +336,9 @@ void FX::update(float dt) {
                             break;
                         }
 
-                        spawnParticle(wx, wy, col, sz, life, vx, vy, ax, ay, shrink);
+                        spawnParticle(wx, wy, col, sz, life, vx, vy, ax, ay, shrink,
+                                      isWellWater ? Stereo::PLANE_FLOOR : GAS_PLANE,
+                                      isWellWater ? FLOOR_RISE : GAS_RISE);
                     }
                 }
             }
@@ -360,7 +377,8 @@ void FX::update(float dt) {
                     uint32_t frostCol = (Random::Int(2) == 0) ? 0xD0F0FFFF : 0xFFFFFFFF;
                     spawnParticle(wx, wy, frostCol, Random::Float(2.0f, 3.5f),
                                   Random::Float(0.8f, 1.3f), Random::Float(-2.0f, 2.0f),
-                                  Random::Float(6.0f, 14.0f), 0.0f, 5.0f, false);
+                                  Random::Float(6.0f, 14.0f), 0.0f, 5.0f, false,
+                                  Stereo::PLANE_ENTITY, 0.0f);
                 }
             }
 
@@ -377,7 +395,8 @@ void FX::update(float dt) {
                     float wy = cy + Random::Float(-10.0f, -2.0f); // Emanating from torch held high
                     spawnParticle(wx, wy, torchCols[Random::Int(4)], Random::Float(2.0f, 3.5f),
                                   Random::Float(0.35f, 0.55f), Random::Float(-4.0f, 4.0f),
-                                  Random::Float(-22.0f, -42.0f), 0.0f, -35.0f, true);
+                                  Random::Float(-22.0f, -42.0f), 0.0f, -35.0f, true,
+                                  Stereo::PLANE_ENTITY, Stereo::PLANE_APEX);
                 }
             }
         };
@@ -405,6 +424,9 @@ void FX::drawGround(const noosa::Camera* camera) {
         float radius = 24.0f * zoom * pulse;
         C2D_DrawCircleSolid(sx, sy, 0.21f, radius, C2D_Color32(0xFF, 0xDD, 0xAA, 0x24));
     }
+
+    // Shadows of airborne missiles land here too: drawn any later, the depth buffer would reject them
+    for (const auto& m : s_missiles) if (m && m->active) m->drawShadow(camera);
 }
 
 void FX::draw(const noosa::Camera* camera, C2D_TextBuf textBuf) {
@@ -443,8 +465,8 @@ void FX::draw(const noosa::Camera* camera, C2D_TextBuf textBuf) {
             float y1 = (c1 / Level::WIDTH) * 16.0f + 8.0f;
             float x2 = (c2 % Level::WIDTH) * 16.0f + 8.0f;
             float y2 = (c2 / Level::WIDTH) * 16.0f + 8.0f;
-            float mx = (x1 + x2) * 0.5f + Random::Float(-4.0f, 4.0f);
-            float my = (y1 + y2) * 0.5f + Random::Float(-4.0f, 4.0f);
+            float mx = (x1 + x2) * 0.5f + s_lightning.jitter[i].x;
+            float my = (y1 + y2) * 0.5f + s_lightning.jitter[i].y;
             float sx1, sy1, smx, smy, sx2, sy2;
             camera->worldToScreen(x1, y1, sx1, sy1);
             camera->worldToScreen(mx, my, smx, smy);
@@ -465,8 +487,10 @@ void FX::draw(const noosa::Camera* camera, C2D_TextBuf textBuf) {
         C2D_DrawCircleSolid(msx, msy, 0.77f, 3.5f * camera->getZoom(), s_magicMissile.color);
     }
 
-    // 5. Floating damage / text indicators (drawn on top)
+    // 5. Floating damage / text indicators (drawn on top, on the nearest plane)
+    Stereo::setPlane(Stereo::PLANE_UI);
     for (const auto& t : s_texts) if (t.active) t.draw(camera, textBuf);
+    Stereo::setPlane(Stereo::PLANE_ENTITY);
 }
 
 void FX::splash(int cell, uint32_t color, int count) {
@@ -499,9 +523,9 @@ void FX::waterSplash(int cell, int count) {
 
     int half1 = (count + 1) / 2;
     int half2 = count - half1;
-    burst(cx, cy, baseCol, half1, 40.0f, 80.0f, +100.0f);
+    burst(cx, cy, baseCol, half1, 40.0f, 80.0f, +100.0f, Stereo::PLANE_FLOOR, FLOOR_RISE);
     if (half2 > 0) {
-        burst(cx, cy, highlightCol, half2, 35.0f, 70.0f, +90.0f);
+        burst(cx, cy, highlightCol, half2, 35.0f, 70.0f, +90.0f, Stereo::PLANE_FLOOR, FLOOR_RISE);
     }
 }
 
@@ -565,7 +589,8 @@ void FX::floatingText(int cell, const std::string& str, uint32_t color) {
 }
 
 void FX::burst(float wx, float wy, uint32_t color, int count,
-               float speedMin, float speedMax, float gravity) {
+               float speedMin, float speedMax, float gravity,
+               float startPlane, float planeRise) {
     int spawned = 0;
     for (auto& p : s_particles) {
         if (!p.active) {
@@ -576,7 +601,7 @@ void FX::burst(float wx, float wy, uint32_t color, int count,
 
             p.reset(wx, wy, color, Random::Float(3.0f, 5.0f),
                     Random::Float(0.4f, 0.7f),
-                    vx, vy, 0.0f, gravity, true);
+                    vx, vy, 0.0f, gravity, true, startPlane, planeRise);
 
             if (++spawned >= count) break;
         }
@@ -645,6 +670,7 @@ void FX::magicMissile(int fromCell, int toCell, uint32_t color, std::function<vo
 void FX::lightning(const std::vector<int>& points, std::function<void()> callback) {
     s_lightning.active = true;
     s_lightning.points = points;
+    s_lightning.jitter.assign(points.size(), noosa::PointF(0.0f, 0.0f));
     s_lightning.time = 0.3f;
     s_lightning.callback = std::move(callback);
 }
@@ -659,7 +685,9 @@ void FX::deathRay(int fromCell, int toCell, std::function<void()> callback) {
 }
 
 bool FX::isMissileActive() {
-    return !s_missiles.empty() || s_magicMissile.active || s_lightning.active;
+    CharSprite* heroSprite = Dungeon::hero ? Dungeon::hero->getSprite() : nullptr;
+    return !s_missiles.empty() || s_magicMissile.active || s_lightning.active ||
+           (heroSprite && heroSprite->isJumping());
 }
 
 } // namespace pd

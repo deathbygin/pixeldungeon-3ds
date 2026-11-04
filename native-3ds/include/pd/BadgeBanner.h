@@ -5,8 +5,11 @@
 #include <memory>
 #include "pd/Badges.h"
 #include "noosa/Texture.h"
+#include "noosa/Camera.h"
 
 namespace pd {
+
+class FrostedGlass;
 
 class BadgeBanner {
 public:
@@ -19,7 +22,7 @@ public:
 
     static void show(Badges::Badge badge);
     static void update(float dt);
-    static void drawTop(C2D_TextBuf textBuf);
+    static void drawTop(C2D_TextBuf textBuf, const noosa::Camera* camera, const FrostedGlass& glass);
     static bool isActive();
 
     static void drawBadge(int imageIndex, float x, float y, float scale = 1.0f, float alpha = 1.0f, bool locked = false, float depth = 0.65f);

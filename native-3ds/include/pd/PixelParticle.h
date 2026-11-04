@@ -2,6 +2,7 @@
 
 #include "noosa/Types.h"
 #include "noosa/Camera.h"
+#include "noosa/Stereo.h"
 #include <citro2d.h>
 
 namespace pd {
@@ -19,11 +20,15 @@ public:
     bool shrinking = true;
     bool active = false;
 
+    // Stereo depth: starts on `plane` and climbs towards the viewer by `rise` over its lifespan
+    float plane = noosa::Stereo::PLANE_ENTITY;
+    float rise = 0.0f;
+
     PixelParticle() = default;
 
     void reset(float x, float y, uint32_t col, float sz, float life,
                float vx = 0.0f, float vy = 0.0f, float ax = 0.0f, float ay = 0.0f,
-               bool shrink = true);
+               bool shrink = true, float startPlane = noosa::Stereo::PLANE_ENTITY, float planeRise = 3.0f);
 
     void update(float dt);
     void draw(const noosa::Camera* camera) const;

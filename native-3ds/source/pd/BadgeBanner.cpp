@@ -1,5 +1,6 @@
 #include "pd/BadgeBanner.h"
 #include "pd/Assets.h"
+#include "pd/FrostedGlass.h"
 #include "pd/Sample.h"
 #include "pd/ui/BitmapFont.h"
 #include <algorithm>
@@ -140,7 +141,7 @@ void BadgeBanner::highlight(int imageIndex, float x, float y, float scale, float
     C2D_DrawRectSolid(sparkX, sparkY, depth, sparkSize, sparkSize, C2D_Color32(0xFF, 0xFF, 0xFF, 0xEE));
 }
 
-void BadgeBanner::drawTop(C2D_TextBuf textBuf) {
+void BadgeBanner::drawTop(C2D_TextBuf textBuf, const noosa::Camera* camera, const FrostedGlass& glass) {
     (void)textBuf;
     if (s_state == State::INACTIVE || s_currentBadge >= Badges::Badge::COUNT) return;
 
@@ -159,19 +160,21 @@ void BadgeBanner::drawTop(C2D_TextBuf textBuf) {
 
     // Banner layout on Top Screen (400x240)
     float bW = 340.0f;
-    float bH = 56.0f;
+    float bH = 68.0f;
     float bX = (400.0f - bW) * 0.5f;
-    float bY = 80.0f;
+    float bY = 76.0f;
     float zBg = 0.94f;
     float zContent = 0.95f;
     float zText = 0.96f;
 
-    u8 aBg = static_cast<u8>(230.0f * alpha);
+    u8 aGlass = static_cast<u8>(255.0f * alpha);
+    u8 aFrost = static_cast<u8>(150.0f * alpha);
     u8 aBorder = static_cast<u8>(255.0f * alpha);
     u8 aText = static_cast<u8>(255.0f * alpha);
 
-    // Background Plaque
-    C2D_DrawRectSolid(bX, bY, zBg, bW, bH, C2D_Color32(0x14, 0x16, 0x12, aBg));
+    // Frosted glass plaque: the blurred dungeon behind it, under a dark veil keeping text legible
+    glass.draw(camera, bX, bY, bW, bH, zBg, aGlass);
+    C2D_DrawRectSolid(bX, bY, zBg + 0.002f, bW, bH, C2D_Color32(0x14, 0x16, 0x12, aFrost));
     // Gold borders (top & bottom)
     C2D_DrawRectSolid(bX, bY, zBg + 0.005f, bW, 2.0f, C2D_Color32(0xFF, 0xAA, 0x22, aBorder));
     C2D_DrawRectSolid(bX, bY + bH - 2.0f, zBg + 0.005f, bW, 2.0f, C2D_Color32(0xFF, 0xAA, 0x22, aBorder));
@@ -183,30 +186,20 @@ void BadgeBanner::drawTop(C2D_TextBuf textBuf) {
     float iconSize = 32.0f * scaleAnim;
     float iconX = bX + 16.0f + (32.0f - iconSize) * 0.5f;
     float iconY = bY + (bH - iconSize) * 0.5f;
-    drawBadge(info.image >= 0 ? info.image : 0, iconX, iconY, 2.0f * scaleAnim, alpha, false);
-
-    // Sparkling highlight in STATIC state
-    if (s_state == State::STATIC) {
-        float sparkPhase = std::fmod(s_sparkleTime * 3.0f, 1.0f);
-        if (sparkPhase < 0.4f) {
-            float spX = iconX + 6.0f;
-            float spY = iconY + 6.0f;
-            C2D_DrawCircleSolid(spX, spY, zContent + 0.01f, 3.0f, C2D_Color32(0xFF, 0xFF, 0xFF, static_cast<u8>(220 * alpha)));
-        }
-    }
+    drawBadge(info.image >= 0 ? info.image : 0, iconX, iconY, 2.0f * scaleAnim, alpha, false, zContent);
 
     // Texts on Right
     float textX = bX + 60.0f;
-    float titleY = bY + 11.0f;
-    float descY = bY + 29.0f;
+    float maxTextW = bW - 60.0f - 8.0f;
 
     std::string headerStr = info.meta ? "SUPER BADGE UNLOCKED!" : "BADGE UNLOCKED!";
     u32 headerCol = C2D_Color32(0xFF, 0xAA, 0x22, aText);
-    u32 shadowCol = C2D_Color32(0x10, 0x10, 0x10, aText);
-    u32 descCol = C2D_Color32(0xEE, 0xEE, 0xEE, aText);
+    u32 titleCol = C2D_Color32(0xFF, 0xFF, 0xFF, aText);
+    u32 descCol = C2D_Color32(0xBB, 0xBB, 0xBB, aText);
 
-    ui::BitmapFont::drawWithShadow(ui::BitmapFont::FontType::Font1x, headerStr, textX, titleY, zText, headerCol, shadowCol);
-    ui::BitmapFont::drawWithShadow(ui::BitmapFont::FontType::Font1x, info.description, textX, descY, zText, descCol, shadowCol);
+    ui::BitmapFont::draw(ui::BitmapFont::FontType::Font1x, headerStr, textX, bY + 7.0f, zText, headerCol);
+    ui::BitmapFont::draw(ui::BitmapFont::FontType::Font1x, info.title, textX, bY + 21.0f, zText, titleCol);
+    ui::BitmapFont::drawMultiline(ui::BitmapFont::FontType::Font1x, info.description, textX, bY + 35.0f, maxTextW, zText, descCol);
 }
 
 } // namespace pd

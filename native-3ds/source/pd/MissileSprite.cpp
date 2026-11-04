@@ -2,6 +2,7 @@
 #include "pd/Level.h"
 #include "pd/ItemSpriteSheet.h"
 #include "noosa/Camera.h"
+#include "noosa/Stereo.h"
 #include <cmath>
 #include <algorithm>
 
@@ -16,7 +17,7 @@ void MissileSprite::initFilm(std::shared_ptr<noosa::TextureFilm> film) {
 MissileSprite::MissileSprite() {
     active = false;
     visible = false;
-    z = 0.70f; // Render above characters (0.60f) and fog of war (0.65f)
+    z = 0.80f; // Render above characters (0.60f), particles (0.78f) and targeting overlays (0.79f)
     origin = noosa::PointF(8.0f, 8.0f); // Center origin for 16x16 sprite rotation
     targetScreen = noosa::ScreenTarget::Top;
 }
@@ -102,6 +103,11 @@ void MissileSprite::update(float dt) {
     // Parabolic vertical arc offset: -height * 4 * t * (1 - t)
     float arcOffset = -heightArc * 4.0f * t * (1.0f - t);
 
+    // In stereo, real depth carries half of the height the screen-space arc shows in 2D
+    if (noosa::Stereo::isActive()) {
+        arcOffset *= 0.5f;
+    }
+
     x = curX;
     y = curY + arcOffset;
 
@@ -110,13 +116,13 @@ void MissileSprite::update(float dt) {
     }
 }
 
-void MissileSprite::draw(const noosa::Camera* camera) {
+void MissileSprite::drawShadow(const noosa::Camera* camera) const {
     if (!active || !visible) return;
 
     float zoom = camera ? camera->getZoom() : 1.0f;
     float t = duration > 0.0f ? std::clamp(elapsed / duration, 0.0f, 1.0f) : 0.0f;
 
-    // 1. Ground shadow (directly underneath the airborne projectile on the floor)
+    // Ground shadow (directly underneath the airborne projectile on the floor)
     float curGroundX = startX + (targetX - startX) * t;
     float curGroundY = startY + (targetY - startY) * t;
     float gsx, gsy;
@@ -129,8 +135,19 @@ void MissileSprite::draw(const noosa::Camera* camera) {
     float altRatio = std::max(0.0f, 4.0f * t * (1.0f - t));
     float shadowRadius = std::max(1.5f, (3.5f - 1.0f * altRatio)) * zoom;
     C2D_DrawCircleSolid(gsx, gsy + 4.0f * zoom, 0.28f, shadowRadius, C2D_Color32(0x00, 0x00, 0x00, 0x88));
+}
 
-    // 2. Airborne flying projectile
+void MissileSprite::draw(const noosa::Camera* camera) {
+    if (!active || !visible) return;
+
+    float zoom = camera ? camera->getZoom() : 1.0f;
+    float t = duration > 0.0f ? std::clamp(elapsed / duration, 0.0f, 1.0f) : 0.0f;
+
+    // Longer throws fly higher, breaking further out of the foreground plane at their apex
+    using noosa::Stereo;
+    float altitude = 4.0f * t * (1.0f - t) * (heightArc / 32.0f);
+    Stereo::setDepth(Stereo::PLANE_ENTITY + (Stereo::PLANE_APEX - Stereo::PLANE_ENTITY) * altitude);
+
     if (m_image.tex && m_image.subtex) {
         noosa::Image::draw(camera);
     } else {
@@ -145,6 +162,8 @@ void MissileSprite::draw(const noosa::Camera* camera) {
         float size = 8.0f * zoom;
         C2D_DrawRectSolid(px - size * 0.5f, py - size * 0.5f, z, size, size, C2D_Color32(0xff, 0xee, 0x66, 0xFF));
     }
+
+    Stereo::setPlane(Stereo::PLANE_ENTITY);
 }
 
 } // namespace pd

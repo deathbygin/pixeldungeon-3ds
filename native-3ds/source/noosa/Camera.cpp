@@ -1,5 +1,6 @@
 #include "noosa/Camera.h"
 #include "noosa/Visual.h"
+#include "noosa/Stereo.h"
 #include <cmath>
 #include <cstdlib>
 
@@ -118,13 +119,20 @@ bool Camera::isVisible(float wx, float wy, float w, float h) const {
     float sw = w * m_zoom;
     float sh = h * m_zoom;
 
-    return (sx + sw >= 0.0f && sx <= m_viewportW &&
+    float margin = Stereo::isActive() ? Stereo::MAX_EYE_SHIFT : 0.0f;
+
+    return (sx + sw >= -margin && sx <= m_viewportW + margin &&
             sy + sh >= 0.0f && sy <= m_viewportH);
 }
 
 void Camera::getVisibleWorldBounds(float& left, float& top, float& right, float& bottom) const {
     screenToWorld(0.0f, 0.0f, left, top);
     screenToWorld(m_viewportW, m_viewportH, right, bottom);
+
+    if (Stereo::isActive()) {
+        left -= Stereo::MAX_EYE_SHIFT / m_zoom;
+        right += Stereo::MAX_EYE_SHIFT / m_zoom;
+    }
 }
 
 } // namespace noosa

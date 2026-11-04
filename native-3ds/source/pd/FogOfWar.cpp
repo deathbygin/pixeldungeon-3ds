@@ -47,7 +47,12 @@ FogOfWar::FogOfWar(int mapWidth, int mapHeight)
     scale.x = 16.0f;
     scale.y = 16.0f;
     targetScreen = noosa::ScreenTarget::Top;
-    z = 0.65f;
+    z = 0.40f;
+}
+
+uint8_t FogOfWar::rememberedShade() {
+    uint32_t fogAlpha = (pd::Preferences::brightness() ? 0x88111111u : COLOR_VISITED) >> 24;
+    return static_cast<uint8_t>(255 - fogAlpha);
 }
 
 void FogOfWar::updateVisibility(const bool* visible, const bool* visited, const bool* mapped) {

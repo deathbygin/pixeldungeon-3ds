@@ -4,7 +4,8 @@
 namespace pd {
 
 void PixelParticle::reset(float x, float y, uint32_t col, float sz, float life,
-                          float vx, float vy, float ax, float ay, bool shrink) {
+                          float vx, float vy, float ax, float ay, bool shrink,
+                          float startPlane, float planeRise) {
     pos.x = x;
     pos.y = y;
     speed.x = vx;
@@ -16,6 +17,8 @@ void PixelParticle::reset(float x, float y, uint32_t col, float sz, float life,
     lifespan = (life > 0.0f) ? life : 0.6f;
     left = lifespan;
     shrinking = shrink;
+    plane = startPlane;
+    rise = planeRise;
     active = true;
 }
 
@@ -59,7 +62,9 @@ void PixelParticle::draw(const noosa::Camera* camera) const {
     uint8_t b = static_cast<uint8_t>((color >> 8) & 0xFF);
 
     u32 finalColor = C2D_Color32(r, g, b, a);
-    // Depth 0.78f ensures particles render in front of characters (0.60f) and Fog of War (0.65f)
+    drawX += noosa::Stereo::shift(plane + rise * (1.0f - p));
+
+    // Depth 0.78f ensures particles render in front of characters (0.60f)
     C2D_DrawRectSolid(drawX - curSize * 0.5f, drawY - curSize * 0.5f, 0.78f, curSize, curSize, finalColor);
 }
 

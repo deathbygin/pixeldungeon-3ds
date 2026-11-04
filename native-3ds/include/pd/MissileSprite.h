@@ -37,6 +37,9 @@ public:
     void update(float dt) override;
     void draw(const noosa::Camera* camera = nullptr) override;
 
+    // Shadow cast on the floor, drawn with the ground layer beneath the projectile
+    void drawShadow(const noosa::Camera* camera) const;
+
 private:
     static std::shared_ptr<noosa::TextureFilm> s_itemsFilm;
 };

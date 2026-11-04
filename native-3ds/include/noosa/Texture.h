@@ -35,6 +35,9 @@ public:
     // Update existing texture data in-place from linear RGBA8 buffer
     bool updateSubRGBA8(const uint8_t* rgbaPixels, int width, int height);
 
+    // Average colour of the opaque pixels in a region, packed as 0x00BBGGRR
+    uint32_t averageColor(int x, int y, int w, int h) const;
+
     // Texture filtering and wrap controls
     void setFilter(GPU_TEXTURE_FILTER_PARAM mag, GPU_TEXTURE_FILTER_PARAM min);
     void setWrap(GPU_TEXTURE_WRAP_PARAM wrapS, GPU_TEXTURE_WRAP_PARAM wrapT);

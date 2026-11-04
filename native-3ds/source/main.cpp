@@ -29,6 +29,7 @@
 #include "noosa/Audio.h"
 #include "noosa/Music.h"
 #include "noosa/Profiler.h"
+#include "noosa/Stereo.h"
 
 // Core Game Logic (Phase 3)
 #include "pd/Random.h"
@@ -49,6 +50,7 @@
 #include "pd/DungeonTilemap.h"
 #include "pd/ItemSpriteSheet.h"
 #include "pd/FogOfWar.h"
+#include "pd/FrostedGlass.h"
 #include "pd/ShadowCaster.h"
 #include "pd/FX.h"
 #include "pd/GLog.h"
@@ -185,8 +187,9 @@ int main(int argc, char* argv[]) {
 
     // 1. Initialize 3DS hardware services
     gfxInitDefault();
+    gfxSet3D(true); // Frames that skip the right eye are mirrored from the left, so menus stay flat
     C3D_Init(C3D_DEFAULT_CMDBUF_SIZE);
-    C2D_Init(C2D_DEFAULT_MAX_OBJECTS);
+    C2D_Init(C2D_DEFAULT_MAX_OBJECTS * 2); // Objects are budgeted per frame, and stereo draws the top screen twice
     C2D_Prepare();
     C2D_SetTintMode(C2D_TintMult);
 
@@ -194,6 +197,7 @@ int main(int argc, char* argv[]) {
     Profiler::init();
 
     C3D_RenderTarget* topTarget = C2D_CreateScreenTarget(GFX_TOP, GFX_LEFT);
+    C3D_RenderTarget* topTargetRight = C2D_CreateScreenTarget(GFX_TOP, GFX_RIGHT);
     C3D_RenderTarget* bottomTarget = C2D_CreateScreenTarget(GFX_BOTTOM, GFX_LEFT);
 
     C2D_TextBuf textBuf = C2D_TextBufNew(4096);
@@ -206,6 +210,7 @@ int main(int argc, char* argv[]) {
     // 3. Asset Pipeline & Sprite Sheets (Step 1 Parity)
     DungeonTilemap tilemap;
     tilemap.loadForDepth(Dungeon::depth);
+    FrostedGlass frostedGlass;
 
     auto heroTex  = Texture::get(Assets::WARRIOR);
     auto ratTex   = Texture::get(Assets::RAT);
@@ -1128,33 +1133,69 @@ int main(int argc, char* argv[]) {
         Sample::update(dt);
         tilemap.update(dt);
 
-        Profiler::beginRender();
-
-        C2D_TextBufClear(textBuf);
-
-        // ---------------------------------------------------------------------
-        // BEGIN FRAME
-        // ---------------------------------------------------------------------
-        C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
-
-        // =====================================================================
-        // TOP SCREEN (400x240): Clean, Immersive Dungeon Viewport
-        // =====================================================================
-        C2D_TargetClear(topTarget, C2D_Color32(0x00, 0x00, 0x00, 0xFF));
-        C2D_SceneBegin(topTarget);
-
         static int lastDungeonDepth = Dungeon::depth;
         if (Dungeon::depth != lastDungeonDepth) {
             tilemap.loadForDepth(Dungeon::depth);
             lastDungeonDepth = Dungeon::depth;
         }
 
+        // Sleeping indicators matching Java "Zzz"
         if (level && hero) {
+            for (const auto& mob : Dungeon::mobs) {
+                if (mob && mob->isAlive() && mob->state == Mob::State::SLEEPING && mob->spriteVisible && Dungeon::visible[mob->pos]) {
+                    CharSprite* spr = mob->getSprite();
+                    if (spr && !spr->isDead()) {
+                        FX::floatingText(mob->pos, "Zzz", 0x88ccffff);
+                    }
+                }
+            }
+
+            static float heroSleepTimer = 0.0f;
+            if (hero->restoreHealth) {
+                heroSleepTimer += dt;
+                if (heroSleepTimer >= 0.8f) {
+                    heroSleepTimer = 0.0f;
+                    FX::floatingText(hero->pos, "Zzz", 0xa5cde4FF);
+                }
+            } else {
+                heroSleepTimer = 0.0f;
+            }
+        }
+
+        static float examinePulse = 0.0f;
+        if (bottomUI.isExamineMode()) {
+            examinePulse += dt * 4.0f;
+        }
+
+        Profiler::beginRender();
+
+        C2D_TextBufClear(textBuf);
+        Stereo::beginFrame();
+
+        // ---------------------------------------------------------------------
+        // BEGIN FRAME
+        // ---------------------------------------------------------------------
+        C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+
+        if (BadgeBanner::isActive()) {
+            frostedGlass.refresh(level, tilemap);
+        }
+
+        // =====================================================================
+        // TOP SCREEN (400x240): Clean, Immersive Dungeon Viewport
+        // Runs once per eye, so nothing here may advance game or animation state.
+        // Layers draw back to front in rising z: Citro2D has no alpha test, so even
+        // transparent pixels write depth and would reject anything drawn later below them.
+        // =====================================================================
+        auto drawDungeon = [&]() {
             uint32_t drawnTiles = 0;
             uint32_t culledTiles = 0;
 
+            // Deepest plane: floor, liquids, chasms and everything lying flat on them
+            Stereo::setPlane(Stereo::PLANE_FLOOR);
+
             if (tilemap.getFilm() && tilemap.getTexture()->isLoaded()) {
-                tilemap.draw(level, &topCamera, drawnTiles, culledTiles);
+                tilemap.drawFloor(level, &topCamera, drawnTiles, culledTiles);
             } else {
                 float camL, camT, camR, camB;
                 topCamera.getVisibleWorldBounds(camL, camT, camR, camB);
@@ -1189,20 +1230,6 @@ int main(int argc, char* argv[]) {
             }
             Profiler::recordTiles(drawnTiles, culledTiles);
 
-            // Render Ground Heaps (chests, skeletons, dropped/placed items)
-            if (itemsFilm) {
-                for (const auto& heap : level->heaps) {
-                    if (heap && (!heap->isEmpty() || heap->type != Heap::Type::HEAP) && level->visited[heap->pos]) {
-                        charImg.x = (heap->pos % Level::WIDTH) * 16.0f;
-                        charImg.y = (heap->pos / Level::WIDTH) * 16.0f;
-                        charImg.z = 0.25f;
-                        charImg.tint = Color(255, 255, 255, 255);
-                        charImg.setFilm(itemsFilm, heap->image());
-                        charImg.draw(&topCamera);
-                    }
-                }
-            }
-
             // Render Active Plants on the ground
             if (plantsFilm) {
                 for (const auto& plant : level->plants) {
@@ -1220,6 +1247,38 @@ int main(int argc, char* argv[]) {
             // Render Ground FX (Water ripples & search checked cell highlights)
             FX::drawGround(&topCamera);
 
+            if (CharSprite* spr = hero->getSprite()) {
+                spr->drawJumpShadow(&topCamera);
+            }
+
+            // Midground plane: walls, doors and tall grass
+            Stereo::setPlane(Stereo::PLANE_WALL);
+            tilemap.drawRaised(level, &topCamera);
+
+            // Smooth tile-based Fog of War, a dark veil hanging over the recessed terrain
+            if (Dungeon::fog) {
+                Stereo::setPlane(Stereo::PLANE_FOG);
+                Dungeon::fog->draw(&topCamera);
+            }
+
+            // Foreground plane, above the fog
+            Stereo::setPlane(Stereo::PLANE_ENTITY);
+
+            // Render Ground Heaps (chests, skeletons, dropped/placed items)
+            if (itemsFilm) {
+                uint8_t shade = FogOfWar::rememberedShade();
+                for (const auto& heap : level->heaps) {
+                    if (heap && (!heap->isEmpty() || heap->type != Heap::Type::HEAP) && level->visited[heap->pos]) {
+                        charImg.x = (heap->pos % Level::WIDTH) * 16.0f;
+                        charImg.y = (heap->pos / Level::WIDTH) * 16.0f;
+                        charImg.z = 0.55f;
+                        charImg.tint = Dungeon::visible[heap->pos] ? Color(255, 255, 255, 255) : Color(shade, shade, shade, 255);
+                        charImg.setFilm(itemsFilm, heap->image());
+                        charImg.draw(&topCamera);
+                    }
+                }
+            }
+
             // Render Mobs (strictly visible in hero's field of view / line of sight)
             for (const auto& mob : Dungeon::mobs) {
                 if (mob) {
@@ -1227,39 +1286,16 @@ int main(int argc, char* argv[]) {
                     if (spr && !spr->isDead()) {
                         if (mob->spriteVisible && Dungeon::visible[mob->pos]) {
                             spr->draw(&topCamera);
-
-                            // Sleeping indicator matching Java "Zzz"
-                            if (mob->isAlive() && mob->state == Mob::State::SLEEPING) {
-                                FX::floatingText(mob->pos, "Zzz", 0x88ccffff);
-                            }
                         }
                     }
                 }
             }
 
             // Render Hero with full animated state machine & armor tier
-            if (hero) {
-                CharSprite* spr = hero->getSprite();
-                if (spr && !spr->isDead()) {
+            if (CharSprite* spr = hero->getSprite()) {
+                if (!spr->isDead()) {
                     spr->draw(&topCamera);
                 }
-
-                // Resting "Zzz" indicator
-                static float heroSleepTimer = 0.0f;
-                if (hero->restoreHealth) {
-                    heroSleepTimer += dt;
-                    if (heroSleepTimer >= 0.8f) {
-                        heroSleepTimer = 0.0f;
-                        FX::floatingText(hero->pos, "Zzz", 0xa5cde4FF);
-                    }
-                } else {
-                    heroSleepTimer = 0.0f;
-                }
-            }
-
-            // Smooth tile-based Fog of War
-            if (Dungeon::fog) {
-                Dungeon::fog->draw(&topCamera);
             }
 
             // Ranged Targeting Trajectory & Reticle Overlay
@@ -1338,8 +1374,6 @@ int main(int argc, char* argv[]) {
                 topCamera.worldToScreen(rx + 16.0f, ry + 16.0f, sx2, sy2);
 
                 // Pulsing white and gold color animation
-                static float examinePulse = 0.0f;
-                examinePulse += dt * 4.0f;
                 float p = 0.5f + 0.5f * std::sin(examinePulse);
                 u8 r = static_cast<u8>(255 * p + 255 * (1.0f - p));
                 u8 g = static_cast<u8>(215 * p + 255 * (1.0f - p));
@@ -1369,9 +1403,13 @@ int main(int argc, char* argv[]) {
             // Render Core Visual Effects & Particles
             FX::draw(&topCamera, textBuf);
 
+            // Spatial UI: everything from here on sits on the plane nearest the player
+            Stereo::setPlane(Stereo::PLANE_UI);
+
             // Full-Screen Flash Overlay (Psionic Blast, Wipe Out, etc.)
+            // Oversized so the shift of the UI plane can't uncover the screen edge
             if (FX::isFlashing()) {
-                C2D_DrawRectSolid(0.0f, 0.0f, 0.88f, 400.0f, 240.0f, FX::getFlashColor());
+                C2D_DrawRectSolid(-Stereo::MAX_EYE_SHIFT, 0.0f, 0.88f, 400.0f + Stereo::MAX_EYE_SHIFT * 2.0f, 240.0f, FX::getFlashColor());
             }
 
             // Game Over Banner overlay if hero perished
@@ -1411,13 +1449,14 @@ int main(int argc, char* argv[]) {
 
             // Real-time Badge Unlock Banner Overlay
             if (BadgeBanner::isActive()) {
-                BadgeBanner::drawTop(textBuf);
+                BadgeBanner::drawTop(textBuf, &topCamera, frostedGlass);
             }
-        }
+        };
 
         // Real-time Performance Profiling Overlay (toggled via [SELECT])
-        if (Profiler::isOverlayEnabled()) {
-            C2D_DrawRectSolid(0.0f, 0.0f, 0.95f, 400.0f, 16.0f, C2D_Color32(0x0a, 0x0a, 0x14, 0xEE));
+        auto drawProfilerOverlay = [&]() {
+            Stereo::setPlane(Stereo::PLANE_UI);
+            C2D_DrawRectSolid(-Stereo::MAX_EYE_SHIFT, 0.0f, 0.95f, 400.0f + Stereo::MAX_EYE_SHIFT * 2.0f, 16.0f, C2D_Color32(0x0a, 0x0a, 0x14, 0xEE));
             char profBuf[128];
             std::snprintf(profBuf, sizeof(profBuf), "FPS: %.1f | Frame: %.2fms (Upd: %.2fms, Ren: %.2fms) | Culled: %lu/%d",
                           Profiler::getFps(), Profiler::getFrameTimeMs(),
@@ -1427,6 +1466,28 @@ int main(int argc, char* argv[]) {
             C2D_TextParse(&profText, textBuf, profBuf);
             C2D_TextOptimize(&profText);
             C2D_DrawText(&profText, C2D_WithColor, 6.0f, 1.0f, 0.96f, 0.38f, 0.38f, C2D_Color32(0x40, 0xf0, 0x60, 0xFF));
+        };
+
+        auto drawTopEye = [&](C3D_RenderTarget* target, Stereo::Eye eye) {
+            C2D_TargetClear(target, C2D_Color32(0x00, 0x00, 0x00, 0xFF));
+            C2D_SceneBegin(target);
+            Stereo::beginEye(eye);
+
+            if (level && hero) {
+                drawDungeon();
+            }
+            if (Profiler::isOverlayEnabled()) {
+                drawProfilerOverlay();
+            }
+
+            Stereo::endEye();
+        };
+
+        if (Stereo::isActive()) {
+            drawTopEye(topTarget, Stereo::Eye::Left);
+            drawTopEye(topTargetRight, Stereo::Eye::Right);
+        } else {
+            drawTopEye(topTarget, Stereo::Eye::Mono);
         }
 
         // =====================================================================

@@ -4742,33 +4742,41 @@ void WarriorArmor::castSpecial(Hero* hero, int targetCell) {
     }
     hero->removeBuff(BuffType::Invisibility);
 
-    hero->move(cell);
-    if (hero->getSprite()) {
-        hero->getSprite()->place(cell);
-    }
-    if (Dungeon::level) {
-        Dungeon::level->press(cell, hero);
-    }
-    Dungeon::observe();
+    auto land = [hero, cell]() {
+        hero->move(cell);
+        if (hero->getSprite()) {
+            hero->getSprite()->place(cell);
+        }
+        if (Dungeon::level) {
+            Dungeon::level->press(cell, hero);
+        }
+        Dungeon::observe();
 
-    for (int n : Level::NEIGHBOURS8) {
-        int neighborCell = cell + n;
-        if (neighborCell >= 0 && neighborCell < Level::LENGTH) {
-            Char* mob = Actor::findChar(neighborCell);
-            if (mob && mob != hero) {
-                mob->prolong<Paralysis>(3.0f);
+        for (int n : Level::NEIGHBOURS8) {
+            int neighborCell = cell + n;
+            if (neighborCell >= 0 && neighborCell < Level::LENGTH) {
+                Char* mob = Actor::findChar(neighborCell);
+                if (mob && mob != hero) {
+                    mob->prolong<Paralysis>(3.0f);
+                }
             }
         }
-    }
 
-    FX::burst(cell, 0x887766FF, 12);
-    if (noosa::Camera::main) {
-        noosa::Camera::main->shake(0.5f, 2.0f);
+        FX::burst(cell, 0x887766FF, 12);
+        if (noosa::Camera::main) {
+            noosa::Camera::main->shake(0.5f, 2.0f);
+        }
+        Sample::play(Assets::SND_ROCKS);
+        hero->spend(1.0f);
+        hero->next();
+        Actor::process();
+    };
+
+    if (hero->getSprite()) {
+        hero->getSprite()->jump(hero->pos, cell, land);
+    } else {
+        land();
     }
-    Sample::play(Assets::SND_ROCKS);
-    hero->spend(1.0f);
-    hero->next();
-    Actor::process();
 }
 
 std::unique_ptr<Item> WarriorArmor::clone(int qty) const {

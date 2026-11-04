@@ -21,6 +21,10 @@ public:
 
     void updateVisibility(const bool* visible, const bool* visited, const bool* mapped = nullptr);
 
+    // Brightness (0-255) the fog leaves a remembered cell at. Loot floats above the fog plane,
+    // so it has to apply this dimming itself.
+    static uint8_t rememberedShade();
+
     void draw(const noosa::Camera* camera = nullptr) override;
 
 private:

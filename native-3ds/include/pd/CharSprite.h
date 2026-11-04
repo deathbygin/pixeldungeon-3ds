@@ -3,6 +3,7 @@
 #include "noosa/MovieClip.h"
 #include "noosa/Camera.h"
 #include "pd/Buff.h"
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -37,6 +38,10 @@ public:
     // y = (cell / WIDTH + 1.0f) * 16.0f - height
     void place(int cell);
     void move(int from, int to);
+
+    // Leaps along a parabola, calling back on landing. Height and duration match Java's
+    // CharSprite.jump (distance * 4 pixels over distance * 0.1 seconds).
+    void jump(int from, int to, std::function<void()> callback);
     void attack(int targetCell);
     void die();
     void idle();
@@ -45,7 +50,11 @@ public:
     virtual void update(float dt);
     virtual void draw(const noosa::Camera* camera);
 
+    // Shadow cast on the floor while airborne, drawn with the ground layer
+    void drawJumpShadow(const noosa::Camera* camera) const;
+
     bool isMoving() const { return m_isMoving; }
+    bool isJumping() const { return m_isJumping; }
     bool isDying() const { return m_isDying; }
     bool isDead() const { return m_isDead; }
 
@@ -91,6 +100,14 @@ protected:
     float m_targetY = 0.0f;
     float m_moveTimer = 0.0f;
     static constexpr float MOVE_INTERVAL = 0.10f;
+
+    // Parabolic leap, reusing the movement start/target
+    bool m_isJumping = false;
+    float m_jumpElapsed = 0.0f;
+    float m_jumpDuration = 0.0f;
+    float m_jumpHeight = 0.0f;
+    float m_jumpAltitude = 0.0f; // 0 on the ground, 1 at the apex
+    std::function<void()> m_jumpCallback;
 
     // Death animation & fade
     bool m_isDying = false;

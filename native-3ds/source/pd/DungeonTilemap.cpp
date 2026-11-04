@@ -1,6 +1,8 @@
 #include "pd/DungeonTilemap.h"
 #include "pd/Assets.h"
 #include "pd/Terrain.h"
+#include "pd/Dungeon.h"
+#include "noosa/Stereo.h"
 #include <algorithm>
 #include <cmath>
 #include <citro2d.h>
@@ -24,6 +26,17 @@ bool DungeonTilemap::loadForDepth(int depth) {
     if (m_texture && m_texture->isLoaded()) {
         m_film = std::make_shared<noosa::TextureFilm>(m_texture, SIZE, SIZE);
         m_tileImage.setFilm(m_film);
+
+        // One representative colour per frame, read back here so FrostedGlass can blur the map cheaply
+        m_tileColors.resize(m_film->size());
+        int potW = m_texture->potWidth();
+        int potH = m_texture->potHeight();
+        for (size_t i = 0; i < m_tileColors.size(); ++i) {
+            C2D_Image frame = m_film->get(static_cast<int>(i));
+            int fx = static_cast<int>(frame.subtex->left * potW);
+            int fy = static_cast<int>((1.0f - frame.subtex->top) * potH);
+            m_tileColors[i] = m_texture->averageColor(fx, fy, SIZE, SIZE);
+        }
     }
 
     const std::string& waterPath = Assets::getWaterForDepth(depth);
@@ -33,6 +46,7 @@ bool DungeonTilemap::loadForDepth(int depth) {
         m_waterImage.setFilm(m_waterFilm);
         m_waterTexture->setWrap(GPU_REPEAT, GPU_REPEAT);
         m_waterImage.setTexture(m_waterTexture);
+        m_waterColor = m_waterTexture->averageColor(0, 0, m_waterTexture->width(), m_waterTexture->height());
     }
 
     return (m_texture && m_texture->isLoaded());
@@ -61,23 +75,56 @@ int DungeonTilemap::getVisualTileIndex(int terrainType) {
     return terrainType;
 }
 
-void DungeonTilemap::draw(const Level* level, const noosa::Camera* camera, uint32_t& drawnCount, uint32_t& culledCount) {
-    if (!level || !camera || !m_film) return;
+bool DungeonTilemap::isRaised(int rawTile) {
+    int tile = getVisualTileIndex(rawTile);
+    return tile == Terrain::OPEN_DOOR || (Terrain::flags(tile) & (Terrain::SOLID | Terrain::LOS_BLOCKING)) != 0;
+}
 
+uint32_t DungeonTilemap::cellColor(const Level* level, int cell) const {
+    int rawTile = level->get(cell);
+    if (rawTile == Terrain::WATER) return m_waterColor;
+
+    size_t frame = static_cast<size_t>(getVisualTileIndex(rawTile));
+    return (frame < m_tileColors.size()) ? m_tileColors[frame] : 0;
+}
+
+DungeonTilemap::TileRange DungeonTilemap::visibleRange(const noosa::Camera* camera) {
     float camL, camT, camR, camB;
     camera->getVisibleWorldBounds(camL, camT, camR, camB);
-    int minTileX = std::max(0, static_cast<int>(camL / static_cast<float>(SIZE)));
-    int maxTileX = std::min(Level::WIDTH - 1, static_cast<int>(camR / static_cast<float>(SIZE)) + 1);
-    int minTileY = std::max(0, static_cast<int>(camT / static_cast<float>(SIZE)));
-    int maxTileY = std::min(Level::HEIGHT - 1, static_cast<int>(camB / static_cast<float>(SIZE)) + 1);
 
+    TileRange range;
+    range.minX = std::max(0, static_cast<int>(camL / static_cast<float>(SIZE)));
+    range.maxX = std::min(Level::WIDTH - 1, static_cast<int>(camR / static_cast<float>(SIZE)) + 1);
+    range.minY = std::max(0, static_cast<int>(camT / static_cast<float>(SIZE)));
+    range.maxY = std::min(Level::HEIGHT - 1, static_cast<int>(camB / static_cast<float>(SIZE)) + 1);
+    return range;
+}
+
+// Never-seen cells sit entirely under opaque fog, so drawing them is wasted work
+static bool isRevealed(const Level* level, int cell) {
+    return level->visited[cell] || level->mapped[cell] || Dungeon::visible[cell];
+}
+
+void DungeonTilemap::drawTile(int x, int y, int rawTile, const noosa::Camera* camera) {
+    m_tileImage.x = x * static_cast<float>(SIZE);
+    m_tileImage.y = y * static_cast<float>(SIZE);
+    m_tileImage.setFrame(getVisualTileIndex(rawTile));
+    m_tileImage.tint = noosa::Color(255, 255, 255, 255);
+    m_tileImage.draw(camera);
+}
+
+void DungeonTilemap::drawFloor(const Level* level, const noosa::Camera* camera, uint32_t& drawnCount, uint32_t& culledCount) {
+    if (!level || !camera || !m_film) return;
+
+    TileRange range = visibleRange(camera);
     drawnCount = 0;
     noosa::Color litTint(255, 255, 255, 255);
 
-    for (int y = minTileY; y <= maxTileY; ++y) {
-        for (int x = minTileX; x <= maxTileX; ++x) {
+    // Liquids first, so the tile pass below stays on one texture
+    for (int y = range.minY; y <= range.maxY; ++y) {
+        for (int x = range.minX; x <= range.maxX; ++x) {
             int cellIdx = y * Level::WIDTH + x;
-            drawnCount++;
+            if (!isRevealed(level, cellIdx)) continue;
 
             int rawTile = level->get(cellIdx);
             bool isWaterTile = (rawTile == Terrain::WATER || (rawTile >= Terrain::WATER_TILES && rawTile < Terrain::WATER_TILES + 16));
@@ -133,25 +180,56 @@ void DungeonTilemap::draw(const Level* level, const noosa::Camera* camera, uint3
                 u32 waterColor = C2D_Color32(r, g, b, 255);
                 C2D_DrawRectSolid(sx, sy, 0.19f, ww * zoom, wh * zoom, waterColor);
             }
+        }
+    }
 
-            // 3. Tilemap overlay:
-            // If it's pure open water (rawTile == Terrain::WATER), the animated water texture is shown directly.
-            // If it's a shore/edge tile (Terrain::WATER_TILES to WATER_TILES+15), the semi-transparent stitched tile
-            // from tilesX.png is rendered over the water texture with full alpha blending!
-            if (rawTile != Terrain::WATER) {
-                m_tileImage.x = x * static_cast<float>(SIZE);
-                m_tileImage.y = y * static_cast<float>(SIZE);
-                m_tileImage.z = 0.2f;
+    // 3. Tilemap overlay:
+    // If it's pure open water (rawTile == Terrain::WATER), the animated water texture is shown directly.
+    // If it's a shore/edge tile (Terrain::WATER_TILES to WATER_TILES+15), the semi-transparent stitched tile
+    // from tilesX.png is rendered over the water texture with full alpha blending!
+    m_tileImage.z = 0.2f;
+    for (int y = range.minY; y <= range.maxY; ++y) {
+        for (int x = range.minX; x <= range.maxX; ++x) {
+            int cellIdx = y * Level::WIDTH + x;
+            if (!isRevealed(level, cellIdx)) continue;
+            drawnCount++;
 
-                int visualFrame = getVisualTileIndex(rawTile);
-                m_tileImage.setFrame(visualFrame);
-                m_tileImage.tint = litTint;
-                m_tileImage.draw(camera);
+            int rawTile = level->get(cellIdx);
+            if (rawTile == Terrain::WATER) continue;
+
+            // Raised tiles belong to drawRaised. In stereo, those facing lower ground also leave a
+            // copy down here: their plane shifts away from the floor's, and this fills the gap
+            // that opens beside them with what reads as the wall's side face.
+            if (isRaised(rawTile)) {
+                bool exposed = (x > 0 && !isRaised(level->get(cellIdx - 1))) ||
+                               (x < Level::WIDTH - 1 && !isRaised(level->get(cellIdx + 1)));
+                if (!noosa::Stereo::isActive() || !exposed) continue;
             }
+
+            drawTile(x, y, rawTile, camera);
         }
     }
 
     culledCount = Level::LENGTH - drawnCount;
+}
+
+void DungeonTilemap::drawRaised(const Level* level, const noosa::Camera* camera) {
+    if (!level || !camera || !m_film) return;
+
+    TileRange range = visibleRange(camera);
+
+    m_tileImage.z = 0.3f;
+    for (int y = range.minY; y <= range.maxY; ++y) {
+        for (int x = range.minX; x <= range.maxX; ++x) {
+            int cellIdx = y * Level::WIDTH + x;
+            if (!isRevealed(level, cellIdx)) continue;
+
+            int rawTile = level->get(cellIdx);
+            if (isRaised(rawTile)) {
+                drawTile(x, y, rawTile, camera);
+            }
+        }
+    }
 }
 
 } // namespace pd
