@@ -8,6 +8,8 @@ Works on both New 3DS and Old 3DS.
 
 DISCLAIMER: AI was used in creating this port - mainly in translating Java function to C++. Use this app at your own risk and do not post this code anywhere that AI-generated code is not allowed.
 
+Tip: Tap on your coins to reveal a secret!
+
 ---
 
 ## Screenshots
