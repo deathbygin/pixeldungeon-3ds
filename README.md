@@ -1,6 +1,6 @@
 # Pixel Dungeon for Nintendo 3DS
 
-#### [Check out all of my projects here!](https://dbgdungeon.com).
+#### [Check out all of my projects here!](https://dbgdungeon.com)
 
 A port of the classic open-source roguelike **Pixel Dungeon** by Watabou, built for the Nintendo 3DS family of systems.
 
