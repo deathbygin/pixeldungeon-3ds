@@ -33,7 +33,6 @@ ICON            := icon.png
 # CIA build tools (from devkitPro tools)
 BANNERTOOL      := $(DEVKITPRO)/tools/bin/bannertool
 MAKEROM         := $(DEVKITPRO)/tools/bin/makerom
-THREEDSTOOL     ?= $(DEVKITPRO)/tools/bin/3dstool
 BANNER_IMAGE    := banner.png
 BANNER_AUDIO    := audio.wav
 RSF             := PixelDungeon.rsf
@@ -92,7 +91,7 @@ ifneq ($(wildcard $(TOPDIR)/$(ROMFS)),)
 export _3DSXFLAGS += --romfs=$(CURDIR)/$(ROMFS)
 endif
 
-.PHONY: all clean cia banner romfs
+.PHONY: all clean cia banner
 
 all:
 	@mkdir -p $(BUILD)
@@ -107,13 +106,6 @@ clean:
 # CIA build targets
 # Usage: first run 'make all', then 'make cia'
 #---------------------------------------------------------------------------------
-
-# Build the IVFC RomFS binary required by makerom.
-romfs: romfs.bin
-
-romfs.bin:
-	@echo "Packing romfs..."
-	@$(THREEDSTOOL) -cvtf romfs romfs.bin --romfs-dir $(ROMFS)
 
 # Build banner.bnr from banner image + audio
 # Requires: banner.png (256x128 PNG) and audio.wav (mono/stereo, <=3s, 16-bit PCM)
@@ -134,7 +126,9 @@ icon.bin: $(ICON)
 
 # Build the final installable CIA
 # Depends on: PixelDungeon.elf, banner.bnr, icon.bin, PixelDungeon.rsf, romfs dir
-cia: all banner icon.bin romfs
+# makerom packs the RomFS itself from the RSF's RomFs/RootPath, so the CIA always
+# carries the current romfs directory.
+cia: all banner icon.bin
 	@echo "Building CIA..."
 	@$(MAKEROM) -f cia \
 	    -o $(TARGET).cia \
@@ -142,8 +136,7 @@ cia: all banner icon.bin romfs
 	    -rsf $(RSF) \
 	    -icon icon.bin \
 	    -banner banner.bnr \
-	    -target t \
-	    -romfs romfs.bin
+	    -target t
 	@echo "Done: $(TARGET).cia"
 
 else

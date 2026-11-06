@@ -100,3 +100,6 @@ SystemControlInfo:
     gsp: 0x0004013000001c02
     hid: 0x0004013000001d02
     ro:  0x0004013000003702
+
+RomFs:
+  RootPath: romfs
